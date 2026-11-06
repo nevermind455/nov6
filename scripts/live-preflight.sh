@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Read-only checks before a live run. Sends no order and prints no secret.
 # With --dry-run, a missing 24-hour paper run is a warning, because a dry run
-# sends nothing.
+# sends nothing. --skip-paper-check explicitly waives that requirement.
 set -u
 sniper_root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$sniper_root" || exit 1
-dry=0
-[[ ${1:-} == --dry-run ]] && dry=1
+dry=0 skip_paper=0
+for argument in "$@"; do
+  case "$argument" in
+    --dry-run) dry=1 ;;
+    --skip-paper-check) skip_paper=1 ;;
+    *) printf 'Unknown preflight option: %s\n' "$argument" >&2; exit 2 ;;
+  esac
+done
 fails=0 warns=0
 ok() { printf 'ok    %s\n' "$*"; }
 warn() {
@@ -92,7 +98,7 @@ else
   fail "could not reach the order API"
 fi
 
-# ---- the required 24-hour paper run
+# ---- the 24-hour paper run (required unless explicitly skipped)
 # The longest unbroken stretch of the once-a-minute summaries, so short runs days
 # apart do not add up to 24 hours.
 journal=state/paper/sniper.jsonl
@@ -106,6 +112,8 @@ span=${span:-0}
 hours=$((span / 3600))
 if ((span >= 86400 - 300)); then
   ok "longest paper run is ${hours} hours"
+elif ((skip_paper)); then
+  warn "24-hour paper requirement skipped (--skip-paper-check); longest run is ${hours} hours"
 elif ((dry)); then
   warn "longest paper run is ${hours} hours (24 are required before real orders)"
 else

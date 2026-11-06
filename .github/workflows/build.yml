@@ -36,6 +36,7 @@ jobs:
         run: |
           bash -n scripts/run-live.sh
           bash -n scripts/live-preflight.sh
+          bash tests/live_scripts_tests.sh
           bash scripts/prepare-live.sh
           [ "$(stat -c %a .env.live)" = 600 ]
           export SNIPER_LIVE_CANARY=1 POLY_PRIVATE_KEY="0x$(printf '%064d' 1)"

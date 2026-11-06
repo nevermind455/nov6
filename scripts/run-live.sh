@@ -7,13 +7,19 @@ if [[ ${SNIPER_LIVE_CANARY:-0} != 1 ]]; then
   exit 1
 fi
 preflight=()
+runtime=()
 for argument in "$@"; do
-  if [[ $argument == --dry-run ]]; then
-    preflight=(--dry-run)
-  fi
+  case "$argument" in
+    --skip-paper-check) preflight+=("$argument") ;;
+    --dry-run)
+      preflight+=("$argument")
+      runtime+=("$argument")
+      ;;
+    *) runtime+=("$argument") ;;
+  esac
 done
 if ! bash "$sniper_root/scripts/live-preflight.sh" "${preflight[@]+"${preflight[@]}"}"; then
   printf '%s\n' 'Live start refused: fix the FAIL lines above.' >&2
   exit 1
 fi
-exec "$sniper_root/bin/sniper-cpp" --config "$sniper_root/.env.live" --live "$@"
+exec "$sniper_root/bin/sniper-cpp" --config "$sniper_root/.env.live" --live "${runtime[@]+"${runtime[@]}"}"

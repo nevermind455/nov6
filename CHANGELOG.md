@@ -13,6 +13,8 @@ still describes release 1.1.0.
     They had no effect, because the engine's round counters only follow paper fills.
   * Live mode accepts `SNIPER_SLIP=0.02` as well as the baseline 0.05.
   * Removed the server location check from live startup and the preflight script.
+  * New launcher flag `--skip-paper-check` explicitly skips the 24-hour paper-run
+    requirement while keeping the remaining preflight checks and live limits.
   * New `--dry-run`: every live check and a signed order, but nothing is sent.
   * New `scripts/prepare-live.sh` and `scripts/live-preflight.sh`.
     `scripts/run-live.sh` now uses `.env.live` and requires the preflight.

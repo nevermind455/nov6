@@ -252,6 +252,13 @@ After acceptance, the explicit first-session interface is:
 bash scripts/run-live.sh --new-canary-session
 ```
 
+To explicitly waive the launcher's 24-hour paper-run requirement, add
+`--skip-paper-check`. Other preflight checks and live limits still apply:
+
+```bash
+bash scripts/run-live.sh --skip-paper-check --new-canary-session --dash
+```
+
 Resume the same session using `bash scripts/run-live.sh`. Do not use
 `--new-canary-session` to bypass an unresolved order. It creates a deliberate
 new canary budget, not a reset of exchange positions or the accounting ledger.

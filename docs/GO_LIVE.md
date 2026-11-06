@@ -22,7 +22,16 @@ bash scripts/run-paper.sh --dash --run-for 86400
 ```
 
 Read the results before moving on: `errors` should be 0 and the numbers should
-look sensible. The preflight refuses real orders until the journal covers 24 hours.
+look sensible. By default, the preflight refuses real orders until the journal
+covers 24 hours. To deliberately skip only that requirement, add
+`--skip-paper-check` to the live command:
+
+```bash
+bash scripts/run-live.sh --skip-paper-check --new-canary-session --dash
+```
+
+The other preflight checks and live trading limits still apply. The flag is
+handled by the shell launcher, so it does not require rebuilding the executable.
 
 ## 3. Prepare the first-run settings
 
