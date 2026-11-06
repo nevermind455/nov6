@@ -1,0 +1,38 @@
+2026-11-06T20:43:19+03:00
+Running ./sniper-bench
+Run on (2 X 2100 MHz CPU s)
+CPU Caches:
+  L1 Data 48 KiB (x2)
+  L1 Instruction 32 KiB (x2)
+  L2 Unified 2048 KiB (x2)
+  L3 Unified 266240 KiB (x1)
+Load Average: 0.91, 0.79, 0.52
+***WARNING*** Library was built as DEBUG. Timings may be affected.
+------------------------------------------------------------------------------------------------------
+Benchmark                                            Time             CPU   Iterations UserCounters...
+------------------------------------------------------------------------------------------------------
+TickToWirePercentiles/0/iterations:1_mean          486 ms          482 ms            5 decide_p50_us=53.1874 decide_p99_us=113.522 orders=2k wire_p50_us=169.301 wire_p99_us=318.373
+TickToWirePercentiles/0/iterations:1_median        487 ms          485 ms            5 decide_p50_us=52.723 decide_p99_us=119.562 orders=2k wire_p50_us=167.177 wire_p99_us=319.659
+TickToWirePercentiles/0/iterations:1_stddev       20.3 ms         15.3 ms            5 decide_p50_us=1.59664 decide_p99_us=16.0642 orders=0 wire_p50_us=4.39173 wire_p99_us=53.405
+TickToWirePercentiles/0/iterations:1_cv           4.18 %          3.17 %             5 decide_p50_us=3.00% decide_p99_us=14.15% orders=0.00% wire_p50_us=2.59% wire_p99_us=16.77%
+TickToWirePercentiles/1/iterations:1_mean         1071 ms          688 ms            5 decide_p50_us=67.7706 decide_p99_us=153.305 orders=2k wire_p50_us=430.965 wire_p99_us=847.578
+TickToWirePercentiles/1/iterations:1_median       1062 ms          672 ms            5 decide_p50_us=67.309 decide_p99_us=151.756 orders=2k wire_p50_us=426.2 wire_p99_us=816.789
+TickToWirePercentiles/1/iterations:1_stddev       36.9 ms         34.8 ms            5 decide_p50_us=4.27405 decide_p99_us=15.2478 orders=0 wire_p50_us=13.7038 wire_p99_us=113.244
+TickToWirePercentiles/1/iterations:1_cv           3.45 %          5.05 %             5 decide_p50_us=6.31% decide_p99_us=9.95% orders=0.00% wire_p50_us=3.18% wire_p99_us=13.36%
+Maths_mean                                        96.4 ns         96.0 ns            5
+Maths_median                                      96.4 ns         95.8 ns            5
+Maths_stddev                                      1.19 ns         1.12 ns            5
+Maths_cv                                          1.24 %          1.17 %             5
+Signing_mean                                     29657 ns        29466 ns            5
+Signing_median                                   28831 ns        28748 ns            5
+Signing_stddev                                    2410 ns         2324 ns            5
+Signing_cv                                        8.13 %          7.89 %             5
+TickToDecision/repeats:1                         51358 ns        51348 ns        10000 orders_per_tick=1
+TickToIntent/0_mean                             178817 ns       177825 ns            5
+TickToIntent/0_median                           178689 ns       177268 ns            5
+TickToIntent/0_stddev                             4286 ns         4040 ns            5
+TickToIntent/0_cv                                 2.40 %          2.27 %             5
+TickToIntent/1_mean                             432466 ns       258632 ns            5
+TickToIntent/1_median                           424459 ns       260885 ns            5
+TickToIntent/1_stddev                            21700 ns        13509 ns            5
+TickToIntent/1_cv                                 5.02 %          5.22 %             5

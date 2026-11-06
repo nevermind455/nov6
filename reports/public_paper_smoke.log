@@ -1,0 +1,4 @@
+{"native_cpp":true,"mode":"PAPER","trigger_bp":0.5,"window_ms":250.0,"order_type":"FAK","kelly_fraction":0.25,"fair_margin":0.01,"runtime_dependencies":"C++ libraries; no Python","independent_paper_model":true,"notices":[]}
+{"result":"summary","native_cpp":true,"mode":"PAPER","signals":0,"orders":0,"paper_fills":0,"errors":0,"skips":{},"paper_order_calls":0,"book_history_bytes":0,"coinbase_live":false,"clob_h2_ready":false,"cash":1000.0,"realized_pnl":0.0}
+{"result":"summary","native_cpp":true,"mode":"PAPER","signals":60,"orders":0,"paper_fills":0,"errors":0,"skips":{"ask outside price band":15,"no asks on this side":7,"no current round":38},"paper_order_calls":0,"book_history_bytes":14389344,"coinbase_live":true,"clob_h2_ready":true,"cash":1000.0,"realized_pnl":0.0}
+{"peak_rss_kib":54132,"native_cpp":true,"stopped":true,"exit_code":0,"paper_order_calls":0,"signals":72,"orders":0,"paper_fills":0,"errors":0}

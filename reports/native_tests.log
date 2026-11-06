@@ -1,0 +1,136 @@
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 35 tests from 20 test suites.
+[----------] Global test environment set-up.
+[----------] 3 tests from Crypto
+[ RUN      ] Crypto.KeccakKnownAnswers
+[       OK ] Crypto.KeccakKnownAnswers (0 ms)
+[ RUN      ] Crypto.ActualSdkSignaturesAndWireBytes
+[       OK ] Crypto.ActualSdkSignaturesAndWireBytes (2 ms)
+[ RUN      ] Crypto.NativeAuthHmacAndWalletDerivation
+[       OK ] Crypto.NativeAuthHmacAndWalletDerivation (0 ms)
+[----------] 3 tests from Crypto (3 ms total)
+
+[----------] 1 test from Amounts
+[ RUN      ] Amounts.EverySdkGridVector
+[       OK ] Amounts.EverySdkGridVector (105 ms)
+[----------] 1 test from Amounts (105 ms total)
+
+[----------] 2 tests from Money
+[ RUN      ] Money.MinimumsAndExactBoundaries
+[       OK ] Money.MinimumsAndExactBoundaries (0 ms)
+[ RUN      ] Money.FixedSixMatchesPrintfRounding
+[       OK ] Money.FixedSixMatchesPrintfRounding (9 ms)
+[----------] 2 tests from Money (9 ms total)
+
+[----------] 2 tests from Math
+[ RUN      ] Math.IndependentReferenceVectors
+[       OK ] Math.IndependentReferenceVectors (52 ms)
+[ RUN      ] Math.HybridExactDrawdown
+[       OK ] Math.HybridExactDrawdown (0 ms)
+[----------] 2 tests from Math (52 ms total)
+
+[----------] 1 test from Trigger
+[ RUN      ] Trigger.GoldenTicksGapsAndThreshold
+[       OK ] Trigger.GoldenTicksGapsAndThreshold (0 ms)
+[----------] 1 test from Trigger (0 ms total)
+
+[----------] 1 test from Volatility
+[ RUN      ] Volatility.WarmupFloorAndBoundedHistory
+[       OK ] Volatility.WarmupFloorAndBoundedHistory (1 ms)
+[----------] 1 test from Volatility (1 ms total)
+
+[----------] 8 tests from Ledger
+[ RUN      ] Ledger.DurableIntentConfirmedFillIdempotenceAndSettlement
+[       OK ] Ledger.DurableIntentConfirmedFillIdempotenceAndSettlement (187 ms)
+[ RUN      ] Ledger.UnauthorizedAndOverCapFillRefused
+[       OK ] Ledger.UnauthorizedAndOverCapFillRefused (1 ms)
+[ RUN      ] Ledger.ProcessCrashAfterIntentNeverLosesAuthorization
+[       OK ] Ledger.ProcessCrashAfterIntentNeverLosesAuthorization (3 ms)
+[ RUN      ] Ledger.TornOrCorruptedJournalRefusesRestart
+[       OK ] Ledger.TornOrCorruptedJournalRefusesRestart (2 ms)
+[ RUN      ] Ledger.PendingPartialFillBlocksSettlementAcrossRestart
+[       OK ] Ledger.PendingPartialFillBlocksSettlementAcrossRestart (5 ms)
+[ RUN      ] Ledger.DurableDrawdownPauseDoesNotRebaseCapital
+[       OK ] Ledger.DurableDrawdownPauseDoesNotRebaseCapital (5 ms)
+[ RUN      ] Ledger.EmptyFillSlotReleaseIsIdempotentAndDurable
+[       OK ] Ledger.EmptyFillSlotReleaseIsIdempotentAndDurable (2 ms)
+[ RUN      ] Ledger.DurableSignedProofExcludesApiCredentialEnvelope
+[       OK ] Ledger.DurableSignedProofExcludesApiCredentialEnvelope (1 ms)
+[----------] 8 tests from Ledger (209 ms total)
+
+[----------] 1 test from Risk
+[ RUN      ] Risk.CanaryPausesThenIncrementsOnlyOnce
+[       OK ] Risk.CanaryPausesThenIncrementsOnlyOnce (0 ms)
+[----------] 1 test from Risk (0 ms total)
+
+[----------] 1 test from Safety
+[ RUN      ] Safety.PaperHasOneNativeSubmissionFirewall
+[       OK ] Safety.PaperHasOneNativeSubmissionFirewall (0 ms)
+[----------] 1 test from Safety (0 ms total)
+
+[----------] 1 test from Clock
+[ RUN      ] Clock.RejectsSlowSamplesAndAdvancesOnMonotonicTime
+[       OK ] Clock.RejectsSlowSamplesAndAdvancesOnMonotonicTime (0 ms)
+[----------] 1 test from Clock (0 ms total)
+
+[----------] 1 test from Discovery
+[ RUN      ] Discovery.PublicVenueResponsesAcceptMissingNegativeRiskFlag
+[       OK ] Discovery.PublicVenueResponsesAcceptMissingNegativeRiskFlag (0 ms)
+[----------] 1 test from Discovery (0 ms total)
+
+[----------] 1 test from Config
+[ RUN      ] Config.RejectsAmbiguousModesAndInvalidDuration
+[       OK ] Config.RejectsAmbiguousModesAndInvalidDuration (0 ms)
+[----------] 1 test from Config (0 ms total)
+
+[----------] 1 test from Journal
+[ RUN      ] Journal.OversizedRecordFailsClosed
+[       OK ] Journal.OversizedRecordFailsClosed (11 ms)
+[----------] 1 test from Journal (11 ms total)
+
+[----------] 1 test from Freshness
+[ RUN      ] Freshness.ReferenceReasonsAndOrder
+[       OK ] Freshness.ReferenceReasonsAndOrder (0 ms)
+[----------] 1 test from Freshness (0 ms total)
+
+[----------] 2 tests from Book
+[ RUN      ] Book.AtomicDeltasLockedBookAndZeroSizeSnapshot
+[       OK ] Book.AtomicDeltasLockedBookAndZeroSizeSnapshot (0 ms)
+[ RUN      ] Book.ArrivalBookIsStrictUnlessQuietIsOptedIn
+[       OK ] Book.ArrivalBookIsStrictUnlessQuietIsOptedIn (0 ms)
+[----------] 2 tests from Book (0 ms total)
+
+[----------] 1 test from Paper
+[ RUN      ] Paper.DecimalFakFokAndShareSizedReference
+[       OK ] Paper.DecimalFakFokAndShareSizedReference (0 ms)
+[----------] 1 test from Paper (0 ms total)
+
+[----------] 2 tests from Live
+[ RUN      ] Live.PresendCheckMatchesReferencePrepare
+[       OK ] Live.PresendCheckMatchesReferencePrepare (0 ms)
+[ RUN      ] Live.RefusedDispatchIsJournalledAsReferenceSkip
+[       OK ] Live.RefusedDispatchIsJournalledAsReferenceSkip (1 ms)
+[----------] 2 tests from Live (1 ms total)
+
+[----------] 1 test from Settings
+[ RUN      ] Settings.ReferenceDefaultsAndRefusals
+[       OK ] Settings.ReferenceDefaultsAndRefusals (0 ms)
+[----------] 1 test from Settings (0 ms total)
+
+[----------] 1 test from Python
+[ RUN      ] Python.NumericsMatchCPython
+[       OK ] Python.NumericsMatchCPython (0 ms)
+[----------] 1 test from Python (0 ms total)
+
+[----------] 3 tests from NativeHttp2
+[ RUN      ] NativeHttp2.LocalTlsMatchedReply
+[       OK ] NativeHttp2.LocalTlsMatchedReply (12 ms)
+[ RUN      ] NativeHttp2.LocalTlsHttp400Reply
+[       OK ] NativeHttp2.LocalTlsHttp400Reply (11 ms)
+[ RUN      ] NativeHttp2.UncertainWriteIsNeverRetried
+[       OK ] NativeHttp2.UncertainWriteIsNeverRetried (11 ms)
+[----------] 3 tests from NativeHttp2 (34 ms total)
+
+[----------] Global test environment tear-down
+[==========] 35 tests from 20 test suites ran. (431 ms total)
+[  PASSED  ] 35 tests.

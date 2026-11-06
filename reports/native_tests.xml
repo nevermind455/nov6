@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="35" failures="0" disabled="0" errors="0" time="0.431" timestamp="2026-11-06T20:44:19.750" name="AllTests">
+  <testsuite name="Crypto" tests="3" failures="0" disabled="0" skipped="0" errors="0" time="0.003" timestamp="2026-11-06T20:44:19.750">
+    <testcase name="KeccakKnownAnswers" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="51" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:19.750" classname="Crypto" />
+    <testcase name="ActualSdkSignaturesAndWireBytes" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="59" status="run" result="completed" time="0.002" timestamp="2026-11-06T20:44:19.750" classname="Crypto" />
+    <testcase name="NativeAuthHmacAndWalletDerivation" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="83" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:19.753" classname="Crypto" />
+  </testsuite>
+  <testsuite name="Amounts" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0.105" timestamp="2026-11-06T20:44:19.753">
+    <testcase name="EverySdkGridVector" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="97" status="run" result="completed" time="0.105" timestamp="2026-11-06T20:44:19.753" classname="Amounts" />
+  </testsuite>
+  <testsuite name="Money" tests="2" failures="0" disabled="0" skipped="0" errors="0" time="0.009" timestamp="2026-11-06T20:44:19.859">
+    <testcase name="MinimumsAndExactBoundaries" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="107" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:19.859" classname="Money" />
+    <testcase name="FixedSixMatchesPrintfRounding" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="184" status="run" result="completed" time="0.009" timestamp="2026-11-06T20:44:19.859" classname="Money" />
+  </testsuite>
+  <testsuite name="Math" tests="2" failures="0" disabled="0" skipped="0" errors="0" time="0.052" timestamp="2026-11-06T20:44:19.868">
+    <testcase name="IndependentReferenceVectors" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="128" status="run" result="completed" time="0.052" timestamp="2026-11-06T20:44:19.868" classname="Math" />
+    <testcase name="HybridExactDrawdown" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="139" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:19.920" classname="Math" />
+  </testsuite>
+  <testsuite name="Trigger" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:19.920">
+    <testcase name="GoldenTicksGapsAndThreshold" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="155" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:19.920" classname="Trigger" />
+  </testsuite>
+  <testsuite name="Volatility" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0.001" timestamp="2026-11-06T20:44:19.920">
+    <testcase name="WarmupFloorAndBoundedHistory" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="171" status="run" result="completed" time="0.001" timestamp="2026-11-06T20:44:19.920" classname="Volatility" />
+  </testsuite>
+  <testsuite name="Ledger" tests="8" failures="0" disabled="0" skipped="0" errors="0" time="0.209" timestamp="2026-11-06T20:44:19.922">
+    <testcase name="DurableIntentConfirmedFillIdempotenceAndSettlement" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="199" status="run" result="completed" time="0.187" timestamp="2026-11-06T20:44:19.922" classname="Ledger" />
+    <testcase name="UnauthorizedAndOverCapFillRefused" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="226" status="run" result="completed" time="0.001" timestamp="2026-11-06T20:44:20.109" classname="Ledger" />
+    <testcase name="ProcessCrashAfterIntentNeverLosesAuthorization" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="238" status="run" result="completed" time="0.003" timestamp="2026-11-06T20:44:20.111" classname="Ledger" />
+    <testcase name="TornOrCorruptedJournalRefusesRestart" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="258" status="run" result="completed" time="0.002" timestamp="2026-11-06T20:44:20.114" classname="Ledger" />
+    <testcase name="PendingPartialFillBlocksSettlementAcrossRestart" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="320" status="run" result="completed" time="0.005" timestamp="2026-11-06T20:44:20.117" classname="Ledger" />
+    <testcase name="DurableDrawdownPauseDoesNotRebaseCapital" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="345" status="run" result="completed" time="0.005" timestamp="2026-11-06T20:44:20.123" classname="Ledger" />
+    <testcase name="EmptyFillSlotReleaseIsIdempotentAndDurable" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="364" status="run" result="completed" time="0.002" timestamp="2026-11-06T20:44:20.128" classname="Ledger" />
+    <testcase name="DurableSignedProofExcludesApiCredentialEnvelope" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="409" status="run" result="completed" time="0.001" timestamp="2026-11-06T20:44:20.130" classname="Ledger" />
+  </testsuite>
+  <testsuite name="Risk" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.132">
+    <testcase name="CanaryPausesThenIncrementsOnlyOnce" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="270" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.132" classname="Risk" />
+  </testsuite>
+  <testsuite name="Safety" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.132">
+    <testcase name="PaperHasOneNativeSubmissionFirewall" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="284" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.132" classname="Safety" />
+  </testsuite>
+  <testsuite name="Clock" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.132">
+    <testcase name="RejectsSlowSamplesAndAdvancesOnMonotonicTime" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="297" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.132" classname="Clock" />
+  </testsuite>
+  <testsuite name="Discovery" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.132">
+    <testcase name="PublicVenueResponsesAcceptMissingNegativeRiskFlag" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="305" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.132" classname="Discovery" />
+  </testsuite>
+  <testsuite name="Config" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.133">
+    <testcase name="RejectsAmbiguousModesAndInvalidDuration" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="386" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.133" classname="Config" />
+  </testsuite>
+  <testsuite name="Journal" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0.011" timestamp="2026-11-06T20:44:20.133">
+    <testcase name="OversizedRecordFailsClosed" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="397" status="run" result="completed" time="0.011" timestamp="2026-11-06T20:44:20.133" classname="Journal" />
+  </testsuite>
+  <testsuite name="Freshness" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.144">
+    <testcase name="ReferenceReasonsAndOrder" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="436" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.144" classname="Freshness" />
+  </testsuite>
+  <testsuite name="Book" tests="2" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.144">
+    <testcase name="AtomicDeltasLockedBookAndZeroSizeSnapshot" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="472" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.144" classname="Book" />
+    <testcase name="ArrivalBookIsStrictUnlessQuietIsOptedIn" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="507" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.144" classname="Book" />
+  </testsuite>
+  <testsuite name="Paper" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.144">
+    <testcase name="DecimalFakFokAndShareSizedReference" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="534" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.144" classname="Paper" />
+  </testsuite>
+  <testsuite name="Live" tests="2" failures="0" disabled="0" skipped="0" errors="0" time="0.001" timestamp="2026-11-06T20:44:20.145">
+    <testcase name="PresendCheckMatchesReferencePrepare" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="562" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.145" classname="Live" />
+    <testcase name="RefusedDispatchIsJournalledAsReferenceSkip" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="718" status="run" result="completed" time="0.001" timestamp="2026-11-06T20:44:20.145" classname="Live" />
+  </testsuite>
+  <testsuite name="Settings" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.146">
+    <testcase name="ReferenceDefaultsAndRefusals" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="781" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.146" classname="Settings" />
+  </testsuite>
+  <testsuite name="Python" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2026-11-06T20:44:20.146">
+    <testcase name="NumericsMatchCPython" file="<build-host>/sniper-native-cpp/tests/native_tests.cpp" line="804" status="run" result="completed" time="0." timestamp="2026-11-06T20:44:20.146" classname="Python" />
+  </testsuite>
+  <testsuite name="NativeHttp2" tests="3" failures="0" disabled="0" skipped="0" errors="0" time="0.034" timestamp="2026-11-06T20:44:20.146">
+    <testcase name="LocalTlsMatchedReply" file="<build-host>/sniper-native-cpp/tests/transport_tests.cpp" line="232" status="run" result="completed" time="0.012" timestamp="2026-11-06T20:44:20.146" classname="NativeHttp2" />
+    <testcase name="LocalTlsHttp400Reply" file="<build-host>/sniper-native-cpp/tests/transport_tests.cpp" line="233" status="run" result="completed" time="0.011" timestamp="2026-11-06T20:44:20.158" classname="NativeHttp2" />
+    <testcase name="UncertainWriteIsNeverRetried" file="<build-host>/sniper-native-cpp/tests/transport_tests.cpp" line="234" status="run" result="completed" time="0.011" timestamp="2026-11-06T20:44:20.170" classname="NativeHttp2" />
+  </testsuite>
+</testsuites>

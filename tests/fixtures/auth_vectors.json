@@ -1,0 +1,12 @@
+{
+  "signer": "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+  "timestamp": 1900000000,
+  "nonce": 0,
+  "digest": "0x73798847fb45550cc196908102758e7652f809b80cb7696c3c39c762f08c4f38",
+  "signature": "0xaaa0234e68fc709da16fb31b3c30999de5749a2455c020a6a5ca0520d2c91cd51bfae23c68d51841fffa0cbbea9cd431664c25ff0399eb20bb1dbbcb74a077b61c",
+  "proxy": "0x909dEdA326ED2aE677F5F8c2527E32977c9838c3",
+  "safe": "0x51b7C68A71dCcBc0b7FA4400934a293D8f4d3Ba8",
+  "hmac_secret": "b2ZmbGluZS1zZWNyZXQtb25seQ",
+  "hmac_body": "{\"label\":\"é\",\"amount\":\"5.10\"}",
+  "hmac_signature": "temi6DmYKPvARJl2TgU4DZQ4TSs91UVkTT8iYLxLcgE="
+}

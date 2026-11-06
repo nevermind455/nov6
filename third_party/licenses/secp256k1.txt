@@ -1,0 +1,112 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Contact: https://github.com/bitcoin/secp256k1/issues
+Upstream-Name: secp256k1
+Source: https://github.com/bitcoin/secp256k1
+
+Files:
+ contrib/*.c
+ contrib/*.h
+ src/*.c
+ src/*.h
+Copyright:
+  2013-2020,             Andrew Poelstra
+  2013-2015,             Cory Fields
+  2013-2014,             Diederik Huys
+  2013-2015, 2020        Gregory Maxwell
+  2013-2014, 2017-2020   Jonas Nick
+  2020                   Peter Dettman
+  2013-2015, 2017, 2020  Pieter Wuille <pieter.wuille@gmail.com>
+  2013-2015              Thomas Daede
+  2014                   Wladimir J. van der Laan
+  2013-2021,             Russell O'Connor
+License-Grant:
+ Distributed under the MIT software license,
+ see the accompanying file COPYING
+ or <http://www.opensource.org/licenses/mit-license.php>.
+License: Expat
+
+Files:
+ build-aux/m4/ax_*.m4
+Copyright:
+  2008  Don Anderson <dda@sleepycat.com>
+  2008  Paolo Bonzini <bonzini@gnu.org>
+License: FSFAP
+
+Files:
+ */.gitignore
+ */Makefile.am.include
+ include/*.h
+ sage/*.sage
+ .travis.yml
+ autogen.sh
+ build-aux/m4/bitcoin_secp.m4
+ configure.ac
+ contrib/travis.sh
+ COPYING
+ libsecp256k1.pc.in
+ Makefile.am
+ README.md
+ SECURITY.md
+Copyright: None
+License: None
+Comment:
+ These files seem authored by main upstream authors,
+ and copyright and license is therefore assumed
+ (to the extend required)
+ to be same as generally for this project
+ (see topmost Files section).
+
+Files:
+ examples/*
+Copyright:
+ 2020-2022 by Elichai Turkel
+License: CC0-1.0
+
+Files:
+ debian/*
+Copyright:
+  2016-2021  Jonas Smedegaard <js@debian.org>
+  2020-2021  Purism, SPC
+License-Grant:
+ This program is free software;
+ you can redistribute it and/or modify it
+ under the terms of the GNU General Public License
+ as published by the Free Software Foundation;
+ either version 3,
+ or (at your option) any later version.
+License: GPL-3+
+
+Files:
+ debian/patches/*
+Copyright:
+  2016-2021  Jonas Smedegaard <js@debian.org>
+License: Expat
+
+License: Expat
+ Permission is hereby granted, free of charge,
+ to any person obtaining a copy
+ of this software and associated documentation files
+ (the "Software"),
+ to deal in the Software without restriction,
+ including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software,
+ and to permit persons to whom the Software is furnished to do so,
+ subject to the following conditions:
+ .
+ The above copyright notice and this permission notice
+ shall be included
+ in all copies or substantial portions of the Software.
+
+License: FSFAP
+ Copying and distribution of this file,
+ with or without modification,
+ are permitted in any medium without royalty
+ provided the copyright notice and this notice are preserved.
+ This file is offered as-is, without any warranty.
+
+License: GPL-3+
+License-Reference: /usr/share/common-licenses/GPL-3
+
+License: CC0-1.0
+License-Reference: /usr/share/common-licenses/CC0-1.0

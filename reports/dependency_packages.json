@@ -1,0 +1,92 @@
+{
+  "libboost1.83-dev": {
+    "Version": "1.83.0-2.1ubuntu3",
+    "Filename": "pool/main/b/boost1.83/libboost1.83-dev_1.83.0-2.1ubuntu3_amd64.deb",
+    "SHA256": "747b364a7d578babed9efa4c40446be4ba3470ac5b2c9951b0e3bde3d7bb47d6",
+    "Depends": "libstdc++-13-dev",
+    "Size": "10746098"
+  },
+  "libnghttp2-dev": {
+    "Version": "1.59.0-1build4",
+    "Filename": "pool/main/n/nghttp2/libnghttp2-dev_1.59.0-1build4_amd64.deb",
+    "SHA256": "bcfd65e6cc319a81684807562c128b2fea37ee4d0fe0df9d10e033ca5cd4de45",
+    "Depends": "libnghttp2-14 (= 1.59.0-1build4), pkg-config",
+    "Size": "116260"
+  },
+  "libbenchmark-dev": {
+    "Version": "1.8.3-3",
+    "Filename": "pool/universe/b/benchmark/libbenchmark-dev_1.8.3-3_amd64.deb",
+    "SHA256": "17dd6c48477255dfe1c9ce2e58c87fc952bbb15cb386d5ef80d00d0c055d976c",
+    "Depends": "libbenchmark1.8.3 (= 1.8.3-3)",
+    "Size": "86818"
+  },
+  "libbenchmark1.8.3": {
+    "Version": "1.8.3-3",
+    "Filename": "pool/universe/b/benchmark/libbenchmark1.8.3_1.8.3-3_amd64.deb",
+    "SHA256": "c55df40d662e6eecc7c1c29782b949166341fc24849492ef54477c06991fcfe3",
+    "Depends": "libc6 (>= 2.38), libgcc-s1 (>= 3.4), libstdc++6 (>= 13.1)",
+    "Size": "159816"
+  },
+  "libfmt-dev": {
+    "Version": "9.1.0+ds1-2",
+    "Filename": "pool/universe/f/fmtlib/libfmt-dev_9.1.0+ds1-2_amd64.deb",
+    "SHA256": "cc05cae4b7c6e541b6871e3333329605c0d90312a852f2c3b507ad5c30dd9914",
+    "Depends": "libfmt9 (= 9.1.0+ds1-2)",
+    "Size": "121674"
+  },
+  "libfmt9": {
+    "Version": "9.1.0+ds1-2",
+    "Filename": "pool/universe/f/fmtlib/libfmt9_9.1.0+ds1-2_amd64.deb",
+    "SHA256": "0a9dd337aea7ae59aba44994a92dd2780365b534a714518477c4e906f0efd297",
+    "Depends": "libc6 (>= 2.33), libgcc-s1 (>= 3.0), libstdc++6 (>= 11)",
+    "Size": "62960"
+  },
+  "libgmock-dev": {
+    "Version": "1.14.0-1",
+    "Filename": "pool/universe/g/googletest/libgmock-dev_1.14.0-1_amd64.deb",
+    "SHA256": "9e299726c3015d03324a81074224a43efbd444d83103357d83f1b99aed3fa9f6",
+    "Depends": "libgtest-dev (= 1.14.0-1)",
+    "Size": "134570"
+  },
+  "libgtest-dev": {
+    "Version": "1.14.0-1",
+    "Filename": "pool/universe/g/googletest/libgtest-dev_1.14.0-1_amd64.deb",
+    "SHA256": "c7dd1ecf6b816bf13ab6e1d8813d1ff0ae7a4fa09326a0cd467c3943d952117f",
+    "Depends": "googletest (= 1.14.0-1)",
+    "Size": "268320"
+  },
+  "libsecp256k1-1": {
+    "Version": "0.2.0-2",
+    "Filename": "pool/universe/libs/libsecp256k1/libsecp256k1-1_0.2.0-2_amd64.deb",
+    "SHA256": "7e435140687357fd20b08da85e390902e5cb504588cf53c57aba0a06ee2d96a4",
+    "Depends": "libc6 (>= 2.4)",
+    "Size": "1158250"
+  },
+  "libsecp256k1-dev": {
+    "Version": "0.2.0-2",
+    "Filename": "pool/universe/libs/libsecp256k1/libsecp256k1-dev_0.2.0-2_amd64.deb",
+    "SHA256": "597adcb084fb41d073db42080477d6db190a88eea6b366c18593691b867882e5",
+    "Depends": "libsecp256k1-1 (= 0.2.0-2), pkg-config",
+    "Size": "1170768"
+  },
+  "libsimdjson-dev": {
+    "Version": "3.6.4-1",
+    "Filename": "pool/universe/s/simdjson/libsimdjson-dev_3.6.4-1_amd64.deb",
+    "SHA256": "95245042a748a9c857b896c49c6dc5399875484fafcaf8c552e7da5b1db52da3",
+    "Depends": "libsimdjson19 (= 3.6.4-1)",
+    "Size": "224754"
+  },
+  "nlohmann-json3-dev": {
+    "Version": "3.11.3-1",
+    "Filename": "pool/universe/n/nlohmann-json3/nlohmann-json3-dev_3.11.3-1_all.deb",
+    "SHA256": "85e4e95dc4bdc6034d593e1933ee88e085319fee36cae83c178e8ddc1a66e8fd",
+    "Depends": null,
+    "Size": "189676"
+  },
+  "libsimdjson19": {
+    "Version": "3.6.4-1",
+    "Filename": "pool/universe/s/simdjson/libsimdjson19_3.6.4-1_amd64.deb",
+    "SHA256": "5e86177bb5ff189e492729ff71bd9e8f45d6af2fb1e7f2523a56d08e6d87343c",
+    "Size": "81218"
+  }
+}

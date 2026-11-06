@@ -1,0 +1,9 @@
+.env
+STOP_LIVE
+state/
+build/
+build-*/
+*.lock
+tools/fake-venue/node_modules/
+tools/fake-venue/certs/
+tools/fake-venue/venue.log

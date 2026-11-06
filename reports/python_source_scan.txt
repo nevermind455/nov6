@@ -1,0 +1,14 @@
+Python files in this package (development parity tools only; the bot, its
+build scripts and its tests never run Python):
+./tools/replay/compare.py
+./tools/replay/diff_cases.py
+./tools/replay/limit_vs_market.py
+./tools/replay/live_prepare_cases.py
+./tools/replay/make_recording.py
+./tools/replay/py_replay.py
+
+Python libraries linked by the shipped binaries:
+bin/sniper-cpp: 0
+bin/sniper-diff: 0
+bin/sniper-replay: 0
+bin/sniper-tests: 0

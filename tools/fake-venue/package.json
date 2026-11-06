@@ -1,0 +1,9 @@
+{
+  "name": "sniper-fake-venue",
+  "private": true,
+  "description": "Development-only local Polymarket/Coinbase venue for end-to-end paper tests of sniper-cpp",
+  "dependencies": {
+    "@noble/hashes": "1.8.0",
+    "ws": "8.22.1"
+  }
+}
