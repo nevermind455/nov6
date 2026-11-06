@@ -131,7 +131,8 @@ that this release passed a full runtime soak under sanitizers.
   `fair = Phi(Phi^-1(m) + |r|/(sigma*sqrt(tau)))`, with sigma from one-second
   samples over 300 s (floor 0.2 bp, 60 samples to warm up). The limit is fair
   minus the fee curve and $0.01, floored to the tick; the cap is the lower of
-  that and ask + $0.05.
+  that and ask + `SNIPER_SLIP` ($0.05 in the reference, $0.02 in this package's
+  `.env.example`).
 * Fractional Kelly (0.25) scaled by volatility and drawdown, limited by venue
   minimums, whole-cent stakes, cash, the round caps and (live) the canary.
 * FAK buys held to resolution. Paper models the order's arrival at
@@ -153,7 +154,7 @@ features. Never copy the old Python bot's entire configuration without review.
 | `SNIPER_MIN_LEFT_S` | `10` | Minimum time remaining |
 | `SNIPER_STALE_MS` | `2000` | Market-book freshness bound |
 | `MIN_BUY_PRICE`, `MAX_BUY_PRICE` | `0.05`, `0.95` | Ask price band |
-| `SNIPER_SLIP`, `SNIPER_FAIR_MARGIN` | `0.05`, `0.01` | Price protection and fair margin |
+| `SNIPER_SLIP`, `SNIPER_FAIR_MARGIN` | `0.02`, `0.01` | Price protection (limit is at most ask + this) and fair margin. `--live` currently requires `SNIPER_SLIP=0.05` |
 | `SNIPER_KELLY_FRACTION` | `0.25` | Base fractional Kelly |
 | `SNIPER_HYBRID_SIZING` | `1` | Volatility/drawdown risk scaling |
 | `SNIPER_HYBRID_DRAWDOWN_STOP` | `0.20` | Drawdown stop fraction |
