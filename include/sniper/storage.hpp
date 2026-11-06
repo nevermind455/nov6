@@ -30,6 +30,7 @@ class DurableLog {
   std::filesystem::path path_;
   int fd_ = -1;
   std::uint64_t seq_ = 0;
+  bool failed_ = false;
 
 public:
   // Only the benchmark binary sets this (to time the hot path without the

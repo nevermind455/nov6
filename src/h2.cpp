@@ -336,17 +336,24 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
       if (ec || !self->current(p) || !p->up)
         return;
       auto now = mono_s();
+      bool clock_lost = false;
       for (auto it = p->requests.begin(); it != p->requests.end();) {
         if (now - it->second->started >= self->timeout) {
           auto id = it->second->id;
           nghttp2_submit_rst_stream(p->session, NGHTTP2_FLAG_NONE, it->first,
                                     NGHTTP2_CANCEL);
           it = p->requests.erase(it);
+          if (id == "__clock")
+            clock_lost = true;
           if (self->callbacks.unknown)
             self->callbacks.unknown(id, "order reply timeout; never resent");
         } else
           ++it;
       }
+      // No answer to /time means the connection is dead. TCP alone can take
+      // many minutes to notice, and live orders stay refused until it does.
+      if (clock_lost)
+        return self->fail(p, "HTTP/2 clock probe timed out");
       if (now - self->last_ping >= 15) {
         unsigned char opaque[8]{};
         nghttp2_submit_ping(p->session, NGHTTP2_FLAG_NONE, opaque);

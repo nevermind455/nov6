@@ -91,14 +91,24 @@ void DurableLog::replay(
   seq_ = next - 1;
 }
 std::uint64_t DurableLog::append(const Json &event) {
+  // A failed write or sync can leave this row, or part of it, on disk. A later
+  // row would then repeat its sequence number and the log would be refused at
+  // the next start, so after a failure the log takes no more rows.
+  if (failed_)
+    throw std::runtime_error("durable log refused: an earlier write failed");
   auto text = Json{{"seq", seq_ + 1},
                    {"event", event},
                    {"sha256", sha256(event.dump())}}
                   .dump() +
               "\n";
-  all_write(fd_, text);
-  if (!benchmark_without_sync && fdatasync(fd_))
-    throw std::runtime_error("durable intent sync failed");
+  try {
+    all_write(fd_, text);
+    if (!benchmark_without_sync && fdatasync(fd_))
+      throw std::runtime_error("durable intent sync failed");
+  } catch (...) {
+    failed_ = true;
+    throw;
+  }
   return ++seq_;
 }
 Journal::Journal(const std::filesystem::path &p)

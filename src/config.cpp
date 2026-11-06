@@ -52,7 +52,7 @@ bool Config::flag(const std::string &name, bool fallback) {
 }
 Config Config::load(int argc, char **argv) {
   Config c;
-  bool requested_paper = false;
+  bool requested_paper = false, explicit_config = false;
   c.root = std::filesystem::current_path();
   std::filesystem::path env_path = c.root / ".env";
   for (int i = 1; i < argc; ++i) {
@@ -70,6 +70,7 @@ Config Config::load(int argc, char **argv) {
     else if (a == "--config" && i + 1 < argc) {
       env_path = std::filesystem::absolute(argv[++i]);
       c.root = env_path.parent_path();
+      explicit_config = true;
     } else if (a == "--run-for" && i + 1 < argc) {
       std::size_t consumed = 0;
       std::string seconds = argv[++i];
@@ -109,7 +110,8 @@ Config Config::load(int argc, char **argv) {
         value = value.substr(1, value.size() - 2);
       c.values[key] = value;
     }
-  }
+  } else if (explicit_config)
+    throw std::invalid_argument("--config file not found: " + env_path.string());
   for (auto key : {"PRIVATE_KEY", "POLY_PRIVATE_KEY", "POLY_API_KEY",
                    "POLY_API_SECRET", "POLY_API_PASSPHRASE"})
     if (c.values.count(key))
@@ -203,6 +205,26 @@ Config Config::load(int argc, char **argv) {
   c.book_wait_ms = static_cast<int>(c.s.book_wait_ms);
   c.ptb_skip = c.s.ptb_skip_close;
   c.ptb_margin = c.s.ptb_margin_bp;
+  // The runtime reads these later. They count as used here, and --check refuses
+  // a bad value now instead of leaving it to fail at the real start.
+  for (auto name :
+       {"MAX_ALLOWED_SPREAD", "PAPER_LATENCY_MS", "ORDERBOOK_MAX_AGE_SECONDS",
+        "ORDERBOOK_MAX_QUIET_SECONDS", "ORDERBOOK_FUTURE_TOLERANCE_SECONDS",
+        "PAPER_FLAGGED_DELAY_SECONDS", "PAPER_OWN_FILL_TTL_S"}) {
+    auto v = c.raw(name);
+    if (!v || v->find_first_not_of(" \t") == std::string::npos)
+      continue;
+    double x;
+    try {
+      x = py::parse_float(*v);
+    } catch (const py::ValueError &) {
+      throw std::invalid_argument(std::string(name) +
+                                  " must be a finite number");
+    }
+    if (!std::isfinite(x))
+      throw std::invalid_argument(std::string(name) +
+                                  " must be a finite number");
+  }
   for (auto &[name, value] : c.values)
     if (!c.used.count(name))
       c.notices.push_back("unused setting: " + name);

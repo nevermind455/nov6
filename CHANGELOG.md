@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — source fixes, binaries in `bin/` not yet rebuilt
+
+These change the source only. Rebuild with `scripts/build.sh` on Ubuntu 24.04
+to get them in `bin/`; until then, `bin/` and the reports describe 1.1.0.
+
+* A missing `--config` file now refuses startup instead of using defaults.
+  `scripts/run-live.sh` without a `.env` refuses for the same reason.
+* After a failed write or sync the ledger log takes no more rows, so a duplicate
+  sequence number cannot damage it.
+* A round passed during a long stall no longer blocks later round preparation.
+* A `/time` probe with no reply now reconnects the HTTP/2 connection.
+* A clock probe still in flight keeps its own send time.
+* Closed rounds now calibrate the price-to-beat estimate, so
+  `SNIPER_PTB_SKIP_CLOSE=1` can take effect.
+* Reconciliation no longer journals already-booked trades every 5 seconds.
+* Live summaries count sent orders.
+* `--check` accepts the settings the runtime reads itself (such as
+  `MAX_ALLOWED_SPREAD`) as used, and refuses invalid values for them.
+
 ## 1.1.0 — matched to the reference bot (6 November 2026)
 
 The PDF names `nevermind455/oct10@772f2eb` as the source of truth. An audit of

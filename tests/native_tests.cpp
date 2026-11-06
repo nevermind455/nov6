@@ -393,6 +393,46 @@ TEST(Config, RejectsAmbiguousModesAndInvalidDuration) {
   EXPECT_THROW(load({"sniper-cpp", "--live", "--paper"}), std::exception);
   EXPECT_THROW(load({"sniper-cpp", "--run-for", "1junk"}), std::exception);
   EXPECT_THROW(load({"sniper-cpp", "--run-for", "nan"}), std::exception);
+  EXPECT_THROW(load({"sniper-cpp", "--config", "/nonexistent/sniper-test/.env"}),
+               std::exception);
+}
+TEST(Config, RuntimeSettingsCountAsUsedAndAreChecked) {
+  auto dir = tempdir();
+  auto path = dir / ".env";
+  auto load = [&](const std::string &text) {
+    {
+      std::ofstream out(path);
+      out << text << '\n';
+    }
+    std::filesystem::permissions(path, std::filesystem::perms::owner_read |
+                                           std::filesystem::perms::owner_write);
+    std::vector<std::string> a{"sniper-cpp", "--config", path.string(),
+                               "--check"};
+    std::vector<char *> args;
+    for (auto &s : a)
+      args.push_back(s.data());
+    return Config::load(static_cast<int>(args.size()), args.data());
+  };
+  auto notices = load("MAX_ALLOWED_SPREAD=0.1").notices;
+  EXPECT_EQ(std::count(notices.begin(), notices.end(),
+                       std::string("unused setting: MAX_ALLOWED_SPREAD")),
+            0);
+  EXPECT_THROW(load("MAX_ALLOWED_SPREAD=abc"), std::exception);
+  std::filesystem::remove_all(dir);
+}
+TEST(DurableLog, RefusesMoreRowsAfterAFailedWrite) {
+  // Every write to /dev/full fails with "no space left on device".
+  DurableLog durable("/dev/full");
+  Json row{{"type", "test"}};
+  EXPECT_THROW(durable.append(row), std::runtime_error);
+  std::string second;
+  try {
+    durable.append(row);
+  } catch (const std::runtime_error &e) {
+    second = e.what();
+  }
+  EXPECT_NE(second.find("an earlier write failed"), std::string::npos);
+  EXPECT_EQ(durable.sequence(), 0u);
 }
 TEST(Journal, OversizedRecordFailsClosed) {
   auto p = tempdir() / "audit.jsonl";

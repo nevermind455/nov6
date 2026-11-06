@@ -636,6 +636,10 @@ struct Runtime::Impl {
         hub_new = true;
       } else
         hub.reset();
+      // A stall (a paused VM, a blocked loop) can pass the prepared round.
+      // Keeping it would block every later preparation.
+      if (prepared && prepared->start < window)
+        prepared.reset();
       changed = true;
     }
     if (!hub) {
@@ -1063,6 +1067,7 @@ struct Runtime::Impl {
       ledger.set_canary(unsent_state);
       return refuse("native HTTP/2 sender not ready before dispatch");
     }
+    ++orders_sent;
     inflight_id[n] = intent.id;
     row["order_id"] = intent.id;
     row["client_order_id"] = intent.id;
@@ -1241,6 +1246,10 @@ struct Runtime::Impl {
           t.status != "CONFIRMED" && t.status != "RETRYING")
         throw std::runtime_error("unknown private trade status");
       private_sizes[t.order][t.id] = t.shares;
+      // Reconciliation re-reads every trade of the session every 5 s; one that
+      // is already booked has nothing new to record.
+      if (ledger.trade_ids.count(t.id))
+        return;
       Units delivered = 0;
       for (auto &[id, sh] : private_sizes[t.order])
         delivered += sh;
@@ -1350,10 +1359,13 @@ struct Runtime::Impl {
       rounds[r.start] = r;
     }
     auto start = static_cast<std::int64_t>(wall_s()) / 300 * 300;
-    // a published price to beat for a closed round calibrates the estimate
-    for (auto &r : fresh)
-      if (r.ptb && r.start < start && sniper)
-        sniper->ptb_official(static_cast<double>(r.start), *r.ptb);
+    // A published price to beat for a closed round calibrates the estimate.
+    // Discovery only returns the current and next rounds, so closed rounds come
+    // from the ones kept here; ptb_official uses each round once.
+    if (sniper)
+      for (auto &[round_start, r] : rounds)
+        if (r.ptb && round_start < start)
+          sniper->ptb_official(static_cast<double>(round_start), *r.ptb);
     update_hub();
     for (auto i = rounds.begin(); i != rounds.end();)
       if (i->first < start - 300 && !(hub && hub->start == i->first) &&
@@ -1668,10 +1680,14 @@ struct Runtime::Impl {
       if (rec_out.is_open())
         rec_out.flush();
       if (sender->ready() && now - last_probe >= 5) {
-        probe_sent = now;
-        probe_wall = wall_s();
-        if (sender->get_time())
+        // Note the send time only when a probe really goes out: one still in
+        // flight keeps its own times, or its late reply would look fast.
+        double sent_wall = wall_s();
+        if (sender->get_time()) {
+          probe_sent = now;
+          probe_wall = sent_wall;
           last_probe = now;
+        }
       }
       for (int n = 0; n < c.conns; ++n)
         if (cb_open[n] && now - cb_last_tick[n] > 60)
