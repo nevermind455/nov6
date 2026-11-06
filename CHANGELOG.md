@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased — source fixes, binaries in `bin/` not yet rebuilt
+## Unreleased — fixes, live safety checks and a terminal dashboard
 
-These change the source only. Rebuild with `scripts/build.sh` on Ubuntu 24.04
-to get them in `bin/`; until then, `bin/` and the reports describe 1.1.0.
+The programs in `bin/` were built from this source by GitHub Actions on Ubuntu
+24.04 (run 42280885378). Everything in `reports/` except `SHA256SUMS` still
+describes release 1.1.0.
 
 * Live safety, ahead of a first live run (`docs/GO_LIVE.md`):
   * Canary budgets are now hard stops by default (`SNIPER_CANARY_HARD_STOP=1`).
