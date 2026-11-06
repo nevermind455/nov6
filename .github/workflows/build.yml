@@ -1,0 +1,86 @@
+name: Build and test
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SNIPER_BUILD_JOBS: 4
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build ca-certificates \
+            libssl-dev libboost1.83-dev libfmt-dev nlohmann-json3-dev \
+            libsimdjson-dev libnghttp2-dev libsecp256k1-dev \
+            libgtest-dev libbenchmark-dev
+
+      - name: Build and run the native tests
+        run: bash scripts/build.sh
+
+      - name: Run setup on the shipped settings
+        run: bash scripts/setup.sh
+
+      # Exercises the real sockets, TLS, HTTP/2, round changes and paper fills.
+      # Everything stays on this machine: the fake venue stands in for every
+      # outside service, so no real market is contacted.
+      - name: Paper run against the local fake venue
+        shell: bash
+        working-directory: tools/fake-venue
+        run: |
+          bash make-certs.sh
+          npm install --no-audit --no-fund
+          node venue.js > "$RUNNER_TEMP/venue.log" 2>&1 &
+          venue=$!
+          trap 'kill "$venue"' EXIT
+          for _ in {1..30}; do
+            (exec 3<>/dev/tcp/127.0.0.1/18080) 2>/dev/null && break
+            sleep 1
+          done
+
+          sim="$RUNNER_TEMP/sim"
+          mkdir -p "$sim"
+          cp ../../.env.example "$sim/.env"
+          chmod 600 "$sim/.env"
+
+          # 360 seconds always crosses a 5-minute round boundary.
+          HTTPS_PROXY=http://127.0.0.1:18080 SSL_CERT_FILE="$PWD/certs/ca.crt" \
+            ../../bin/sniper-cpp --config "$sim/.env" --paper --run-for 360 \
+            | tee "$sim/out.log"
+
+          tail -n 1 "$sim/out.log" \
+            | jq -e '.stopped and .exit_code == 0 and .errors == 0 and .signals > 0'
+          grep '"result":"summary"' "$sim/out.log" | tail -n 1 \
+            | jq -e '.coinbase_live and .clob_h2_ready'
+          jq -s -e '[.[] | .round_end // empty] | unique | length >= 2' \
+            "$sim/state/paper/sniper.jsonl"
+
+      - name: Keep the paper run logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paper-run-logs
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/venue.log
+            ${{ runner.temp }}/sim/out.log
+            ${{ runner.temp }}/sim/state/paper/*.jsonl
+
+      - name: Keep the rebuilt programs
+        uses: actions/upload-artifact@v7
+        with:
+          name: sniper-linux-x86_64
+          retention-days: 30
+          path: |
+            bin/
+            lib/
