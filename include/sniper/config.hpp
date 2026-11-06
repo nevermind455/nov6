@@ -6,7 +6,9 @@
 namespace sniper {
 struct Config {
   std::filesystem::path root, state, journal, ledger, stop_file, record;
-  bool live = false, health = false, new_session = false, check = false;
+  bool live = false, health = false, new_session = false, check = false,
+       dash = false;
+  double dash_fps = 2;
   int conns = 2, max_fills = 20, backlog_max = 20, guard_strikes = 3;
   double k = .5, window = 250, cooldown = 300, min_left = 10, stale_ms = 2000,
          max_side = 200;

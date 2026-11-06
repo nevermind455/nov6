@@ -84,6 +84,35 @@ Volatility needs at least 60 seconds of valid data. Market discovery and fresh
 books must be ready before an order can be considered. A signal is not a promise
 of a fill. Paper fills are simulations, not evidence of live execution or profit.
 
+## Terminal dashboard
+
+Add `--dash` to watch the bot live in the terminal, for example inside tmux:
+
+```bash
+bash scripts/run-paper.sh --dash --run-for 86400
+```
+
+It shows the trigger feed, the current market and its books, the account, this
+market's orders, feed health, positions, settlement, execution quality and
+recent events. It fits itself to the window: smaller windows drop panels, and
+80x24 still shows the essentials. A value the bot does not have is drawn as `--`,
+never invented. Press Ctrl+C to stop the bot, as usual.
+
+* The frames are drawn on their own thread from a copy of the data, so a slow
+  terminal or SSH link cannot delay a trade. `DASH_FPS` sets the frame rate
+  (0.5 to 10, default 2).
+* The once-a-minute summary is not printed while the dashboard is up, but it is
+  still written to the journal. The final report prints when the bot stops.
+* Without a terminal (a log file, systemd), `--dash` prints one plain status line
+  every 10 seconds instead.
+* Times are US Eastern, as the venue names its rounds. WON/LOST counts this run.
+* Text from outside is reduced to plain characters and common secrets are hidden
+  before it is drawn.
+
+The reference bot's POSITION MANAGER, POLYMARKET BTC, LATENCY BUDGET and P/L BY
+SOURCE panels, and its markouts, are left out because this build does not have
+those features.
+
 ## Build and test from source
 
 For Ubuntu 24.04 with the usual main and universe package sources enabled:

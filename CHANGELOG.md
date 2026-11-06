@@ -5,6 +5,10 @@
 These change the source only. Rebuild with `scripts/build.sh` on Ubuntu 24.04
 to get them in `bin/`; until then, `bin/` and the reports describe 1.1.0.
 
+* New `--dash` terminal dashboard, ported to C++ from the reference bot's
+  `dashboard/` package. It draws on its own thread, so a slow terminal cannot
+  delay trading. See "Terminal dashboard" in the README.
+
 * A missing `--config` file now refuses startup instead of using defaults.
   `scripts/run-live.sh` without a `.env` refuses for the same reason.
 * After a failed write or sync the ledger log takes no more rows, so a duplicate

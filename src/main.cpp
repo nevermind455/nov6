@@ -79,8 +79,10 @@ int main(int argc, char **argv) {
     }
     if (argc == 2 && std::string_view(argv[1]) == "--help") {
       std::cout
-          << "sniper-cpp [--paper | --live | --health] [--config FILE] "
-             "[--run-for SECONDS] [--record FILE]\n  --check                 "
+          << "sniper-cpp [--paper | --live | --health] [--dash] [--config FILE] "
+             "[--run-for SECONDS] [--record FILE]\n  --dash                  "
+             "terminal dashboard (DASH_FPS frames a second, default 2)\n  "
+             "--check                 "
              "validate settings offline\n  --self-test             native "
              "crypto/math check, no network\n  --new-canary-session    "
              "deliberate new live session (backs up old state)\n  --compare A "

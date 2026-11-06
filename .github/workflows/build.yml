@@ -22,7 +22,7 @@ jobs:
           sudo apt-get install -y build-essential cmake ninja-build ca-certificates \
             libssl-dev libboost1.83-dev libfmt-dev nlohmann-json3-dev \
             libsimdjson-dev libnghttp2-dev libsecp256k1-dev \
-            libgtest-dev libbenchmark-dev
+            libgtest-dev libbenchmark-dev tmux
 
       - name: Build and run the native tests
         run: bash scripts/build.sh
@@ -64,6 +64,54 @@ jobs:
           jq -s -e '[.[] | .round_end // empty] | unique | length >= 2' \
             "$sim/state/paper/sniper.jsonl"
 
+      # The dashboard in a real terminal (tmux), against the same local venue.
+      # The screen is saved so the layout can be read, at two sizes.
+      - name: Dashboard run in a terminal
+        shell: bash
+        working-directory: tools/fake-venue
+        run: |
+          node venue.js > "$RUNNER_TEMP/venue-dash.log" 2>&1 &
+          venue=$!
+          trap 'kill "$venue"; tmux kill-server || true' EXIT
+          for _ in {1..30}; do
+            (exec 3<>/dev/tcp/127.0.0.1/18080) 2>/dev/null && break
+            sleep 1
+          done
+
+          sim="$RUNNER_TEMP/dash"
+          mkdir -p "$sim"
+          cp ../../.env.example "$sim/.env"
+          chmod 600 "$sim/.env"
+
+          tmux new-session -d -s dash -x 170 -y 50 -c "$PWD" \
+            "HTTPS_PROXY=http://127.0.0.1:18080 SSL_CERT_FILE='$PWD/certs/ca.crt' ../../bin/sniper-cpp --config '$sim/.env' --paper --dash --run-for 100; echo \$? > '$sim/exit_code'; sleep 20"
+          sleep 80
+          tmux capture-pane -pt dash > "$sim/frame-170x50.txt"
+          tmux resize-window -t dash -x 100 -y 30
+          sleep 3
+          tmux capture-pane -pt dash > "$sim/frame-100x30.txt"
+          for _ in {1..60}; do
+            [ -f "$sim/exit_code" ] && break
+            sleep 1
+          done
+          tmux capture-pane -pt dash -S -40 > "$sim/after-exit.txt"
+
+          cat "$sim/frame-170x50.txt"
+          cat "$sim/frame-100x30.txt"
+          [ "$(cat "$sim/exit_code")" = 0 ]
+          for part in "BTC SNIPER" TRIGGER MARKET ACCOUNT ORDERS HEALTH SETTLEMENT EVENTS "FAK +0.02"; do
+            grep -qF "$part" "$sim/frame-170x50.txt"
+          done
+          for part in "BTC SNIPER" TRIGGER MARKET ACCOUNT ORDERS; do
+            grep -qF "$part" "$sim/frame-100x30.txt"
+          done
+          # The dashboard gave the screen back and the final report is on it.
+          grep -qF '"stopped":true' "$sim/after-exit.txt"
+          if grep -qF "BTC SNIPER" "$sim/after-exit.txt"; then
+            echo "the dashboard was still on screen after the bot stopped"
+            exit 1
+          fi
+
       - name: Keep the paper run logs
         if: always()
         uses: actions/upload-artifact@v7
@@ -75,6 +123,7 @@ jobs:
             ${{ runner.temp }}/venue.log
             ${{ runner.temp }}/sim/out.log
             ${{ runner.temp }}/sim/state/paper/*.jsonl
+            ${{ runner.temp }}/dash/*.txt
 
       - name: Keep the rebuilt programs
         uses: actions/upload-artifact@v7

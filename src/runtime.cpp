@@ -1,4 +1,5 @@
 #include "sniper/runtime.hpp"
+#include "sniper/dashboard.hpp"
 #include "sniper/paper.hpp"
 #include "sniper/sniper.hpp"
 #include <mutex>
@@ -111,6 +112,31 @@ struct Runtime::Impl {
   std::atomic<int> refreshers_live{2};
   std::mutex wake_mutex;
   std::condition_variable wake;
+
+  // The terminal dashboard (--dash). All of this is read and written on the
+  // event loop only; what reaches the dashboard's thread is a finished copy.
+  struct DashSeries {
+    std::deque<double> values;
+    bool simulated = false;
+  };
+  struct DashQuality {
+    long long attempted = 0, sent = 0, acked = 0, pending = 0, filled = 0,
+              partial = 0, zero_fill = 0, rejected = 0, failed = 0, slip_n = 0;
+    double slip_sum = 0;
+    Json last;
+  };
+  std::unique_ptr<dash::Dashboard> dashboard;
+  double next_dash = 0, dash_every = 0.5, dash_last_tick = 0, dash_tick_gap = 0;
+  std::deque<Json> dash_orders, dash_events, dash_settled;
+  std::deque<std::pair<double, std::uint64_t>> dash_signals;
+  std::optional<std::pair<double, double>> dash_last_signal;
+  Json dash_last_fair;
+  std::map<std::string, DashSeries> dash_latency;
+  Json dash_latency_json = Json::object();
+  bool dash_latency_dirty = false;
+  DashQuality dash_quality;
+  long long dash_wins = 0, dash_losses = 0;
+  std::vector<std::string> dash_faults;
 
   explicit Impl(Config cfg)
       : c(std::move(cfg)), ledger(c.ledger, c.live ? 0 : c.start_cash, c.live),
@@ -228,6 +254,7 @@ struct Runtime::Impl {
         },
         [this](bool up) {
           rec(Json{{"k", "mconn"}, {"up", up}});
+          dash_event("market", up ? "connected" : "disconnected", up ? "good" : "warn");
           book.connected = up;
           book.desync_all(up ? "connect" : "disconnect");
           if (up) {
@@ -253,6 +280,10 @@ struct Runtime::Impl {
             cb_open[n] = up;
             cb_ack[n] = false;
             cb_last_tick[n] = mono_s();
+            dash_event("coinbase",
+                       "socket " + std::to_string(n + 1) +
+                           (up ? " connected" : " disconnected"),
+                       up ? "good" : "warn");
             if (up) {
               if (!any) { // the first socket up restarts the rule
                 rec(Json{{"k", "cbconn"}, {"up", true}});
@@ -302,6 +333,8 @@ struct Runtime::Impl {
     build_engine();
   }
   ~Impl() {
+    if (dashboard)
+      dashboard->stop();
     workers_stop = true;
     wake.notify_all();
     fetch_wake.notify_all();
@@ -325,10 +358,638 @@ struct Runtime::Impl {
       rtds->stop();
   }
   void audit(Json row) {
+    if (dashboard)
+      dash_note(row);
     if (!journal.write(std::move(row))) {
       pause_reason = "journal disk failure or queue overflow";
       pause_until = std::numeric_limits<double>::infinity();
     }
+  }
+
+  // ------------------------------------------------------------ dashboard
+  // Port of run.py's DashView and JournalTail (nevermind455/oct10@772f2eb). A
+  // fault in any of this is shown on the dashboard and never reaches trading.
+  static std::string dash_str(const Json &row, const char *key) {
+    auto it = row.find(key);
+    return it != row.end() && it->is_string() ? it->get<std::string>()
+                                              : std::string();
+  }
+  static double dash_number(const Json &row, const char *key, double fallback) {
+    auto it = row.find(key);
+    return it != row.end() && it->is_number() ? it->get<double>() : fallback;
+  }
+  static Json dash_field(const Json &row, const char *key) {
+    auto it = row.find(key);
+    return it == row.end() ? Json() : *it;
+  }
+  static bool dash_has(std::string text, const char *needle) {
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](unsigned char ch) { return std::tolower(ch); });
+    return text.find(needle) != std::string::npos;
+  }
+  void dash_event(const std::string &source, const std::string &text,
+                  const char *level = "info") {
+    if (!dashboard)
+      return;
+    // A repeating message (a failing round, a flapping socket) keeps one line.
+    if (!dash_events.empty() && dash_events.back()[1] == source &&
+        dash_events.back()[2] == text) {
+      dash_events.back()[0] = wall_s();
+      return;
+    }
+    dash_events.push_back(Json::array({wall_s(), source, text, level}));
+    while (dash_events.size() > 40)
+      dash_events.pop_front();
+  }
+  void dash_sample(const char *key, double value, bool simulated) {
+    if (!std::isfinite(value))
+      return;
+    auto &series = dash_latency[key];
+    series.simulated = simulated;
+    series.values.push_back(value);
+    while (series.values.size() > 1000)
+      series.values.pop_front();
+    dash_latency_dirty = true;
+  }
+  void dash_quality_last(const Json &row, std::optional<double> slip) {
+    Json last = Json::object();
+    for (auto key : {"side", "signal_mid", "ask_seen", "cap", "price", "shares"})
+      last[key] = dash_field(row, key);
+    last["slip_c"] = slip ? Json(*slip) : Json();
+    dash_quality.last = std::move(last);
+  }
+  void dash_filled(const Json &row, double ask, double price) {
+    auto &q = dash_quality;
+    ++(row.value("partial", false) ? q.partial : q.filled);
+    std::optional<double> slip;
+    if (ask > 0 && price > 0) {
+      slip = (price - ask) * 100.0;
+      q.slip_sum += *slip;
+      ++q.slip_n;
+    }
+    dash_quality_last(row, slip);
+  }
+  // A row that adds to an order already listed: live, its reply and its fills
+  // arrive after the row that listed it.
+  bool dash_update_order(const Json &row, const std::string &result) {
+    auto id = dash_str(row, "order_id");
+    if (id.empty())
+      return false;
+    for (auto &old : dash_orders) {
+      if (dash_str(old, "order_id") != id)
+        continue;
+      double shares = dash_number(row, "shares", 0);
+      auto reason = dash_str(row, "reason");
+      auto &q = dash_quality;
+      bool first_reply = !old.value("replied", false);
+      if (first_reply && (result == "live_fill_update" || result == "refused" ||
+                          result == "pending"))
+        ++q.acked;
+      if (row.contains("reply_ms") && row["reply_ms"].is_number())
+        dash_sample("send_to_ack", row["reply_ms"].get<double>(), false);
+      if (result == "live_fill_update" && shares > 0) {
+        double amount = dash_number(row, "amount", 0), price = amount / shares;
+        old["result"] = "filled";
+        old["shares"] = shares;
+        old["price"] = price;
+        if (first_reply) {
+          q.pending = std::max(0LL, q.pending - 1);
+          dash_filled(old, dash_number(old, "ask", 0), price);
+          q.last["ask_seen"] = old["ask"];
+        }
+      } else if (result == "refused") {
+        bool miss = dash_has(reason, "no match") || dash_has(reason, "no-fill");
+        old["result"] = miss ? "missed" : "refused";
+        old["detail"] = reason.substr(0, 120);
+        if (first_reply) {
+          q.pending = std::max(0LL, q.pending - 1);
+          ++(miss ? q.zero_fill : q.rejected);
+        }
+      } else if (!reason.empty())
+        old["detail"] = reason.substr(0, 120);
+      if (result == "live_fill_update" || result == "refused" || result == "pending")
+        old["replied"] = true;
+      return true;
+    }
+    return false;
+  }
+  void dash_take(const Json &row) {
+    auto result = dash_str(row, "result"), reason = dash_str(row, "reason"),
+         side = dash_str(row, "side");
+    double wall = dash_number(row, "wall", wall_s());
+    if (!side.empty() && row.contains("bp") && row["bp"].is_number())
+      dash_last_signal = std::pair{wall, row["bp"].get<double>()};
+    if (!side.empty() && row.contains("fair") && row["fair"].is_number())
+      dash_last_fair = Json{
+          {"side", side},
+          {"market_mid", dash_field(row, "market_mid")},
+          {"fair", row["fair"]},
+          {"limit", dash_field(row, "fair_limit")},
+          {"shares", row.contains("shares") ? row["shares"]
+                                            : dash_field(row, "kelly_shares")}};
+    if (result == "guard" || (result == "error" && side.empty()))
+      dash_event(result, reason, "bad");
+    else if (result == "discovery_refused")
+      dash_event("discovery", reason, "warn");
+    else if (result == "coinbase_reconnect")
+      dash_event("coinbase", reason, "warn");
+    else if (result == "start")
+      dash_event("bot", reason.empty() ? "started" : reason);
+    else if (result == "stop")
+      dash_event("bot", "stopping: " + reason, "warn");
+    else if (result == "hybrid_drawdown_pause")
+      dash_event("hybrid", "drawdown stop reached: paused", "warn");
+    else if (result == "hybrid_drawdown_reset")
+      dash_event("hybrid", "drawdown pause over: risk rebased", "warn");
+    else if (result == "refused" && side.empty() && !row.contains("order_id"))
+      dash_event("bot", reason, "bad");
+    if (result != "filled" && result != "refused" && result != "pending" &&
+        result != "error" && result != "live_fill_update")
+      return;
+    if (dash_update_order(row, result) || side.empty())
+      return;
+    // The first row of one order.
+    auto &q = dash_quality;
+    ++q.attempted;
+    if (row.contains("loop_lag_ms") && row["loop_lag_ms"].is_number())
+      dash_sample("trigger_to_decision", row["loop_lag_ms"].get<double>(), false);
+    if (c.live) {
+      if (result != "error")
+        ++q.sent;
+      if (row.contains("T0_ns") && row.contains("T2_ns"))
+        dash_sample("trigger_to_send",
+                    (row["T2_ns"].get<double>() - row["T0_ns"].get<double>()) / 1e6,
+                    false);
+    } else {
+      if (result != "error" && !dash_has(reason, "signing failed")) {
+        ++q.sent;
+        ++q.acked; // paper: the simulated venue always answers
+      }
+      if (row.contains("latency_ms") && row["latency_ms"].is_number())
+        dash_sample("trigger_to_ack", row["latency_ms"].get<double>(), true);
+    }
+    auto label = result;
+    if (result == "pending")
+      ++q.pending;
+    else if (result == "filled")
+      dash_filled(row, dash_number(row, "ask_seen", 0), dash_number(row, "price", 0));
+    else if (result == "error")
+      ++q.failed;
+    else {
+      bool miss = dash_has(reason, "no-fill");
+      ++(miss ? q.zero_fill : q.rejected);
+      if (miss)
+        label = "missed";
+      dash_quality_last(row, std::nullopt);
+    }
+    auto why = reason.empty() ? dash_str(row, "outcome") : reason;
+    dash_orders.push_back(Json{
+        {"time", dash::et_time(wall)},
+        {"side", side},
+        {"bp", dash_field(row, "bp")},
+        {"ask", dash_field(row, "ask_seen")},
+        {"cap", dash_field(row, "cap")},
+        {"result", label},
+        {"shares", dash_field(row, "shares")},
+        {"price", dash_field(row, "price")},
+        {"order_id", dash_str(row, "order_id")},
+        {"detail", row.value("partial", false) ? std::string("partial")
+                   : result == "filled"        ? std::string()
+                                               : why.substr(0, 120)},
+        {"round_end", dash_field(row, "round_end")}});
+    while (dash_orders.size() > 40)
+      dash_orders.pop_front();
+    if (result == "filled")
+      dash_event("sniper",
+                 "FILLED " + side + " " + py::fixed(dash_number(row, "shares", 0), 1) +
+                     " @ " + py::fixed(dash_number(row, "price", 0), 3),
+                 "good");
+  }
+  void dash_note(const Json &row) {
+    try {
+      dash_take(row);
+    } catch (const std::exception &e) {
+      dash_event("dashboard", std::string("journal row skipped: ") + e.what(), "warn");
+    }
+  }
+  void dash_note_settlement(const Round &r, const std::map<std::string, Units> &payouts) {
+    if (!dashboard)
+      return;
+    try {
+      double realized = 0;
+      bool has_position = false;
+      std::string winner;
+      for (const auto *token : {&r.up, &r.down}) {
+        auto pay = payouts.find(*token);
+        if (pay == payouts.end())
+          continue;
+        if (pay->second == U)
+          winner = token == &r.up ? "UP" : "DOWN";
+        auto pos = ledger.positions.find(*token);
+        if (pos == ledger.positions.end() || pos->second.shares <= 0)
+          continue;
+        has_position = true;
+        Units pnl = multiply(pos->second.shares, pay->second) - pos->second.cost -
+                    pos->second.fees;
+        realized += dollars(pnl);
+        if (pnl > 0)
+          ++dash_wins;
+        else if (pnl < 0)
+          ++dash_losses;
+      }
+      auto label = dash::et_label(static_cast<double>(r.start), static_cast<double>(r.end));
+      auto shown = winner.empty() ? std::string("SPLIT") : winner;
+      dash_settled.push_front(Json{{"label", label},
+                                   {"state", "SETTLED"},
+                                   {"winner", shown},
+                                   {"realized", realized},
+                                   {"has_position", has_position},
+                                   {"settlement_s", wall_s() - static_cast<double>(r.end)},
+                                   {"settlement_price", winner.empty() ? 0.5 : 1.0},
+                                   {"redeem", c.live ? "MANUAL" : "N/A (PAPER)"},
+                                   {"condition_id", r.condition}});
+      while (dash_settled.size() > 5)
+        dash_settled.pop_back();
+      dash_event("settle", "settled " + label + " " + shown + " " + py::fixed(realized, 2),
+                 realized < 0 ? "warn" : "good");
+    } catch (const std::exception &e) {
+      dash_event("dashboard", std::string("settlement row skipped: ") + e.what(), "warn");
+    }
+  }
+  void dash_refresh_latency() {
+    if (!dash_latency_dirty)
+      return;
+    dash_latency_dirty = false;
+    Json out = Json::object();
+    for (auto &[key, series] : dash_latency) {
+      std::vector<double> v(series.values.begin(), series.values.end());
+      if (v.empty())
+        continue;
+      double last = v.back(), sum = 0;
+      for (double x : v)
+        sum += x;
+      std::sort(v.begin(), v.end());
+      auto at = [&](double q) {
+        return v[static_cast<std::size_t>(q * static_cast<double>(v.size() - 1))];
+      };
+      out[key] = Json{{"n", v.size()},
+                      {"last", last},
+                      {"avg", sum / static_cast<double>(v.size())},
+                      {"p50", at(0.50)},
+                      {"p95", at(0.95)},
+                      {"p99", at(0.99)},
+                      {"max", v.back()},
+                      {"simulated", series.simulated}};
+    }
+    dash_latency_json = std::move(out);
+  }
+  Json dash_snapshot(double now) {
+    double wall = wall_s();
+    Json snap = Json::object();
+    snap["mode"] = c.live ? "LIVE" : "PAPER";
+    snap["clock"] = dash::et_clock(wall);
+    auto counter = [&](const char *key) -> std::uint64_t {
+      auto it = sniper->n.find(key);
+      return it == sniper->n.end() ? 0 : it->second;
+    };
+    auto optional_json = [](std::optional<double> v) { return v ? Json(*v) : Json(); };
+    dash_refresh_latency();
+    auto p50 = [&](const char *key) {
+      auto it = dash_latency_json.find(key);
+      return it == dash_latency_json.end() ? Json() : (*it)["p50"];
+    };
+    // ---- trigger
+    const auto &q = sniper->trigger.q.values;
+    auto mid = q.empty() ? sniper->last_mid : std::optional<double>(q.back().second);
+    Json move;
+    if (q.size() >= 2 && q.front().second != 0)
+      move = (q.back().second / q.front().second - 1.0) * 1e4;
+    auto signals = counter("signals");
+    dash_signals.emplace_back(now, signals);
+    while (dash_signals.size() > 2 && now - dash_signals.front().first > 300)
+      dash_signals.pop_front();
+    Json rate;
+    if (now - dash_signals.front().first >= 10)
+      rate = static_cast<double>(signals - dash_signals.front().second) /
+             (now - dash_signals.front().first) * 60.0;
+    const auto &fresh = sniper->cb_fresh;
+    std::string status =
+        !fresh.enabled     ? "OFF"
+        : !fresh.connected ? "DISCONNECTED"
+        : !fresh.last_msg_mono || (now - *fresh.last_msg_mono) * 1000.0 > fresh.unknown_ms
+            ? "STALE"
+        : fresh.why_not(now).empty() ? "LIVE"
+                                     : "DEGRADED";
+    std::string busy;
+    if (sniper->inflight[0])
+      busy = "UP";
+    if (sniper->inflight[1])
+      busy += busy.empty() ? "DOWN" : "+DOWN";
+    auto filled = counter("filled"), refused = counter("refused");
+    Json trigger{
+        {"feed", c.s.primary_feed},
+        {"status", status},
+        {"mid", optional_json(mid)},
+        {"move_bp", move},
+        {"k_bp", c.s.k_bp},
+        {"window_ms", c.s.window_ms},
+        {"signals", signals},
+        {"signals_per_min", rate},
+        {"orders", counter("orders")},
+        {"filled", filled},
+        {"refused", refused},
+        {"fill_rate", filled + refused
+                          ? Json(static_cast<double>(filled) / static_cast<double>(filled + refused))
+                          : Json()},
+        {"order_type", c.s.order_type},
+        {"slip", c.s.slip},
+        {"send_p50_ms", p50("trigger_to_send")},
+        {"ack_p50_ms", c.live ? p50("send_to_ack") : p50("trigger_to_ack")},
+        {"ack_simulated", !c.live},
+        {"errors", errors + counter("errors")},
+        {"in_flight", busy.empty() ? Json() : Json(busy)},
+        {"last_signal_bp", dash_last_signal ? Json(dash_last_signal->second) : Json()},
+        {"last_signal_age_s", dash_last_signal ? Json(wall - dash_last_signal->first) : Json()}};
+    if (c.s.fair) {
+      auto v = sniper->vol.vol();
+      trigger["fair"] = Json{{"vol_bp", v ? Json(*v * 1e4) : Json()},
+                             {"why", v ? Json() : Json("volatility warming up")},
+                             {"last", dash_last_fair}};
+    }
+    snap["trigger"] = std::move(trigger);
+    // ---- what was skipped, most frequent first
+    std::vector<std::pair<std::string, std::uint64_t>> skips;
+    for (auto &[key, value] : sniper->n)
+      if (value && key.rfind("skip: ", 0) == 0)
+        skips.emplace_back(key.substr(6), value);
+    std::sort(skips.begin(), skips.end(),
+              [](const auto &a, const auto &b) { return a.second > b.second; });
+    Json skip_rows = Json::array();
+    for (std::size_t i = 0; i < skips.size() && i < 6; ++i)
+      skip_rows.push_back(Json::array({skips[i].first, skips[i].second}));
+    snap["skips"] = std::move(skip_rows);
+    // ---- execution
+    const auto &quality = dash_quality;
+    long long any_fill = quality.filled + quality.partial;
+    snap["exec"] = Json{
+        {"latency", dash_latency_json},
+        {"paper", !c.live},
+        {"quality",
+         Json{{"attempted", quality.attempted},
+              {"sent", quality.sent},
+              {"acked", quality.acked},
+              {"pending", quality.pending},
+              {"filled", quality.filled},
+              {"partial", quality.partial},
+              {"zero_fill", quality.zero_fill},
+              {"rejected", quality.rejected},
+              {"failed", quality.failed},
+              {"fill_rate", quality.acked ? Json(static_cast<double>(any_fill) /
+                                                 static_cast<double>(quality.acked))
+                                          : Json()},
+              {"reject_rate", quality.sent ? Json(static_cast<double>(quality.rejected) /
+                                                  static_cast<double>(quality.sent))
+                                           : Json()},
+              {"avg_slip_c", quality.slip_n ? Json(quality.slip_sum /
+                                                   static_cast<double>(quality.slip_n))
+                                            : Json()},
+              {"slip_n", quality.slip_n},
+              {"last", quality.last}}}};
+    // ---- market
+    double end = hub_window >= 0 ? static_cast<double>(hub_window + 300) : 0.0;
+    Json market = Json::object();
+    if (hub_window >= 0)
+      market["seconds_left"] = end - wall;
+    auto book_side = [&](const std::string &token) {
+      auto v = book.view(token);
+      Json age;
+      if (v.updated_mono)
+        age = (now - *v.updated_mono) * 1000.0;
+      return Json{{"bid", optional_json(v.best_bid())},
+                  {"ask", optional_json(v.best_ask())},
+                  {"status", v.status},
+                  {"age_ms", age}};
+    };
+    if (hub) {
+      market["slug"] = "btc-updown-5m-" + std::to_string(hub_window);
+      market["up"] = book_side(hub->up);
+      market["down"] = book_side(hub->down);
+    }
+    market["trade_until_s"] = sniper->window().second;
+    auto round = sniper->rounds.find(end);
+    market["round_fills"] = round == sniper->rounds.end() ? 0LL : round->second.fills;
+    market["round_up_sh"] = round == sniper->rounds.end() ? 0.0 : round->second.up;
+    market["round_down_sh"] = round == sniper->rounds.end() ? 0.0 : round->second.down;
+    market["max_fills"] = c.s.max_fills_round;
+    market["max_side_shares"] = c.s.max_side_shares;
+    snap["market"] = std::move(market);
+    // ---- orders in this market only: the table clears when a new one starts
+    Json orders = Json::array();
+    for (auto &o : dash_orders) {
+      double order_end = dash_number(o, "round_end", -1);
+      if (hub && std::abs(order_end - end) < 0.5)
+        orders.push_back(o);
+    }
+    snap["orders"] = std::move(orders);
+    // ---- positions and account. Positions in the market trading now are marked
+    // to its live bid; ended markets are carried at cost until their result.
+    Json up_row{{"side", "UP"}, {"shares", 0.0}, {"avg", nullptr}, {"cost", 0.0}};
+    Json down_row{{"side", "DOWN"}, {"shares", 0.0}, {"avg", nullptr}, {"cost", 0.0}};
+    std::set<std::string> pending_markets;
+    double pending_shares = 0, pending_cost = 0;
+    for (auto &[token, p] : ledger.positions) {
+      if (p.settled || p.shares <= 0)
+        continue;
+      double shares = dollars(p.shares), cost = dollars(p.cost);
+      if (hub && p.condition == hub->condition && (token == hub->up || token == hub->down)) {
+        Json &row = token == hub->up ? up_row : down_row;
+        row["shares"] = shares;
+        row["avg"] = cost / shares;
+        row["cost"] = cost;
+        continue;
+      }
+      pending_markets.insert(p.condition);
+      pending_shares += shares;
+      pending_cost += cost;
+    }
+    double active_value = 0, unrealized = 0;
+    int unmarkable = 0;
+    auto mark = [&](Json &row, const std::string *token) {
+      std::optional<double> bid;
+      if (token)
+        bid = book.view(*token).best_bid();
+      row["bid"] = optional_json(bid);
+      double shares = row["shares"].get<double>();
+      if (shares <= 0) {
+        row["value"] = 0.0;
+        row["pnl"] = 0.0;
+      } else if (!bid) {
+        row["value"] = nullptr;
+        row["pnl"] = nullptr;
+        ++unmarkable;
+      } else {
+        double value = shares * *bid, pnl = value - row["cost"].get<double>();
+        row["value"] = value;
+        row["pnl"] = pnl;
+        active_value += value;
+        unrealized += pnl;
+      }
+    };
+    mark(up_row, hub ? &hub->up : nullptr);
+    mark(down_row, hub ? &hub->down : nullptr);
+    snap["positions"] = Json{{"rows", Json::array({up_row, down_row})},
+                             {"pending",
+                              Json{{"markets", pending_markets.size()},
+                                   {"shares", pending_shares},
+                                   {"cost", pending_cost}}}};
+    double realized = dollars(ledger.realized);
+    Json position_value = unmarkable ? Json() : Json(active_value + pending_cost);
+    Json account{{"realized", realized},
+                 {"unrealized", unmarkable ? Json() : Json(unrealized)},
+                 {"position_value", position_value},
+                 {"fees", dollars(ledger.fees)},
+                 {"wins", dash_wins},
+                 {"losses", dash_losses}};
+    if (c.live) {
+      account["kind"] = "LIVE";
+      account["balance"] = balance ? Json(dollars(*balance)) : Json();
+      account["equity"] = balance && !unmarkable
+                              ? Json(dollars(*balance) + active_value + pending_cost)
+                              : Json();
+      account["total"] = unmarkable ? Json() : Json(realized + unrealized);
+    } else {
+      double cash = dollars(ledger.cash), start = dollars(c.start_cash);
+      account["kind"] = "PAPER";
+      account["cash"] = cash;
+      account["equity"] = unmarkable ? Json() : Json(cash + active_value + pending_cost);
+      account["total"] = unmarkable ? Json() : Json(cash + active_value + pending_cost - start);
+    }
+    snap["account"] = std::move(account);
+    // ---- settlement
+    Json pending = Json::array();
+    for (auto &[start, r] : rounds) {
+      if (static_cast<double>(r.end) >= wall || ledger.settled_conditions.count(r.condition))
+        continue;
+      if (!ledger.holding(r.up) && !ledger.holding(r.down) && !ledger.awaiting(r.up) &&
+          !ledger.awaiting(r.down))
+        continue;
+      double age = wall - static_cast<double>(r.end);
+      pending.push_back(Json{
+          {"label", dash::et_label(static_cast<double>(r.start), static_cast<double>(r.end))},
+          {"state", "PENDING SETTLEMENT"},
+          {"age_s", age},
+          {"detail", age < 55 ? "the result is read 55s after the round ends"
+                              : "waiting for the on-chain result"},
+          {"condition_id", r.condition}});
+    }
+    Json active;
+    if (hub)
+      active = Json{{"label", dash::et_label(static_cast<double>(hub->start),
+                                             static_cast<double>(hub->end))},
+                    {"state", "ACTIVE"},
+                    {"condition_id", hub->condition}};
+    Json previous = Json::array();
+    for (auto &row : dash_settled)
+      previous.push_back(row);
+    Json settled = dash_settled.empty() ? Json() : dash_settled.front();
+    std::size_t waiting = pending.size();
+    Json subject = waiting ? pending.front() : !settled.is_null() ? settled : active;
+    snap["settlement"] = Json{{"active", active},
+                              {"subject", subject},
+                              {"pending", std::move(pending)},
+                              {"previous", std::move(previous)},
+                              {"last_settled", settled},
+                              {"pending_count", waiting}};
+    // ---- the live canary
+    if (c.live) {
+      Json halted = Json::array();
+      std::error_code ec;
+      if (wall < pause_until)
+        halted.push_back(pause_reason);
+      if (std::filesystem::exists(c.stop_file, ec))
+        halted.push_back("STOP_LIVE present: delete the stop file to allow new orders");
+      if (journal.failed())
+        halted.push_back("audit or recorder failed");
+      const auto &state = ledger.canary;
+      std::size_t unresolved = 0;
+      for (auto &[id, i] : ledger.orders)
+        if (i.unresolved() || i.status == "matched")
+          ++unresolved;
+      snap["canary"] = Json{
+          {"halted", std::move(halted)},
+          {"orders", state.orders},
+          {"max_orders", c.canary_orders},
+          {"fills", state.fills},
+          {"max_fills", c.canary_fills},
+          {"spend", dollars(state.spend)},
+          {"max_spend", dollars(c.canary_spend)},
+          {"rounds", state.rounds.size()},
+          {"max_rounds", c.canary_rounds},
+          {"loss", dollars(state.settled_loss + ledger.open_cost())},
+          {"max_loss", dollars(c.canary_loss)},
+          {"guard", wall < pause_until ? "PAUSED" : "OK"},
+          {"guard_reason", wall < pause_until ? pause_reason : std::string()},
+          {"awaiting", unresolved}};
+    }
+    // ---- network and health
+    Json net_ms{{"coinbase", nullptr}, {"clob", nullptr}};
+    if (fresh.last_trade_mono && now - *fresh.last_trade_mono <= 10 && !fresh.min_q.empty() &&
+        fresh.last_excess)
+      net_ms["coinbase"] = fresh.min_q.front().second + *fresh.last_excess;
+    if (!clock.rtts.empty())
+      net_ms["clob"] = clock.median_rtt();
+    snap["net"] = std::move(net_ms);
+    Json health = Json::array();
+    auto add = [&](const char *name, const std::string &state, const std::string &detail) {
+      health.push_back(Json::array({name, state, detail}));
+    };
+    auto sockets_up = std::count(cb_open.begin(), cb_open.end(), true);
+    add("COINBASE", status,
+        "sockets " + std::to_string(sockets_up) + "/" + std::to_string(cb_open.size()) +
+            " behind " +
+            (fresh.last_excess ? py::fixed(*fresh.last_excess, 0) + "ms" : std::string("--")) +
+            " backlog max " + std::to_string(fresh.backlog_max_seen));
+    std::string book_state = "WAIT";
+    if (!book.connected)
+      book_state = "DISCONNECTED";
+    else if (hub) {
+      auto a = book.status(hub->up), b = book.status(hub->down);
+      book_state = a == LIVE && b == LIVE ? std::string(LIVE) : a == LIVE ? b : a;
+    }
+    add("POLY BOOK", book_state, "resync waiting " + std::to_string(resync_wanted.size()));
+    add("CLOB H2", sender->ready() ? "OK" : "WAIT", "");
+    if (c.live)
+      add("USER WS", user && user->connected() ? "OK" : "DOWN", "");
+    else
+      add("USER WS", "ABSENT", "paper");
+    add("SETTLE", "OK", "pending " + std::to_string(waiting));
+    add("LEDGER", "OK", "entries " + std::to_string(ledger.entries));
+    add("JOURNAL", journal.failed() ? "ERROR" : "OK", "");
+    add("CLOCK", clock.at < 0 ? "WAIT" : now - clock.at > 60 ? "WARN" : "OK",
+        clock.at < 0 ? std::string() : "offset " + py::fixed(clock.offset, 2) + "s");
+    double lag_ms = std::max(0.0, (dash_tick_gap - 0.05) * 1000.0);
+    dash_tick_gap = 0;
+    add("LOOP LAG", lag_ms < 100 ? "OK" : "WARN", "max " + py::fixed(lag_ms, 0) + "ms");
+    snap["health"] = std::move(health);
+    Json events = Json::array();
+    for (auto &e : dash_events)
+      events.push_back(e);
+    snap["events"] = std::move(events);
+    return snap;
+  }
+  void dash_submit(double now) {
+    try {
+      dashboard->submit(dash_snapshot(now));
+    } catch (const std::exception &e) {
+      dash_event("dashboard", std::string("snapshot failed: ") + e.what(), "bad");
+    }
+  }
+  void runtime_fault(const std::string &what) {
+    if (dashboard) {
+      dash_event("runtime", "fault: " + what, "bad");
+      dash_faults.push_back(what);
+    } else
+      std::cerr << "native runtime fault: " << what << '\n';
   }
 
   // ------------------------------------------------------------ engine
@@ -1638,13 +2299,15 @@ struct Runtime::Impl {
             auto payouts = resolve_payouts(rest, r, c.rpc, c.settle_onchain);
             if (!payouts.empty())
               post("settlement", [this, r, payouts] {
-                if (ledger.settle(r.condition, payouts))
+                if (ledger.settle(r.condition, payouts)) {
+                  dash_note_settlement(r, payouts);
                   audit({{"result", "settlement"},
                          {"condition_id", r.condition},
                          {"source", "verified venue resolution"},
                          {"payouts", payouts},
                          {"redemption",
                           c.live ? "manual" : "paper cash credited"}});
+                }
               });
           } catch (...) {
           }
@@ -1658,6 +2321,11 @@ struct Runtime::Impl {
   }
   void tick() {
     auto now = mono_s();
+    if (dashboard) {
+      if (dash_last_tick > 0)
+        dash_tick_gap = std::max(dash_tick_gap, now - dash_last_tick);
+      dash_last_tick = now;
+    }
     if (!stopping) {
       if (journal.failed()) {
         pause_reason = "audit or recorder failed";
@@ -1710,7 +2378,9 @@ struct Runtime::Impl {
                                  ? (balance ? Json(dollars(*balance)) : Json{})
                                  : Json(dollars(ledger.cash))},
                     {"realized_pnl", dollars(ledger.realized)}};
-        std::cout << status.dump() << std::endl;
+        // The dashboard owns the screen while it runs; the row is still journalled.
+        if (!dashboard)
+          std::cout << status.dump() << std::endl;
         audit(status);
       }
       if (now - last_snapshot >= (c.live ? 60 : 120) ||
@@ -1725,6 +2395,10 @@ struct Runtime::Impl {
         snapshot_entries = ledger.entries;
       }
       refresh_work();
+      if (dashboard && now >= next_dash) {
+        next_dash = now + dash_every;
+        dash_submit(now);
+      }
       if (c.live && !startup_ok) {
         auto r = current();
         if (r && live_readiness(*r).empty()) {
@@ -1768,7 +2442,7 @@ struct Runtime::Impl {
           tick();
         } catch (const std::exception &e) {
           ++errors;
-          std::cerr << "native runtime fault: " << e.what() << '\n';
+          runtime_fault(e.what());
           begin_stop(1);
           tick();
         }
@@ -1799,6 +2473,10 @@ struct Runtime::Impl {
   }
   int run() {
     std::cout << c.public_view().dump() << std::endl;
+    if (c.dash) {
+      dash_every = 1.0 / c.dash_fps;
+      dashboard = std::make_unique<dash::Dashboard>(STDOUT_FILENO);
+    }
     audit({{"result", "start"},
            {"native_cpp", true},
            {"mode", c.live ? "LIVE" : "PAPER"},
@@ -1827,7 +2505,7 @@ struct Runtime::Impl {
         break;
       } catch (const std::exception &e) {
         ++errors;
-        std::cerr << "native runtime fault: " << e.what() << '\n';
+        runtime_fault(e.what());
         try {
           begin_stop(1);
           tick();
@@ -1836,6 +2514,12 @@ struct Runtime::Impl {
           break;
         }
       }
+    }
+    if (dashboard) {
+      // Back to the normal screen first, so the final report below stays visible.
+      dashboard->stop();
+      for (auto &what : dash_faults)
+        std::cerr << "native runtime fault: " << what << '\n';
     }
     workers_stop = true;
     wake.notify_all();

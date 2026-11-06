@@ -65,6 +65,8 @@ Config Config::load(int argc, char **argv) {
       c.health = true;
     else if (a == "--check")
       c.check = true;
+    else if (a == "--dash")
+      c.dash = true;
     else if (a == "--new-canary-session")
       c.new_session = true;
     else if (a == "--config" && i + 1 < argc) {
@@ -138,6 +140,7 @@ Config Config::load(int argc, char **argv) {
       units(fixed6(c.numeric("SNIPER_CANARY_MAX_SPEND_USD", 60, 0, 1e9)));
   c.canary_loss =
       units(fixed6(c.numeric("SNIPER_CANARY_MAX_LOSS_USD", 20, 0, 1e9)));
+  c.dash_fps = c.numeric("DASH_FPS", 2, 0.5, 10);
   c.settle_onchain = c.flag("SETTLE_ONCHAIN", true);
   c.rpc = c.text("POLYGON_RPC", "https://polygon-bor-rpc.publicnode.com");
   c.start_cash = units(c.text("PAPER_START_BALANCE", "1000"));
