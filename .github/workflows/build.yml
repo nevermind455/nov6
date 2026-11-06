@@ -30,6 +30,28 @@ jobs:
       - name: Run setup on the shipped settings
         run: bash scripts/setup.sh
 
+      # Offline, with the self-test's dummy key: no network and no wallet.
+      - name: Check the first-run live settings
+        shell: bash
+        run: |
+          bash -n scripts/run-live.sh
+          bash -n scripts/live-preflight.sh
+          bash scripts/prepare-live.sh
+          [ "$(stat -c %a .env.live)" = 600 ]
+          export SNIPER_LIVE_CANARY=1 POLY_PRIVATE_KEY="0x$(printf '%064d' 1)"
+          ./bin/sniper-cpp --config .env.live --live --check
+          ./bin/sniper-cpp --config .env.live --live --dry-run --check | jq -e '.mode == "LIVE DRY RUN"'
+          # the baseline limit is accepted, anything else is refused
+          sed 's/^SNIPER_SLIP=.*/SNIPER_SLIP=0.05/' .env.live > "$RUNNER_TEMP/slip05"
+          chmod 600 "$RUNNER_TEMP/slip05"
+          ./bin/sniper-cpp --config "$RUNNER_TEMP/slip05" --live --check
+          sed 's/^SNIPER_SLIP=.*/SNIPER_SLIP=0.03/' .env.live > "$RUNNER_TEMP/slip03"
+          chmod 600 "$RUNNER_TEMP/slip03"
+          if ./bin/sniper-cpp --config "$RUNNER_TEMP/slip03" --live --check; then
+            echo "a limit of ask + 0.03 was accepted for live"
+            exit 1
+          fi
+
       # Exercises the real sockets, TLS, HTTP/2, round changes and paper fills.
       # Everything stays on this machine: the fake venue stands in for every
       # outside service, so no real market is contacted.

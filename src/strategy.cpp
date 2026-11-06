@@ -8,7 +8,11 @@ std::string canary_refusal(const Config &c, CanaryState &state, Units shares,
   if (state.pause_until > wall)
     return "canary paused: " + state.pause_reason;
   if (state.pause_until > 0) {
-    state.increments[state.pause_reason]++;
+    // The reference raises a reached budget by its original size after each
+    // pause, so "$5" becomes $10, then $15. With the hard stop a budget stays
+    // what was configured until a deliberate --new-canary-session.
+    if (!c.canary_hard_stop)
+      state.increments[state.pause_reason]++;
     state.pause_until = 0;
     state.pause_reason.clear();
   }

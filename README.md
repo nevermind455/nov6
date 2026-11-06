@@ -183,7 +183,7 @@ features. Never copy the old Python bot's entire configuration without review.
 | `SNIPER_MIN_LEFT_S` | `10` | Minimum time remaining |
 | `SNIPER_STALE_MS` | `2000` | Market-book freshness bound |
 | `MIN_BUY_PRICE`, `MAX_BUY_PRICE` | `0.05`, `0.95` | Ask price band |
-| `SNIPER_SLIP`, `SNIPER_FAIR_MARGIN` | `0.02`, `0.01` | Price protection (limit is at most ask + this) and fair margin. `--live` currently requires `SNIPER_SLIP=0.05` |
+| `SNIPER_SLIP`, `SNIPER_FAIR_MARGIN` | `0.02`, `0.01` | Price protection (limit is at most ask + this) and fair margin. `--live` accepts `SNIPER_SLIP` of 0.02 or 0.05 |
 | `SNIPER_KELLY_FRACTION` | `0.25` | Base fractional Kelly |
 | `SNIPER_HYBRID_SIZING` | `1` | Volatility/drawdown risk scaling |
 | `SNIPER_HYBRID_DRAWDOWN_STOP` | `0.20` | Drawdown stop fraction |
@@ -202,20 +202,24 @@ features. Never copy the old Python bot's entire configuration without review.
 | `SNIPER_CANARY_MAX_SPEND_USD` | `60` | Initial gross-spend budget |
 | `SNIPER_CANARY_MAX_LOSS_USD` | `20` | Initial conservative loss budget |
 
-These are initial canary budgets: reaching a budget pauses the session and the
-implemented reference-style policy can allow one bounded increment after its
-pause. They are not permanent lifetime account loss limits. See `canary_refusal`
-in `src/strategy.cpp` and the native tests before changing them. The PDF calls for
-a $5 loss budget in its first live canary; use that lower value for that staged
-acceptance after the preceding checks have passed.
+Reaching a budget pauses new orders. With `SNIPER_CANARY_HARD_STOP=1`, the default,
+it stays reached until a deliberate `--new-canary-session`. With `0`, the
+reference's policy, it grows by its original size after every 5-minute pause, so
+$5 becomes $10, then $15. These are session budgets, not lifetime account limits.
+See `canary_refusal` in `src/strategy.cpp` and the native tests before changing
+them. The PDF calls for a $5 loss budget in its first live canary, which
+`scripts/prepare-live.sh` sets.
 
-Live mode freezes the baseline trigger, cooldown, fair margin, slippage, FAK
-type and sizing combinations. Changing them can correctly refuse startup.
+Live mode freezes the baseline trigger, cooldown, fair margin, slippage (0.02 or
+0.05), FAK type and sizing combinations. Changing them can correctly refuse startup.
 Optional extra feeds, maker features, direction add-ons, measured fill odds,
 strict paper/live parity and live cash mirroring are not implemented in this
 baseline; enabling them explicitly refuses startup.
 
 ## Live interface — acceptance still required
+
+**Follow [docs/GO_LIVE.md](docs/GO_LIVE.md) for a first live run.** It uses
+`.env.live` and a preflight check, which `scripts/run-live.sh` now requires.
 
 The native signer and HTTP/2 sender are implemented and tested with dummy keys
 and a local TLS exchange. This release has not been validated with a funded

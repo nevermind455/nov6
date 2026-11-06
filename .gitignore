@@ -1,4 +1,6 @@
 .env
+.env.live
+.env.before-live
 STOP_LIVE
 state/
 build/

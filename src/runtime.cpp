@@ -137,6 +137,7 @@ struct Runtime::Impl {
   DashQuality dash_quality;
   long long dash_wins = 0, dash_losses = 0;
   std::vector<std::string> dash_faults;
+  std::uint64_t dry_orders = 0;
 
   explicit Impl(Config cfg)
       : c(std::move(cfg)), ledger(c.ledger, c.live ? 0 : c.start_cash, c.live),
@@ -197,6 +198,15 @@ struct Runtime::Impl {
           throw std::runtime_error(
               "canary session and durable ledger disagree");
       }
+      // The venue's own answer on this server's location. It rejects orders from
+      // blocked places, so a blocked or unverifiable answer stops the start.
+      auto geo = RestClient(true, &blocked).get("https://polymarket.com/api/geoblock");
+      if (!geo.is_object() || !geo.contains("blocked") || !geo.at("blocked").is_boolean())
+        throw std::runtime_error("could not verify this location with the venue");
+      if (geo.at("blocked").get<bool>())
+        throw std::runtime_error(
+            "the venue blocks orders from this server's location (" +
+            dash_str(geo, "country") + "). Live start refused");
       auto closed =
           RestClient(true, &blocked)
               .get("https://clob.polymarket.com/auth/ban-status/closed-only",
@@ -984,6 +994,35 @@ struct Runtime::Impl {
       dash_event("dashboard", std::string("snapshot failed: ") + e.what(), "bad");
     }
   }
+  // What a dry run came to find out: the wallet the venue sees and whether it
+  // could pay for an order. The wallet address is public; no key is shown.
+  void dry_run_report(const Round &r) {
+    auto allowance = [&](std::string_view exchange) -> Json {
+      for (auto &[address, amount] : allowances)
+        if (checksum_address(address) == checksum_address(exchange))
+          return amount.convert_to<double>() / static_cast<double>(U);
+      return Json();
+    };
+    Json report{{"result", "dry_run_ready"},
+                {"wallet", c.funder},
+                {"signature_type", c.signature_type},
+                {"collateral", balance ? Json(dollars(*balance)) : Json()},
+                {"allowance_standard_exchange", Json()},
+                {"allowance_neg_risk_exchange", Json()},
+                {"this_round_uses_neg_risk", r.rules[0].neg},
+                {"note", "live checks passed; a dry run sends no order"}};
+    try {
+      report["allowance_standard_exchange"] = allowance(STANDARD_EXCHANGE);
+      report["allowance_neg_risk_exchange"] = allowance(NEG_EXCHANGE);
+    } catch (const std::exception &e) {
+      report["allowance_error"] = e.what();
+    }
+    if (dashboard)
+      dash_event("dry run", "live checks passed; no order is sent", "good");
+    else
+      std::cout << report.dump() << std::endl;
+    audit(std::move(report));
+  }
   void runtime_fault(const std::string &what) {
     if (dashboard) {
       dash_event("runtime", "fault: " + what, "bad");
@@ -1576,6 +1615,13 @@ struct Runtime::Impl {
       return refuse(ready, halted);
     if (!p->shares)
       return refuse("live orders are share-sized (SNIPER_ORDER_SIZING=shares)");
+    // The engine's own round counters only follow paper fills, so the round caps
+    // are enforced here for live, from the ledger.
+    if (ledger.round_fills(r.condition) >= c.max_fills)
+      return refuse("round cap: fills in this round");
+    if (dollars(ledger.risk_shares(p->token)) + static_cast<double>(*p->shares) >
+        c.max_side + 1e-9)
+      return refuse("round cap: shares on this side");
     // the cash read just before this round started, or since
     if (wall_s() - (mono_s() - balance_at) <
         std::min(static_cast<double>(r.start), wall_s()) - 10.0)
@@ -1660,6 +1706,18 @@ struct Runtime::Impl {
                                     p->token, stake, cap, rule, creds,
                                     c.order_type);
     ts[3] = ts[4] = mono_ns();
+    if (c.dry_run) {
+      // Every check above ran and the order was signed. Nothing is recorded as
+      // an intent, nothing counts against a budget, and nothing is sent.
+      ++dry_orders;
+      audit({{"result", "dry_run_order"},
+             {"side", p->side},
+             {"shares", *p->shares},
+             {"limit", dollars(cap)},
+             {"stake", dollars(stake)},
+             {"order_id", signed_order.id}});
+      return refuse("dry run: passed every check and was not sent", true);
+    }
     intent.id = signed_order.id;
     intent.status = "sent";
     intent.fill_slot = true;
@@ -2401,16 +2459,19 @@ struct Runtime::Impl {
       }
       if (c.live && !startup_ok) {
         auto r = current();
-        if (r && live_readiness(*r).empty()) {
+        auto why = r ? live_readiness(*r) : std::string("no current round found yet");
+        if (why.empty()) {
           startup_ok = true;
           audit({{"result", "start"},
                  {"reason", "native live preflight passed"}});
+          if (c.dry_run)
+            dry_run_report(*r);
         }
         if (now - start_mono > 45 && !startup_ok) {
-          audit(
-              {{"result", "refused"},
-               {"reason",
-                "native live startup checks did not pass within 45 seconds"}});
+          auto reason =
+              "native live startup checks did not pass within 45 seconds: " + why;
+          audit({{"result", "refused"}, {"reason", reason}});
+          runtime_fault(reason);
           begin_stop(1);
         }
       }
@@ -2544,6 +2605,7 @@ struct Runtime::Impl {
                       {"signals", sniper->n["signals"]},
                       {"orders", orders_sent},
                       {"paper_fills", paper_fills},
+                      {"dry_run_orders", dry_orders},
                       {"errors", errors}}
                      .dump()
               << std::endl;

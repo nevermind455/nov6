@@ -67,6 +67,8 @@ Config Config::load(int argc, char **argv) {
       c.check = true;
     else if (a == "--dash")
       c.dash = true;
+    else if (a == "--dry-run")
+      c.dry_run = true;
     else if (a == "--new-canary-session")
       c.new_session = true;
     else if (a == "--config" && i + 1 < argc) {
@@ -140,6 +142,7 @@ Config Config::load(int argc, char **argv) {
       units(fixed6(c.numeric("SNIPER_CANARY_MAX_SPEND_USD", 60, 0, 1e9)));
   c.canary_loss =
       units(fixed6(c.numeric("SNIPER_CANARY_MAX_LOSS_USD", 20, 0, 1e9)));
+  c.canary_hard_stop = c.flag("SNIPER_CANARY_HARD_STOP", true);
   c.dash_fps = c.numeric("DASH_FPS", 2, 0.5, 10);
   c.settle_onchain = c.flag("SETTLE_ONCHAIN", true);
   c.rpc = c.text("POLYGON_RPC", "https://polygon-bor-rpc.publicnode.com");
@@ -242,17 +245,22 @@ void Config::validate() const {
         "SNIPER_FAIR_NO_LIMIT and SNIPER_MIN_GAP_C require SNIPER_FAIR=1");
   if (new_session && !live)
     throw std::invalid_argument("--new-canary-session requires --live");
+  if (dry_run && !live)
+    throw std::invalid_argument("--dry-run requires --live");
   if (live) {
     if (private_key.empty())
       throw std::invalid_argument("POLY_PRIVATE_KEY is required for --live");
     if (signature_type > 0 && funder.empty())
       throw std::invalid_argument(
           "POLY_FUNDER is required for proxy signature types");
-    if (k != .5 || window != 250 || cooldown != 300 || slip != .05 || !fair ||
-        margin != .01 || order_type != "FAK" || fair_no_limit)
+    // Slip: the baseline 0.05, or the owner's tighter 0.02, which can only make
+    // an order's price limit lower.
+    if (k != .5 || window != 250 || cooldown != 300 ||
+        (slip != .05 && slip != .02) || !fair || margin != .01 ||
+        order_type != "FAK" || fair_no_limit)
       throw std::invalid_argument(
-          "live frozen-spec check failed: trigger, window, cooldown, slip, "
-          "fair margin and FAK must match the PDF baseline");
+          "live frozen-spec check failed: trigger, window, cooldown, slip "
+          "(0.02 or 0.05), fair margin and FAK must match the baseline");
     if (!(kelly_on && hybrid && kelly >= .25 && kelly <= .5) &&
         !(flat && !kelly_on && shares >= 5 && shares <= 20))
       throw std::invalid_argument(
@@ -268,7 +276,7 @@ void Config::validate() const {
 }
 Json Config::public_view() const {
   return {{"native_cpp", true},
-          {"mode", live ? "LIVE" : "PAPER"},
+          {"mode", live ? (dry_run ? "LIVE DRY RUN" : "LIVE") : "PAPER"},
           {"trigger_bp", k},
           {"window_ms", window},
           {"order_type", order_type},

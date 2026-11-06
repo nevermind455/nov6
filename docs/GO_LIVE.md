@@ -1,0 +1,95 @@
+# Going live
+
+This bot has never sent a real order. Its live path has only been tested against
+a local stand-in for the venue, with dummy keys. The first real orders are the
+test, so start small, stay at the screen, and use money you can afford to lose.
+
+Run every command below on the VPS, from `~/sniper`.
+
+## 1. Before anything else
+
+- **Check you are allowed to trade.** Polymarket restricts some countries, and
+  the rules depend on where you are, not only on where the server is. A server
+  abroad does not make trading allowed if it is restricted for you, and this
+  bot must not be used to get around that. The bot and the preflight below refuse
+  to start if the venue blocks the server's location, but neither can check your
+  own.
+- **Use a separate wallet** with only what this test needs. Never use a wallet
+  that holds anything else. Its key must never go in a file, a chat or a repo.
+
+## 2. Finish the 24-hour paper run
+
+```bash
+bash scripts/run-paper.sh --dash --run-for 86400
+```
+
+Read the results before moving on: `errors` should be 0 and the numbers should
+look sensible. The preflight refuses real orders until the journal covers 24 hours.
+
+## 3. Prepare the first-run settings
+
+```bash
+bash scripts/prepare-live.sh
+```
+
+This writes `.env.live`, leaving `.env` alone: flat 5-share orders (at most $4.75
+each), a $5 loss budget, and a limit of 10 orders, 5 fills, 3 rounds and $15 spent
+for the session. When a budget is reached, new orders stop until you deliberately
+start a new session. Your limit of ask + 0.02 carries over from `.env`.
+
+## 4. Put your key in this session only
+
+This hides what you type. The key lasts until you close this terminal.
+
+```bash
+read -rsp 'Wallet private key: ' POLY_PRIVATE_KEY; echo; export POLY_PRIVATE_KEY
+```
+
+```bash
+export SNIPER_LIVE_CANARY=1 POLY_SIGNATURE_TYPE=0
+```
+
+Signature type 0 is a wallet that holds the funds itself. For a Polymarket account
+wallet, use type 1 (proxy) or 2 (Safe), and also `export POLY_FUNDER=<its address>`.
+
+## 5. Dry run: every live check, no orders
+
+```bash
+bash scripts/run-live.sh --dry-run --new-canary-session --run-for 300
+```
+
+It logs in, checks your account, signs orders and sends none. It should print a
+`dry_run_ready` line showing your wallet, its collateral and its allowances, and
+`dry_run_orders` above 0 in the final line.
+
+- If an allowance is 0 or missing, the bot will refuse every order. Enable trading
+  for that wallet on polymarket.com, then run this step again.
+- If it stops with `FAIL` or a refusal, fix that first.
+
+## 6. The first real orders
+
+Start this inside tmux so it survives a dropped connection, and watch it:
+
+```bash
+bash scripts/run-live.sh --new-canary-session --dash
+```
+
+To stop new orders at once, from another SSH window:
+
+```bash
+touch STOP_LIVE
+```
+
+- **Ctrl+C or `touch STOP_LIVE` never closes a position.** Anything open is held
+  until the round resolves.
+- **Winnings are not automatic.** Winning shares stay in the wallet until you claim
+  them on polymarket.com, so cash does not come back on its own.
+- **Never restart to get around a pause.** An unknown order outcome pauses new
+  orders while the bot looks it up. It is never resent.
+
+## 7. Check it before you go further
+
+Compare the bot with your account on polymarket.com: orders, fills, fees and cash
+should all agree. Read `state/live/sniper.jsonl` for anything unexpected. Only then
+consider a larger session, by changing `.env.live` and starting again with
+`--new-canary-session`. That starts a new budget; it does not reset positions.

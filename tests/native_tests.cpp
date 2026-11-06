@@ -267,8 +267,40 @@ TEST(Ledger, TornOrCorruptedJournalRefusesRestart) {
   EXPECT_THROW((Ledger(p, 100 * U, false)), std::exception);
   std::filesystem::remove_all(p.parent_path());
 }
+TEST(Risk, CanaryHardStopNeverRaisesABudget) {
+  Config c;
+  ASSERT_TRUE(c.canary_hard_stop);
+  CanaryState state;
+  state.orders = 40;
+  EXPECT_EQ(canary_refusal(c, state, 10, 5 * U, 5 * U, "m", 100),
+            "canary budget: orders");
+  // The pause ends with the budget still reached: paused again, not raised.
+  EXPECT_EQ(canary_refusal(c, state, 10, 5 * U, 5 * U, "m", 400),
+            "canary budget: orders");
+  EXPECT_EQ(state.increments["orders"], 0);
+  EXPECT_EQ(state.pause_until, 700);
+}
+TEST(Config, LiveAcceptsOnlyTheBaselineOrTheTighterLimit) {
+  Config c;
+  c.live = true;
+  c.private_key = "dummy";
+  EXPECT_NO_THROW(c.validate());
+  c.slip = .02;
+  EXPECT_NO_THROW(c.validate());
+  c.slip = .03;
+  EXPECT_THROW(c.validate(), std::exception);
+}
+TEST(Config, DryRunRequiresLive) {
+  Config c;
+  c.dry_run = true;
+  EXPECT_THROW(c.validate(), std::exception);
+  c.live = true;
+  c.private_key = "dummy";
+  EXPECT_NO_THROW(c.validate());
+}
 TEST(Risk, CanaryPausesThenIncrementsOnlyOnce) {
   Config c;
+  c.canary_hard_stop = false; // the reference's behaviour
   CanaryState state;
   state.orders = 40;
   EXPECT_EQ(canary_refusal(c, state, 10, 5 * U, 5 * U, "m", 100),
