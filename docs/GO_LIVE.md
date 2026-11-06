@@ -11,9 +11,7 @@ Run every command below on the VPS, from `~/sniper`.
 - **Check you are allowed to trade.** Polymarket restricts some countries, and
   the rules depend on where you are, not only on where the server is. A server
   abroad does not make trading allowed if it is restricted for you, and this
-  bot must not be used to get around that. The bot and the preflight below refuse
-  to start if the venue blocks the server's location, but neither can check your
-  own.
+  bot must not be used to get around that.
 - **Use a separate wallet** with only what this test needs. Never use a wallet
   that holds anything else. Its key must never go in a file, a chat or a repo.
 

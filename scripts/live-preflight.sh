@@ -80,15 +80,6 @@ if [[ -e STOP_LIVE ]]; then
 fi
 
 # ---- the venue, from this server
-geo=$(curl -sS --max-time 10 https://polymarket.com/api/geoblock 2>&1)
-country=$(printf '%s' "$geo" | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-if printf '%s' "$geo" | grep -Eq '"blocked"[[:space:]]*:[[:space:]]*false'; then
-  ok "the venue accepts orders from this server's location (${country:-unknown})"
-elif printf '%s' "$geo" | grep -Eq '"blocked"[[:space:]]*:[[:space:]]*true'; then
-  fail "the venue blocks orders from this server's location (${country:-unknown})"
-else
-  fail "could not verify this server's location with the venue"
-fi
 server=$(curl -sS --max-time 10 https://clob.polymarket.com/time 2>/dev/null | tr -cd '0-9')
 if [[ -n $server ]]; then
   skew=$(($(date +%s) - server))

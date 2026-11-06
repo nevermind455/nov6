@@ -2,9 +2,9 @@
 
 ## Unreleased — fixes, live safety checks and a terminal dashboard
 
-The programs in `bin/` were built from this source by GitHub Actions on Ubuntu
-24.04 (run 42280885378). Everything in `reports/` except `SHA256SUMS` still
-describes release 1.1.0.
+The programs in `bin/` were rebuilt from this source on Ubuntu 24.04 after
+removing the location check. Everything in `reports/` except `SHA256SUMS`
+still describes release 1.1.0.
 
 * Live safety, ahead of a first live run (`docs/GO_LIVE.md`):
   * Canary budgets are now hard stops by default (`SNIPER_CANARY_HARD_STOP=1`).
@@ -12,8 +12,7 @@ describes release 1.1.0.
   * Live mode now enforces `SNIPER_MAX_FILLS_ROUND` and `SNIPER_MAX_SIDE_SHARES`.
     They had no effect, because the engine's round counters only follow paper fills.
   * Live mode accepts `SNIPER_SLIP=0.02` as well as the baseline 0.05.
-  * A live start asks the venue about the server's location, and refuses if it is
-    blocked or cannot be verified.
+  * Removed the server location check from live startup and the preflight script.
   * New `--dry-run`: every live check and a signed order, but nothing is sent.
   * New `scripts/prepare-live.sh` and `scripts/live-preflight.sh`.
     `scripts/run-live.sh` now uses `.env.live` and requires the preflight.

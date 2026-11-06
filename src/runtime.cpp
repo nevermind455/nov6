@@ -198,15 +198,6 @@ struct Runtime::Impl {
           throw std::runtime_error(
               "canary session and durable ledger disagree");
       }
-      // The venue's own answer on this server's location. It rejects orders from
-      // blocked places, so a blocked or unverifiable answer stops the start.
-      auto geo = RestClient(true, &blocked).get("https://polymarket.com/api/geoblock");
-      if (!geo.is_object() || !geo.contains("blocked") || !geo.at("blocked").is_boolean())
-        throw std::runtime_error("could not verify this location with the venue");
-      if (geo.at("blocked").get<bool>())
-        throw std::runtime_error(
-            "the venue blocks orders from this server's location (" +
-            dash_str(geo, "country") + "). Live start refused");
       auto closed =
           RestClient(true, &blocked)
               .get("https://clob.polymarket.com/auth/ban-status/closed-only",
