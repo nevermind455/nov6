@@ -106,8 +106,9 @@ jobs:
           chmod 600 "$sim/.env"
 
           tmux new-session -d -s dash -x 170 -y 50 -c "$PWD" \
-            "HTTPS_PROXY=http://127.0.0.1:18080 SSL_CERT_FILE='$PWD/certs/ca.crt' ../../bin/sniper-cpp --config '$sim/.env' --paper --dash --run-for 100; echo \$? > '$sim/exit_code'; sleep 20"
-          sleep 80
+            "HTTPS_PROXY=http://127.0.0.1:18080 SSL_CERT_FILE='$PWD/certs/ca.crt' ../../bin/sniper-cpp --config '$sim/.env' --paper --dash --run-for 270; echo \$? > '$sim/exit_code'; sleep 20"
+          # Long enough for volatility to warm up and for orders to reach the table.
+          sleep 240
           tmux capture-pane -pt dash > "$sim/frame-170x50.txt"
           tmux resize-window -t dash -x 100 -y 30
           sleep 3
@@ -127,6 +128,8 @@ jobs:
           for part in "BTC SNIPER" TRIGGER MARKET ACCOUNT ORDERS; do
             grep -qF "$part" "$sim/frame-100x30.txt"
           done
+          # Shrinking the window must leave the last row drawn: a panel's bottom border.
+          sed -n 30p "$sim/frame-100x30.txt" | grep -q $'\xe2\x94\x94'
           # The dashboard gave the screen back and the final report is on it.
           grep -qF '"stopped":true' "$sim/after-exit.txt"
           if grep -qF "BTC SNIPER" "$sim/after-exit.txt"; then

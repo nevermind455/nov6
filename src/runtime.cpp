@@ -715,7 +715,7 @@ struct Runtime::Impl {
         {"slip", c.s.slip},
         {"send_p50_ms", p50("trigger_to_send")},
         {"ack_p50_ms", c.live ? p50("send_to_ack") : p50("trigger_to_ack")},
-        {"ack_simulated", !c.live},
+        {"ack_simulated", !c.live && dash_latency_json.contains("trigger_to_ack")},
         {"errors", errors + counter("errors")},
         {"in_flight", busy.empty() ? Json() : Json(busy)},
         {"last_signal_bp", dash_last_signal ? Json(dash_last_signal->second) : Json()},

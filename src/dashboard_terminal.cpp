@@ -17,7 +17,7 @@ namespace {
 const std::string ALT_ON = "\x1b[?1049h", ALT_OFF = "\x1b[?1049l",
                   CURSOR_OFF = "\x1b[?25l", CURSOR_ON = "\x1b[?25h",
                   WRAP_OFF = "\x1b[?7l", WRAP_ON = "\x1b[?7h",
-                  CLEAR = "\x1b[2J\x1b[H", ERASE_LINE = "\x1b[K",
+                  CLEAR = "\x1b[2J\x1b[H",
                   // Synchronized output: terminals that support it show the
                   // whole frame at once; the rest ignore it.
                   SYNC_ON = "\x1b[?2026h", SYNC_OFF = "\x1b[?2026l",
@@ -124,11 +124,10 @@ struct Dashboard::State {
     for (std::size_t i = 0; i < lines.size(); ++i)
       if (force || i >= prev.size() || prev[i] != lines[i])
         buf += "\x1b[" + std::to_string(i + 1) + ";1H" + lines[i];
-    if (force)
-      // Never a full clear here: that blanks the screen for a frame. Only rows
-      // past the end of a shorter frame need erasing.
-      for (std::size_t i = lines.size(); i < prev.size(); ++i)
-        buf += "\x1b[" + std::to_string(i + 1) + ";1H" + ERASE_LINE;
+    // Nothing is erased, even after a resize. A frame always fills the screen, so
+    // every row is repainted edge to edge, which never blanks the screen for a
+    // frame. Rows past a shorter terminal's end no longer exist: moving the cursor
+    // there lands on the last row, and erasing would wipe the row just drawn.
     if (!buf.empty()) {
       buf += "\x1b[" + std::to_string(lines.size()) + ";1H";
       if (!write_all(SYNC_ON + buf + SYNC_OFF)) {

@@ -370,7 +370,8 @@ Row net_row(const Json &net, int cols) {
                              std::pair<const char *, const char *>{"clob", clob}}) {
       auto v = num(get(net, key));
       out.push_back({std::string(name) + " ", FAINT});
-      out.push_back({v ? sf("%.0f", *v) : MISSING, net_style(key, v)});
+      // A small negative delay (clock offset) would otherwise print as "-0".
+      out.push_back({v ? sf("%.0f", std::abs(*v) < 0.5 ? 0.0 : *v) : MISSING, net_style(key, v)});
       out.push_back({"  ", PAPER});
     }
     return out;
