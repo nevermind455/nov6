@@ -71,6 +71,9 @@ struct Runtime::Impl {
   simdjson::dom::parser parser;
   std::map<std::int64_t, Round> rounds;
   std::set<std::string> subscribed, user_markets;
+  // Orders still open when this run started. New orders wait until the
+  // reconciliation has resolved them; a timed pause would outlast startup.
+  std::set<std::string> inherited_orders;
   std::vector<bool> cb_open, cb_ack;
   std::vector<double> cb_last_tick;
   std::optional<std::uint64_t> sequence;
@@ -220,7 +223,7 @@ struct Runtime::Impl {
         rounds[r.start] = r;
         if (i.unresolved() || i.status == "matched") {
           if (c.live)
-            pause("unresolved native order from previous run", true);
+            inherited_orders.insert(id);
           else
             ledger.status(id, "cancelled");
         }
@@ -1820,6 +1823,13 @@ struct Runtime::Impl {
       return "STOP_LIVE present";
     if (wall_s() < pause_until)
       return pause_reason;
+    for (auto o = inherited_orders.begin(); o != inherited_orders.end();) {
+      auto &i = ledger.orders.at(*o);
+      if (i.unresolved() || i.status == "matched")
+        return "unresolved native order from previous run: " + *o + " (" +
+               i.status + ")";
+      o = inherited_orders.erase(o);
+    }
     if (!sender->ready())
       return "native order connection not ready";
     try {
@@ -2104,6 +2114,10 @@ struct Runtime::Impl {
         out->unresolved.push_back(id);
     out->since =
         ledger.canary.started > 0 ? ledger.canary.started - 5 : wall_s() - 5;
+    // An order from an earlier session still needs its own trades read back.
+    for (auto &[id, i] : ledger.orders)
+      if ((i.unresolved() || i.status == "matched") && i.sent_wall > 0)
+        out->since = std::min(out->since, i.sent_wall - 5);
     try {
       out->auth_time = clock.now(mono_s());
     } catch (...) {
