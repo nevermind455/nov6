@@ -1031,3 +1031,12 @@ TEST(VenueUnits, ARealOverchargeIsNotHiddenAsRounding) {
   intents["o"].matched_cost = 8000000;
   EXPECT_GT(parse_trade(long_decimal_trade(), intents).cost, 8000000);
 }
+
+TEST(CanarySpend, AConfirmedMissGivesItsSpendBackAndNeverGoesNegative) {
+  CanaryState state;
+  state.spend = 25040000;
+  refund_missed_spend(state, 7400000);
+  EXPECT_EQ(state.spend, 17640000);
+  refund_missed_spend(state, 99000000);
+  EXPECT_EQ(state.spend, 0);
+}

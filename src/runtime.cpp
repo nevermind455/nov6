@@ -1902,6 +1902,9 @@ struct Runtime::Impl {
               ? venue_units(j.at("takingAmount"))
               : 0;
       std::string error = j.value("errorMsg", "");
+      // an HTTP 400 carries its text in "error" instead
+      if (error.empty() && j.contains("error") && j.at("error").is_string())
+        error = j.at("error").get<std::string>();
       if (taking > 0 && making > 0) {
         if (making > intent.stake + 1 ||
             making > multiply(taking, intent.limit) + 1)
@@ -1922,6 +1925,13 @@ struct Runtime::Impl {
         bool miss = lower.find("no orders") != std::string::npos ||
                     lower.find("not fully filled") != std::string::npos;
         ledger.status(id, miss ? "no_match" : "refused");
+        // The venue confirmed nothing traded, so no money was spent. A refusal
+        // for any other reason keeps its spend.
+        if (miss && intent.matched_shares == 0 && intent.booked_shares == 0) {
+          auto state = ledger.canary;
+          refund_missed_spend(state, intent.stake);
+          ledger.set_canary(state);
+        }
         ledger.release_fill_slot(id);
         release(id);
         audit({{"result", "refused"},
