@@ -22,6 +22,7 @@ const CFG = {
   resolveDelay: +env('VENUE_RESOLVE_DELAY_S', 20),
   gammaStallAfter: +env('VENUE_GAMMA_STALL_AFTER_S', 0), // 0 = never stall
   gammaStallMs: +env('VENUE_GAMMA_STALL_MS', 12000),
+  proxyDropEvery: +env('VENUE_PROXY_DROP_EVERY_S', 0), // cut every tunnel (0 = never)
   sigma: 1e-4, // per sqrt(second)
   log: env('VENUE_LOG', __dirname + '/venue.log'),
 };
@@ -365,7 +366,18 @@ const ROUTES = {
   'ws-subscriptions-clob.polymarket.com': B + 3, 'ws-feed.exchange.coinbase.com': B + 4,
   'polygon-bor-rpc.publicnode.com': B + 5, 'ws-live-data.polymarket.com': B + 6,
 };
+// Reconnection stress: cut every tunnelled connection (market and Coinbase
+// websockets, CLOB HTTP/2, REST) at a fixed interval.
+const tunnels = new Set();
+if (CFG.proxyDropEvery > 0)
+  setInterval(() => {
+    count('proxy_drop ' + tunnels.size);
+    for (const s of tunnels) s.destroy();
+    tunnels.clear();
+  }, CFG.proxyDropEvery * 1000);
 net.createServer((client) => {
+  tunnels.add(client);
+  client.on('close', () => tunnels.delete(client));
   let buf = Buffer.alloc(0);
   const onData = (d) => {
     buf = Buffer.concat([buf, d]);
@@ -383,6 +395,8 @@ net.createServer((client) => {
       if (rest.length) up.write(rest);
       client.pipe(up); up.pipe(client);
     });
+    client.on('close', () => up.destroy());
+    up.on('close', () => client.destroy());
     up.on('error', () => client.destroy());
     client.on('error', () => up.destroy());
   };

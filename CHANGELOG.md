@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased — missed-order diagnostics, fault pauses and round switch timing
+
+* **Fix: a repeated fault only paused new orders the first time.** `pause()`
+  latched each "once" reason for the life of the process, so after the first
+  unknown order outcome (or private trade failure, accounting disagreement,
+  unauthorized wallet order, invalid private event, handler fault) a later one
+  hours afterwards paused nothing, contrary to the documented 5-minute pause.
+  The latch now holds only while that reason's own pause runs: a repeat inside
+  it neither extends it nor logs again; after it expires the reason pauses
+  again. `execution::PauseLatch`, regression
+  `AuditRuntime.ARepeatedFaultPausesAgainOnceItsPauseHasExpired`.
+* **Fix: triggers in the first 50 ms of a round were judged against the
+  previous round.** The round switched only on the 50 ms timer, so a Coinbase
+  trigger just after a boundary was skipped as too late in the old round. The
+  Coinbase handler now switches first (before recording the frame, so replays
+  keep the order). Measured cost 35 ns per message. Regression
+  `AuditRuntime.TriggersAfterABoundarySwitchTheRoundFirst`.
+* Add `sniper-miss-report` (native, read-only): reason codes and verdicts for
+  every skip and refusal, the live order lifecycle, per-stage latency
+  percentiles, evidence rows and suspected causes. `docs/MISSED_ORDERS.md`;
+  8 `MissReport` regressions, including one that fails when the engine gains
+  a reason without a code.
+* `tools/fake-venue`: `VENUE_PROXY_DROP_EVERY_S` cuts every tunnelled
+  connection for reconnection stress (development only).
+* Add a round-switch check micro-benchmark.
+
 ## Unreleased — subscription cleanup and paper validation
 
 * Retire book subscriptions when a discovery refresh drops the current or

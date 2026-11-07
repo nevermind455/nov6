@@ -47,6 +47,14 @@ if(SNIPER_SANITIZE)
   target_link_options(sniper-edge-report PRIVATE -fsanitize=address,undefined,float-cast-overflow)
 endif()
 install(TARGETS sniper-edge-report RUNTIME DESTINATION .)
+add_executable(sniper-miss-report tools/report/miss_report.cpp)
+target_compile_options(sniper-miss-report PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(sniper-miss-report PRIVATE nlohmann_json::nlohmann_json)
+if(SNIPER_SANITIZE)
+  target_compile_options(sniper-miss-report PRIVATE -O1 -fsanitize=address,undefined,float-cast-overflow -fno-omit-frame-pointer)
+  target_link_options(sniper-miss-report PRIVATE -fsanitize=address,undefined,float-cast-overflow)
+endif()
+install(TARGETS sniper-miss-report RUNTIME DESTINATION .)
 target_link_libraries(sniper-diff PRIVATE sniper_core)
 set_target_properties(sniper-diff PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")
 install(TARGETS sniper-diff RUNTIME DESTINATION .)
@@ -63,12 +71,14 @@ if(SNIPER_TESTS)
     tests/dashboard_tests.cpp tests/discovery_tests.cpp
     tests/audit_strategy_tests.cpp tests/audit_ledger_crypto_tests.cpp
     tests/audit_market_tests.cpp tests/audit_runtime_tests.cpp
-    tests/audit_network_tests.cpp tests/edge_report_tests.cpp)
+    tests/audit_network_tests.cpp tests/edge_report_tests.cpp
+    tests/miss_report_tests.cpp)
   target_include_directories(sniper-tests PRIVATE tools/report)
   target_link_libraries(sniper-tests PRIVATE sniper_core GTest::gtest_main)
   set_target_properties(sniper-tests PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")
   install(TARGETS sniper-tests RUNTIME DESTINATION .)
-  target_compile_definitions(sniper-tests PRIVATE FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+  target_compile_definitions(sniper-tests PRIVATE FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures"
+    SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
   enable_testing()
   add_test(NAME native_suite COMMAND sniper-tests)
   add_test(NAME comparison_cli COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_cli_tests.sh

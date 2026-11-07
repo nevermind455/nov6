@@ -36,5 +36,6 @@ Stress knobs (environment variables for `node venue.js`):
 | `VENUE_MM_LAG_MEAN` | `1.0` | Mean seconds between market-maker requotes |
 | `VENUE_JUMP_RATE` | `0.08` | BTC jumps (2–5 bp) per second |
 | `VENUE_GAMMA_STALL_AFTER_S` | `0` | After this uptime, Gamma replies take `VENUE_GAMMA_STALL_MS` (12 s) |
+| `VENUE_PROXY_DROP_EVERY_S` | `0` | Cut every tunnelled connection (both websockets, HTTP/2, REST) this often; reconnection stress |
 | `VENUE_REST_TS` | `lastchange` | REST `/book` timestamp: time of last change, or `now` |
 | `VENUE_PROXY_PORT`, `VENUE_PORT_BASE` | `18080`, `19000` | Run several venues at once |

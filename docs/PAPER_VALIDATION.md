@@ -53,6 +53,13 @@ from each `round_end - 300` to the first journal row for that round.
 5. `resources.txt` RSS is flat after the first hour (no steady growth).
 6. Every `k=mconn` `up=false` is followed by `up=true`, and the decisions
    after it carry fresh `dec_quote_age_ms`.
+7. `bin/sniper-miss-report state/paper/sniper.jsonl --record
+   ~/sniper-validation/feed.jsonl` lists no `unclassified_reasons` and no
+   `software_failure` codes; `data_not_ready` misses outside the first minute
+   after start are investigated (see `docs/MISSED_ORDERS.md`).
+8. File descriptors stay flat: add `$(ls /proc/$PID/fd | wc -l)` to the
+   resource sampler. In the simulated runs it stayed at 17 through 13 forced
+   disconnects.
 
 ## Reference: 11-minute simulated run (7 November 2026)
 
