@@ -26,6 +26,9 @@ struct Config {
   int shares = 10, hold_ms = 250, extra_ms = 200, book_wait_ms = 500,
       send_timeout_s = 10;
   double run_for = 0, guard_window = 1800;
+  // Seconds before a round boundary at which the next round's books are
+  // subscribed and its rules cached (SNIPER_PREPARE_LEAD_S).
+  double prepare_lead = 60;
   Units canary_shares = 25, canary_orders = 40, canary_fills = 20,
         canary_rounds = 12, canary_spend = 60 * U, canary_loss = 20 * U;
   std::string order_type = "FAK",

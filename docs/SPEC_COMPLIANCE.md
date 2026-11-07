@@ -61,7 +61,7 @@ way: `sniper-replay rec.jsonl out.jsonl` and `py_replay.py REPO rec.jsonl out.js
 | Config | Port of `Settings` (src/settings.cpp). Settings this build lacks are refused when switched on, never silently ignored. |
 | Coinbase feed (2 sockets, dedup by sequence, freshness gate) | Port of `on_coinbase`, `_coinbase_conn` and `BinanceFreshness` |
 | Polymarket market feed, book state | Port of `feeds/book.py` and `poly_market._dispatch`; hub REST recovery (`_resync_loop`) and WS resubscription |
-| Rounds | Current round at the boundary, next round prepared 25-30 s before it, as `run.py` |
+| Rounds | Current round at the boundary, next round prepared up to `SNIPER_PREPARE_LEAD_S` (default 60 s, 30-240) before it; the reference prepares in a fixed 25-30 s slot. Decisions only use the current round, so parity is unchanged |
 | Decision engine | Port of `Sniper._signal/_fire_now/_decide/_skip/_finish` (src/sniper.cpp) |
 | Paper broker | Port of `paper_trade.py` (src/paper.cpp) |
 | Journal | Reference row shapes for decisions; broker audit rows in `paper_audit.jsonl` |

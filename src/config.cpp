@@ -144,6 +144,7 @@ Config Config::load(int argc, char **argv) {
   c.trade_last = c.numeric("TRADE_LAST_SECONDS", 300, 1, 300);
   c.min_expiry = c.numeric("MIN_SECONDS_TO_EXPIRY", 10, 0, 299);
   c.send_timeout_s = c.numeric("SNIPER_SEND_TIMEOUT_S", 10, 1, 60, true);
+  c.prepare_lead = c.numeric("SNIPER_PREPARE_LEAD_S", 60, 30, 240);
   c.guard_strikes = c.numeric("SNIPER_GUARD_STRIKES", 3, 1, 100, true);
   c.guard_window = c.numeric("SNIPER_GUARD_WINDOW_S", 1800, 1, 86400);
   c.canary_shares = c.numeric("SNIPER_CANARY_MAX_SHARES", 25, 0, 100000, true);
@@ -316,6 +317,7 @@ Json Config::public_view() const {
           {"order_type", order_type},
           {"kelly_fraction", kelly},
           {"fair_margin", margin},
+          {"prepare_lead_s", prepare_lead},
           {"runtime_dependencies", "C++ libraries; no Python"},
           {"independent_paper_model", !live},
           {"live_canary", {{"max_loss_usd", dollars(canary_loss)},

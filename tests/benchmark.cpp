@@ -312,10 +312,59 @@ static void TickToWirePercentiles(benchmark::State &state) {
   };
   state.counters["orders"] = static_cast<double>(wire_us.size());
   state.counters["decide_p50_us"] = pct(decide_us, .5);
+  state.counters["decide_p95_us"] = pct(decide_us, .95);
   state.counters["decide_p99_us"] = pct(decide_us, .99);
   state.counters["wire_p50_us"] = pct(wire_us, .5);
+  state.counters["wire_p95_us"] = pct(wire_us, .95);
   state.counters["wire_p99_us"] = pct(wire_us, .99);
 }
+// One websocket price-change delta applied to an in-memory book, from the
+// parsed message to the updated level map (local processing only).
+static void BookUpdatePercentiles(benchmark::State &state) {
+  double now = 1'762'500'000.0;
+  BookState books{8.0, 30.0, [&] { return now; }, [&] { return now; }};
+  books.connected = true;
+  books.set_active({"111"});
+  SnapshotOptions o;
+  o.ts_ms = std::to_string(static_cast<long long>(now * 1000));
+  o.require_exchange_ts = true;
+  Json bids = Json::array(), asks = Json::array();
+  for (int i = 1; i <= 20; ++i) {
+    bids.push_back({{"price", py::fixed(0.50 - 0.01 * i, 2)}, {"size", "500"}});
+    asks.push_back({{"price", py::fixed(0.50 + 0.01 * i, 2)}, {"size", "500"}});
+  }
+  books.apply_snapshot("111", bids, asks, o);
+  const int n = 20000;
+  std::vector<Json> changes, stamps;
+  for (int i = 0; i < n; ++i) {
+    bool bid = i % 2 == 0;
+    changes.push_back(Json::array({{{"asset_id", "111"},
+                                    {"price", py::fixed(bid ? 0.45 : 0.55, 2)},
+                                    {"size", std::to_string(100 + i % 400)},
+                                    {"side", bid ? "BUY" : "SELL"}}}));
+    stamps.push_back(std::to_string(static_cast<long long>(now * 1000) + i + 1));
+  }
+  std::vector<double> us;
+  us.reserve(n);
+  for (auto _ : state) {
+    for (int i = 0; i < n; ++i) {
+      now += 0.001;
+      auto t0 = std::chrono::steady_clock::now();
+      bool ok = books.apply_price_changes(changes[i], stamps[i], Json());
+      auto t1 = std::chrono::steady_clock::now();
+      if (!ok)
+        state.SkipWithError("book update refused");
+      us.push_back(std::chrono::duration<double, std::micro>(t1 - t0).count());
+    }
+  }
+  std::sort(us.begin(), us.end());
+  auto at = [&](double q) { return us[static_cast<std::size_t>(q * (us.size() - 1))]; };
+  state.counters["updates"] = static_cast<double>(us.size());
+  state.counters["p50_us"] = at(.5);
+  state.counters["p95_us"] = at(.95);
+  state.counters["p99_us"] = at(.99);
+}
+BENCHMARK(BookUpdatePercentiles)->Iterations(1)->Unit(benchmark::kMillisecond);
 BENCHMARK(TickToWirePercentiles)->Arg(0)->Arg(1)->Iterations(1)->Unit(benchmark::kMillisecond);
 BENCHMARK(Maths);
 BENCHMARK(Signing);

@@ -11,6 +11,11 @@ std::set<std::string> account_markets(const Ledger &,
                                      std::set<std::string> active);
 bool pending_trade_status(std::string_view);
 bool refresh_round_rules(Round &current, const Round &fresh);
+// Whether the round after the one containing `now_wall` should be prepared:
+// true anywhere in its last `lead` seconds, so a late tick cannot miss it.
+bool prepare_due(double now_wall, double lead);
+// Start (unix seconds) of the five-minute round containing `now_wall`.
+std::int64_t round_window(double now_wall);
 bool cache_round_rules(std::map<std::string, MarketRules> &, const Round &,
                        double fetched_wall);
 } // namespace execution

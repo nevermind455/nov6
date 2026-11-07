@@ -44,6 +44,13 @@ bool pending_trade_status(std::string_view status) {
   return status == "MATCHED" || status == "MATCHED_NOT_BROADCASTED" ||
          status == "MINED" || status == "RETRYING";
 }
+std::int64_t round_window(double now_wall) {
+  return static_cast<std::int64_t>(now_wall) / 300 * 300;
+}
+bool prepare_due(double now_wall, double lead) {
+  double remain = static_cast<double>(round_window(now_wall) + 300) - now_wall;
+  return remain > 0.0 && remain <= lead;
+}
 bool refresh_round_rules(Round &current, const Round &fresh) {
   if (current.condition != fresh.condition || current.up != fresh.up ||
       current.down != fresh.down || current.start != fresh.start || current.end != fresh.end)
@@ -1401,7 +1408,7 @@ struct Runtime::Impl {
   }
   void update_hub() {
     double now_w = wall_s();
-    auto window = static_cast<std::int64_t>(now_w) / 300 * 300;
+    auto window = execution::round_window(now_w);
     bool changed = false, hub_new = false, prepared_new = false;
     if (window != hub_window) {
       hub_window = window;
@@ -1424,8 +1431,10 @@ struct Runtime::Impl {
         changed = hub_new = true;
       }
     }
-    double remain = static_cast<double>(window + 300) - now_w;
-    if (!prepared && remain >= 25.0 && remain <= 30.0) {
+    // Prepare the next round anywhere inside the lead window, not only in a
+    // fixed 25-30 s slot: a discovery pass that lands outside that slot
+    // otherwise leaves the next round cold until its boundary.
+    if (!prepared && execution::prepare_due(now_w, c.prepare_lead)) {
       auto it = rounds.find(window + 300);
       if (it != rounds.end() && it->second.rules[0].loaded) {
         prepared = it->second;

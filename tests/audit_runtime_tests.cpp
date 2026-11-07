@@ -132,3 +132,28 @@ TEST(AuditRuntime, IncompatibleStateAndAuditFilesCannotOverwriteEachOther) {
   EXPECT_THROW(dir.config("PAPER_AUDIT_PATH=paper_audit.jsonl\n"), std::invalid_argument);
   EXPECT_NO_THROW(dir.config());
 }
+TEST(AuditRuntime, PrepareLeadDefaultsToSixtySecondsAndIsBounded) {
+  RuntimeDirectory dir;
+  EXPECT_EQ(dir.config().prepare_lead, 60.0);
+  EXPECT_EQ(dir.config().public_view()["prepare_lead_s"], 60.0);
+  EXPECT_EQ(dir.config("SNIPER_PREPARE_LEAD_S=120\n").prepare_lead, 120.0);
+  for (const auto *bad : {"10", "241", "nan"})
+    EXPECT_THROW(dir.config(std::string("SNIPER_PREPARE_LEAD_S=") + bad + "\n"),
+                 std::invalid_argument) << bad;
+}
+TEST(AuditRuntime, NextRoundPreparationCoversTheWholeLeadWindow) {
+  const double start = 1'762'500'000; // a five-minute boundary
+  ASSERT_EQ(execution::round_window(start + 299.9), start);
+  EXPECT_FALSE(execution::prepare_due(start, 60));          // 300 s left
+  EXPECT_FALSE(execution::prepare_due(start + 239.9, 60));  // 60.1 s left
+  EXPECT_TRUE(execution::prepare_due(start + 240, 60));     // exactly 60 s
+  // The old fixed 25-30 s slot is inside the window, and a tick that lands
+  // after it (a stalled loop) still prepares instead of leaving it cold.
+  EXPECT_TRUE(execution::prepare_due(start + 272, 60));
+  EXPECT_TRUE(execution::prepare_due(start + 290, 60));
+  EXPECT_TRUE(execution::prepare_due(start + 299.99, 60));
+  // At the boundary the clock belongs to the next round: nothing is due.
+  EXPECT_EQ(execution::round_window(start + 300), start + 300);
+  EXPECT_FALSE(execution::prepare_due(start + 300, 30));
+  EXPECT_TRUE(execution::prepare_due(start + 60, 240));
+}
