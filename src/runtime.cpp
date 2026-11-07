@@ -1885,11 +1885,11 @@ struct Runtime::Impl {
       bool success = j.value("success", false);
       auto making =
           j.contains("makingAmount") && !j.at("makingAmount").is_null()
-              ? as_units(j.at("makingAmount"))
+              ? venue_units(j.at("makingAmount"))
               : 0;
       auto taking =
           j.contains("takingAmount") && !j.at("takingAmount").is_null()
-              ? as_units(j.at("takingAmount"))
+              ? venue_units(j.at("takingAmount"))
               : 0;
       std::string error = j.value("errorMsg", "");
       if (taking > 0 && making > 0) {
@@ -2008,7 +2008,7 @@ struct Runtime::Impl {
             continue;
           }
           if (v.value("type", "") == "CANCELLATION") {
-            auto size = as_units(v.at("size_matched"));
+            auto size = venue_units(v.at("size_matched"));
             ledger.status(id, size ? "matched" : "no_match", size);
             if (!size)
               ledger.release_fill_slot(id);
@@ -2247,7 +2247,7 @@ struct Runtime::Impl {
                   if (!j.is_object())
                     throw std::runtime_error("order status is not an object");
                   auto size = j.contains("size_matched")
-                                  ? as_units(j.at("size_matched"))
+                                  ? venue_units(j.at("size_matched"))
                                   : 0;
                   auto status = j.value("status", "");
                   if (status == "MATCHED" || status == "CANCELED" ||
