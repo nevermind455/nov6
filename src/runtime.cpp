@@ -47,6 +47,16 @@ bool pending_trade_status(std::string_view status) {
 std::int64_t round_window(double now_wall) {
   return static_cast<std::int64_t>(now_wall) / 300 * 300;
 }
+std::set<std::string> round_tokens(const std::optional<Round> &current,
+                                   const std::optional<Round> &prepared) {
+  std::set<std::string> out;
+  for (const auto *r : {&current, &prepared})
+    if (*r) {
+      out.insert((*r)->up);
+      out.insert((*r)->down);
+    }
+  return out;
+}
 bool prepare_due(double now_wall, double lead) {
   double remain = static_cast<double>(round_window(now_wall) + 300) - now_wall;
   return remain > 0.0 && remain <= lead;
@@ -1441,13 +1451,14 @@ struct Runtime::Impl {
         changed = prepared_new = true;
       }
     }
-    if (!changed)
+    // A discovery refresh can drop the current or prepared round (identity
+    // change) without another round taking its place; its subscriptions must
+    // still be retired, so compare the wanted set even when nothing changed.
+    auto want = execution::round_tokens(hub, prepared);
+    if (!changed && want == subscribed)
       return;
-    std::set<std::string> want;
     for (auto *r : {&hub, &prepared})
       if (*r) {
-        want.insert((*r)->up);
-        want.insert((*r)->down);
         activate_rules(**r);
         if (!(r == &hub ? hub_new : prepared_new))
           continue;

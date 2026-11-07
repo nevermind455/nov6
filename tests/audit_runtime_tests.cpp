@@ -157,3 +157,23 @@ TEST(AuditRuntime, NextRoundPreparationCoversTheWholeLeadWindow) {
   EXPECT_FALSE(execution::prepare_due(start + 300, 30));
   EXPECT_TRUE(execution::prepare_due(start + 60, 240));
 }
+TEST(AuditRuntime, SubscriptionsFollowOnlyTheCurrentAndPreparedRounds) {
+  Round current, next;
+  current.start = 1'762'500'000;
+  current.up = "cur-up";
+  current.down = "cur-down";
+  next.start = current.start + 300;
+  next.up = "next-up";
+  next.down = "next-down";
+  EXPECT_EQ(execution::round_tokens(current, next),
+            (std::set<std::string>{"cur-up", "cur-down", "next-up", "next-down"}));
+  // A refresh that drops the prepared round (identity change) must retire its
+  // books even though no other round replaces it.
+  EXPECT_EQ(execution::round_tokens(current, std::nullopt),
+            (std::set<std::string>{"cur-up", "cur-down"}));
+  // After the boundary the prepared round is the current one; the previous
+  // round's tokens are no longer wanted.
+  EXPECT_EQ(execution::round_tokens(next, std::nullopt),
+            (std::set<std::string>{"next-up", "next-down"}));
+  EXPECT_TRUE(execution::round_tokens(std::nullopt, std::nullopt).empty());
+}
