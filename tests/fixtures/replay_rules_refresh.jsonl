@@ -1,0 +1,7 @@
+{"k":"round","t":0,"w":1900000000,"current":true,"up":"123","down":"456","cond":"test","start":1899999900,"end":1900000200,"rules":{"condition_id":"test","fee_rate":"0.07","fee_exponent":1,"min_order_size":"5","tick_size":"0.01","up_token_id":"123","down_token_id":"456","taker_delay_ms":0,"taker_delay_flagged":true}}
+{"k":"mconn","t":0.1,"w":1900000000.1,"up":true}
+{"k":"mkt","t":0.2,"w":1900000000.2,"raw":"{\"event_type\":\"book\",\"asset_id\":\"123\",\"market\":\"test\",\"timestamp\":\"1900000000200\",\"bids\":[{\"price\":\"0.49\",\"size\":\"1000\"}],\"asks\":[{\"price\":\"0.5\",\"size\":\"1000\"}],\"tick_size\":\"0.01\"}"}
+{"k":"cbconn","t":0.21,"w":1900000000.21,"up":true}
+{"k":"cb","t":0.3,"w":1900000000.3,"backlog":0,"raw":"{\"type\":\"ticker\",\"sequence\":1,\"product_id\":\"BTC-USD\",\"price\":\"100000\",\"best_bid\":\"100000\",\"best_ask\":\"100000.01\",\"time\":\"2030-03-17T17:46:40.300000Z\",\"trade_id\":1,\"last_size\":\"0.001\"}"}
+{"k":"rules","t":0.4,"w":1900000000.4,"cond":"test","rules":{"condition_id":"test","fee_rate":"0.08","fee_exponent":1,"min_order_size":"100","tick_size":"0.01","up_token_id":"123","down_token_id":"456","taker_delay_ms":0,"taker_delay_flagged":true}}
+{"k":"cb","t":0.6,"w":1900000000.6,"backlog":0,"raw":"{\"type\":\"ticker\",\"sequence\":2,\"product_id\":\"BTC-USD\",\"price\":\"100010\",\"best_bid\":\"100010\",\"best_ask\":\"100010.01\",\"time\":\"2030-03-17T17:46:40.600000Z\",\"trade_id\":2,\"last_size\":\"0.001\"}"}

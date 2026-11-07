@@ -16,7 +16,17 @@ case ${1:-} in
   --help) printf '%s\n' --dry-run; exit 0 ;;
 esac
 for argument in "$@"; do
-  [[ $argument != --check ]] || exit 0
+  if [[ $argument == --check ]]; then
+    loss=${SNIPER_CANARY_MAX_LOSS_USD:-$(sed -n 's/^SNIPER_CANARY_MAX_LOSS_USD=//p' .env.live)}
+    hard=${SNIPER_CANARY_HARD_STOP:-$(sed -n 's/^SNIPER_CANARY_HARD_STOP=//p' .env.live)}
+    [[ $hard != 0 ]] || hard=false
+    [[ $hard != 1 ]] || hard=true
+    jq -n --argjson loss "$loss" --argjson hard "$hard" \
+      --arg state "$PWD/state/live" --arg stop "${SNIPER_CANARY_STOP_FILE:-$PWD/STOP_LIVE}" \
+      --arg paper "${PAPER_AUDIT_PATH:-$PWD/state/paper/sniper.jsonl}" \
+      '{live_canary:{max_loss_usd:$loss, hard_stop:$hard}, paths:{state_dir:$state,stop_file:$stop,paper_journal:$paper}}'
+    exit
+  fi
 done
 printf '%s\n' "$@" > "$SNIPER_TEST_ARGUMENTS"
 STUB
@@ -27,6 +37,7 @@ STUB
 cat > "$fixture/fake-bin/curl" <<'STUB'
 #!/usr/bin/env bash
 [[ ${SNIPER_TEST_CURL_FAIL:-0} != 1 ]] || exit 1
+[[ -z ${SNIPER_TEST_CURL_BODY:-} ]] || { printf '%s\n' "$SNIPER_TEST_CURL_BODY"; exit 0; }
 date +%s
 STUB
 cat > "$fixture/fake-bin/df" <<'STUB'
@@ -41,7 +52,7 @@ chmod +x "$fixture/bin/sniper-cpp" "$fixture/fake-bin/"*
 export PATH="$fixture/fake-bin:$PATH"
 export SNIPER_LIVE_CANARY=1 POLY_PRIVATE_KEY=offline-test-placeholder
 export SNIPER_TEST_ARGUMENTS="$fixture/arguments"
-unset SNIPER_TEST_CURL_FAIL
+unset SNIPER_TEST_CURL_FAIL SNIPER_TEST_CURL_BODY SNIPER_CANARY_MAX_LOSS_USD SNIPER_CANARY_HARD_STOP SNIPER_CANARY_STOP_FILE PAPER_AUDIT_PATH
 
 run() {
   local expected=$1 actual=0
@@ -95,8 +106,51 @@ grep -qF 'could not reach the order API' "$fixture/output"
 [[ ! -f $SNIPER_TEST_ARGUMENTS ]]
 unset SNIPER_TEST_CURL_FAIL
 
+# Exported settings override file settings in the bot and in preflight.
+export SNIPER_CANARY_MAX_LOSS_USD=20
+run 1 --skip-paper-check
+grep -qF 'above $5' "$fixture/output"
+[[ ! -f $SNIPER_TEST_ARGUMENTS ]]
+export SNIPER_CANARY_MAX_LOSS_USD=5
+sed -i 's/MAX_LOSS_USD=5/MAX_LOSS_USD=20/' "$fixture/.env.live"
+run 0 --skip-paper-check
+expect_arguments
+unset SNIPER_CANARY_MAX_LOSS_USD
+sed -i 's/MAX_LOSS_USD=20/MAX_LOSS_USD=5/' "$fixture/.env.live"
+export SNIPER_CANARY_HARD_STOP=0
+run 0 --skip-paper-check
+grep -qF 'a reached budget grows' "$fixture/output"
+unset SNIPER_CANARY_HARD_STOP
+
+# The selected stop path must be checked, and argv cannot change checked config.
+export SNIPER_CANARY_STOP_FILE="$fixture/OTHER_STOP"
+touch "$SNIPER_CANARY_STOP_FILE"
+run 1 --skip-paper-check
+grep -qF 'STOP_LIVE exists' "$fixture/output"
+rm -- "$SNIPER_CANARY_STOP_FILE"
+unset SNIPER_CANARY_STOP_FILE
+run 2 --skip-paper-check --config /tmp/unchecked.env
+grep -qF 'would bypass preflight' "$fixture/output"
+run 2 --skip-paper-check --paper
+grep -qF 'would bypass preflight' "$fixture/output"
+
+# Digits inside error JSON are not a valid venue-clock response.
+export SNIPER_TEST_CURL_BODY='{"error":500,"timestamp":1700000000}'
+run 1 --skip-paper-check
+grep -qF 'could not reach the order API' "$fixture/output"
+unset SNIPER_TEST_CURL_BODY
+
+# Separate short runs must not add up to a 24-hour unbroken run.
+awk 'BEGIN { for (r = 0; r < 24; ++r) {
+  for (i = 0; i <= 60; ++i) printf "{\"result\":\"summary\",\"wall\":%d}\n", 1700000000 + r * 3601 + i * 60
+  printf "{\"result\":\"summary\",\"final\":true,\"wall\":%d}\n", 1700000000 + r * 3601 + 3600
+} }' > "$fixture/state/paper/sniper.jsonl"
+run 1
+grep -qF 'finish the 24-hour paper run first' "$fixture/output"
+[[ ! -f $SNIPER_TEST_ARGUMENTS ]]
+
 # Completing the paper history continues to allow the default command.
 awk 'BEGIN { for (i = 0; i <= 1440; ++i) printf "{\"result\":\"summary\",\"wall\":%d}\n", 1700000000 + i * 60 }' > "$fixture/state/paper/sniper.jsonl"
 run 0 --dash
 expect_arguments --dash
-printf 'Live launcher checks passed (10 cases; no real network or orders).\n'
+printf 'Live launcher checks passed (no real network or orders).\n'

@@ -127,7 +127,15 @@ inline Units as_units(const Json &j) {
 inline double number(const Json &j) {
   if (j.is_boolean())
     throw std::invalid_argument("expected number");
-  double n = j.is_string() ? std::stod(j.get<std::string>()) : j.get<double>();
+  double n;
+  if (j.is_string()) {
+    auto text = j.get<std::string>();
+    std::size_t consumed = 0;
+    n = std::stod(text, &consumed);
+    if (text.find_first_not_of(" \t\r\n\f\v", consumed) != std::string::npos)
+      throw std::invalid_argument("trailing data in number");
+  } else
+    n = j.get<double>();
   if (!std::isfinite(n))
     throw std::invalid_argument("nonfinite number");
   return n;
@@ -135,7 +143,7 @@ inline double number(const Json &j) {
 inline Units ceil_div128(__int128 n, __int128 d) {
   if (n < 0 || d <= 0)
     throw std::invalid_argument("invalid division");
-  auto q = (n + d - 1) / d;
+  auto q = n / d + (n % d != 0);
   if (q > std::numeric_limits<Units>::max())
     throw std::overflow_error("integer overflow");
   return static_cast<Units>(q);
@@ -143,8 +151,13 @@ inline Units ceil_div128(__int128 n, __int128 d) {
 inline Units multiply(Units a, Units b, bool up = false) {
   if (a < 0 || b < 0)
     throw std::invalid_argument("negative monetary input");
-  return up ? ceil_div128(static_cast<__int128>(a) * b, U)
-            : static_cast<Units>(static_cast<__int128>(a) * b / U);
+  auto product = static_cast<__int128>(a) * b;
+  if (up)
+    return ceil_div128(product, U);
+  auto result = product / U;
+  if (result > std::numeric_limits<Units>::max())
+    throw std::overflow_error("monetary multiplication overflow");
+  return static_cast<Units>(result);
 }
 inline Units reservation(Units spend, Units rate, Units quoted = 0) {
   auto fee = std::max(multiply(spend, rate, true), quoted);
@@ -156,7 +169,7 @@ inline Units shares_within_budget(Units bank, Units cap, Units rate) {
   if (bank < 0 || cap <= 0 || rate < 0)
     throw std::invalid_argument("invalid budget");
   return static_cast<Units>((static_cast<__int128>(bank) * U) /
-                            (static_cast<__int128>(cap) * (U + rate)));
+                            (static_cast<__int128>(cap) * (static_cast<__int128>(U) + rate)));
 }
 inline Units share_multiple(Units price) {
   if (price <= 0 || price >= U)
@@ -167,7 +180,10 @@ inline Units minimum_entry_shares(Units price, Units venue = 5 * U,
                                   Units min_usd = U) {
   auto m = std::max(ceil_div128(venue, U), ceil_div128(min_usd, price));
   auto step = share_multiple(price);
-  return ceil_div128(m, step) * step;
+  auto result = static_cast<__int128>(ceil_div128(m, step)) * step;
+  if (result > std::numeric_limits<Units>::max())
+    throw std::overflow_error("minimum share count overflow");
+  return static_cast<Units>(result);
 }
 inline Units cent_compatible_shares(Units whole, Units price) {
   auto step = share_multiple(price);

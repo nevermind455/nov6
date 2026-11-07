@@ -22,6 +22,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     std::size_t offset = 0;
     int status = 0;
     double started = 0;
+    bool replied = false, timed_out = false;
   };
   struct Write {
     std::shared_ptr<std::string> bytes;
@@ -36,7 +37,9 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     nghttp2_session *session = nullptr;
     std::map<int32_t, std::shared_ptr<Request>> requests;
     std::deque<Write> writes;
-    bool up = false, writing = false, goaway = false;
+    std::vector<std::string> serialized_ids;
+    std::size_t queued_bytes = 0;
+    bool up = false, writing = false, goaway = false, failed = false;
     Impl *owner;
     Pipe(net::io_context &i, net::ssl::context &c, Impl *o)
         : stream(i, c), owner(o) {
@@ -64,8 +67,13 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
        std::string po)
       : io(i), ctx(c), live(l), blocked(b), callbacks(std::move(cb)),
         timeout(t), host(std::move(h)), port(std::move(po)), resolver(i),
-        timer(i), retry(i) {}
-  bool current(const std::shared_ptr<Pipe> &p) { return !stopped && p == pipe; }
+        timer(i), retry(i) {
+    if (timeout <= 0)
+      throw std::invalid_argument("HTTP/2 timeout must be positive");
+  }
+  bool current(const std::shared_ptr<Pipe> &p) {
+    return !stopped && p == pipe && !p->failed;
+  }
   static ssize_t data_read(nghttp2_session *, int32_t, uint8_t *buffer,
                            size_t length, uint32_t *flags,
                            nghttp2_data_source *source, void *) {
@@ -118,13 +126,17 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
       auto i = p->requests.find(frame->hd.stream_id);
       if (i != p->requests.end()) {
         auto r = i->second;
-        p->requests.erase(i);
+        if (r->replied || r->timed_out)
+          return 0;
         if (p->owner->callbacks.reply)
           try {
             p->owner->callbacks.reply(r->id, {r->status, r->response});
           } catch (...) {
             return NGHTTP2_ERR_CALLBACK_FAILURE;
           }
+        // A final response can precede the end of the upload. nghttp2 still
+        // holds the data provider's raw Request pointer until stream close.
+        r->replied = true;
       }
     }
     return 0;
@@ -133,30 +145,46 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     auto *p = static_cast<Pipe *>(user);
     auto i = p->requests.find(sid);
     if (i != p->requests.end()) {
-      auto id = i->second->id;
+      auto r = i->second;
       p->requests.erase(i);
-      if (p->owner->callbacks.unknown)
+      if (!r->replied && !r->timed_out && p->owner->callbacks.unknown)
         try {
           p->owner->callbacks.unknown(
-              id, "HTTP/2 stream closed before a complete reply");
+              r->id, "HTTP/2 stream closed before a complete reply");
         } catch (...) {
           return NGHTTP2_ERR_CALLBACK_FAILURE;
         }
     }
     return 0;
   }
+  static int frame_sent(nghttp2_session *, const nghttp2_frame *frame,
+                        void *user) {
+    auto *p = static_cast<Pipe *>(user);
+    if ((frame->hd.type == NGHTTP2_DATA || frame->hd.type == NGHTTP2_HEADERS) &&
+        (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)) {
+      auto i = p->requests.find(frame->hd.stream_id);
+      if (i != p->requests.end() && i->second->id != "__clock") {
+        try {
+          p->serialized_ids.push_back(i->second->id);
+        } catch (...) {
+          return NGHTTP2_ERR_CALLBACK_FAILURE;
+        }
+      }
+    }
+    return 0;
+  }
   void fail(const std::shared_ptr<Pipe> &p, std::string_view reason) {
     if (!current(p))
       return;
-    bool was_up = p->up;
+    p->failed = true;
     p->up = false;
     beast::error_code ec;
     beast::get_lowest_layer(p->stream).socket().close(ec);
-    for (auto &[sid, r] : p->requests)
-      if (callbacks.unknown)
-        callbacks.unknown(r->id, reason);
-    p->requests.clear();
+    resolver.cancel();
+    auto pending = std::move(p->requests);
     p->writes.clear();
+    p->serialized_ids.clear();
+    p->queued_bytes = 0;
     p->writing = false;
     timer.cancel();
     if (stopped)
@@ -164,15 +192,24 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     auto self = shared_from_this();
     retry.expires_after(std::chrono::milliseconds(static_cast<int>(
         std::min(8000., 250. * std::pow(2., std::min(failures++, 5u))))));
-    retry.async_wait([self, p, was_up](beast::error_code ec) {
-      (void)p;
-      (void)was_up;
+    retry.async_wait([self, p](beast::error_code ec) {
       if (!ec)
         self->connect();
     });
+    // Finish transport cleanup before application callbacks, which may throw.
+    std::exception_ptr failure;
+    for (auto &[sid, r] : pending)
+      if (!r->replied && !r->timed_out && callbacks.unknown)
+        try {
+          callbacks.unknown(r->id, reason);
+        } catch (...) {
+          if (!failure) failure = std::current_exception();
+        }
+    if (failure)
+      std::rethrow_exception(failure);
   }
   void connect() {
-    if (stopped)
+    if (stopped || (pipe && !pipe->failed))
       return;
     auto p = std::make_shared<Pipe>(io, ctx, this);
     pipe = p;
@@ -185,16 +222,19 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
       return fail(p, "HTTP/2 ALPN setup failed");
     auto self = shared_from_this();
     std::optional<Url> proxy;
-    auto env = std::getenv("HTTPS_PROXY");
-    if (env && *env && host != "localhost" && host != "127.0.0.1") {
-      try {
-        proxy = Url::parse(env);
-        if (proxy->scheme != "http")
-          throw std::runtime_error("unsupported proxy");
-      } catch (...) {
-        return fail(p, "invalid HTTP CONNECT proxy");
-      }
+    Url endpoint{"https", host, port, "/"};
+    try {
+      proxy = connect_proxy_for(endpoint);
+    } catch (...) {
+      return fail(p, "invalid HTTP CONNECT proxy");
     }
+    // This deadline includes DNS, CONNECT and TLS, rather than starting only
+    // after DNS has already completed.
+    timer.expires_after(std::chrono::seconds(timeout));
+    timer.async_wait([self, p](beast::error_code ec) {
+      if (!ec && self->current(p) && !p->up)
+        self->fail(p, "HTTP/2 connection setup timed out");
+    });
     resolver.async_resolve(
         proxy ? proxy->host : host, proxy ? proxy->port : port,
         [self, p, proxy](beast::error_code ec,
@@ -204,7 +244,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
           if (ec)
             return self->fail(p, "HTTP/2 DNS failed");
           beast::get_lowest_layer(p->stream).expires_after(
-              std::chrono::seconds(10));
+              std::chrono::seconds(self->timeout));
           beast::get_lowest_layer(p->stream).async_connect(
               addresses, [self, p, proxy](beast::error_code ec, const auto &) {
                 if (!self->current(p))
@@ -217,9 +257,10 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
                 }
                 p->proxy_request.method(http::verb::connect);
                 p->proxy_request.version(11);
-                p->proxy_request.target(self->host + ":" + self->port);
+                Url endpoint{"https", self->host, self->port, "/"};
+                p->proxy_request.target(endpoint.authority(true));
                 p->proxy_request.set(http::field::host,
-                                     self->host + ":" + self->port);
+                                     endpoint.authority(true));
                 http::async_write(
                     beast::get_lowest_layer(p->stream), p->proxy_request,
                     [self, p](beast::error_code ec, std::size_t) {
@@ -260,6 +301,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
           nghttp2_session_callbacks_set_on_data_chunk_recv_callback(cb, data);
           nghttp2_session_callbacks_set_on_frame_recv_callback(cb, frame);
           nghttp2_session_callbacks_set_on_stream_close_callback(cb, closed);
+          nghttp2_session_callbacks_set_on_frame_send_callback(cb, frame_sent);
           int rc = nghttp2_session_client_new(&p->session, cb, p.get());
           nghttp2_session_callbacks_del(cb);
           if (rc)
@@ -276,9 +318,8 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
           self->tick(p);
         });
   }
-  void flush(const std::shared_ptr<Pipe> &p,
-             std::vector<std::string> ids = {}) {
-    if (!p->up)
+  void flush(const std::shared_ptr<Pipe> &p) {
+    if (!current(p) || !p->up)
       return;
     auto out = std::make_shared<std::string>();
     const uint8_t *bytes;
@@ -288,7 +329,11 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     if (n < 0)
       return fail(p, "HTTP/2 frame encoding failed");
     if (!out->empty()) {
-      p->writes.push_back({out, std::move(ids)});
+      if (p->writes.size() >= 256 || p->queued_bytes + out->size() > 1024 * 1024)
+        return fail(p, "HTTP/2 write queue exceeded its bound");
+      p->queued_bytes += out->size();
+      p->writes.push_back({out, std::move(p->serialized_ids)});
+      p->serialized_ids.clear();
       if (!p->writing)
         write(p);
     }
@@ -311,8 +356,10 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
                        for (auto &id : payload.ids)
                          if (self->callbacks.written)
                            self->callbacks.written(id, mono_ns());
-                       if (!p->writes.empty())
+                       if (!p->writes.empty()) {
+                         p->queued_bytes -= p->writes.front().bytes->size();
                          p->writes.pop_front();
+                       }
                        self->write(p);
                      });
   }
@@ -345,18 +392,16 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
         return;
       auto now = mono_s();
       bool clock_lost = false;
-      for (auto it = p->requests.begin(); it != p->requests.end();) {
-        if (now - it->second->started >= self->timeout) {
-          auto id = it->second->id;
-          nghttp2_submit_rst_stream(p->session, NGHTTP2_FLAG_NONE, it->first,
+      for (auto &[sid, r] : p->requests) {
+        if (!r->timed_out && now - r->started >= self->timeout) {
+          r->timed_out = true;
+          nghttp2_submit_rst_stream(p->session, NGHTTP2_FLAG_NONE, sid,
                                     NGHTTP2_CANCEL);
-          it = p->requests.erase(it);
-          if (id == "__clock")
+          if (r->id == "__clock" && !r->replied)
             clock_lost = true;
-          if (self->callbacks.unknown)
-            self->callbacks.unknown(id, "order reply timeout; never resent");
-        } else
-          ++it;
+          if (!r->replied && self->callbacks.unknown)
+            self->callbacks.unknown(r->id, "order reply timeout; never resent");
+        }
       }
       // No answer to /time means the connection is dead. TCP alone can take
       // many minutes to notice, and live orders stay refused until it does.
@@ -393,7 +438,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     std::vector<std::pair<std::string, std::string>> h{
         {":method", "POST"},
         {":scheme", "https"},
-        {":authority", host},
+        {":authority", Url{"https", host, port, "/"}.authority()},
         {":path", "/order"},
         {"content-type", "application/json"},
         {"content-length", std::to_string(r->body.size())},
@@ -416,7 +461,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     if (sid < 0)
       return false;
     p->requests[sid] = r;
-    flush(p, {r->id});
+    flush(p);
     return true;
   }
   bool get_time() {
@@ -433,7 +478,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     std::vector<std::pair<std::string, std::string>> h{
         {":method", "GET"},
         {":scheme", "https"},
-        {":authority", host},
+        {":authority", Url{"https", host, port, "/"}.authority()},
         {":path", "/time"},
         {"accept", "application/json"},
         {"user-agent", "sniper-native-cpp/1.0"}};

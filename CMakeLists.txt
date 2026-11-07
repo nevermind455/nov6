@@ -33,8 +33,8 @@ target_compile_definitions(sniper_core PUBLIC BOOST_ERROR_CODE_HEADER_ONLY BOOST
 target_compile_options(sniper_core PUBLIC -O2 -Wall -Wextra -ffp-contract=off)
 target_link_libraries(sniper_core PUBLIC OpenSSL::SSL OpenSSL::Crypto Threads::Threads nlohmann_json::nlohmann_json fmt::fmt-header-only simdjson::simdjson ${NGHTTP2_LIBRARY} ${SECP256K1_LIBRARY})
 if(SNIPER_SANITIZE)
-  target_compile_options(sniper_core PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
-  target_link_options(sniper_core PUBLIC -fsanitize=address,undefined)
+  target_compile_options(sniper_core PUBLIC -fsanitize=address,undefined,float-cast-overflow -fno-omit-frame-pointer)
+  target_link_options(sniper_core PUBLIC -fsanitize=address,undefined,float-cast-overflow)
 endif()
 add_executable(sniper-cpp src/main.cpp)
 add_executable(sniper-replay tools/replay/sniper_replay.cpp)
@@ -52,13 +52,20 @@ if(SNIPER_TESTS)
   find_package(GTest 1.14.0 EXACT REQUIRED)
   find_package(benchmark 1.8.3 EXACT REQUIRED)
   add_executable(sniper-tests tests/native_tests.cpp tests/transport_tests.cpp
-    tests/dashboard_tests.cpp tests/discovery_tests.cpp)
+    tests/dashboard_tests.cpp tests/discovery_tests.cpp
+    tests/audit_strategy_tests.cpp tests/audit_ledger_crypto_tests.cpp
+    tests/audit_market_tests.cpp tests/audit_runtime_tests.cpp
+    tests/audit_network_tests.cpp)
   target_link_libraries(sniper-tests PRIVATE sniper_core GTest::gtest_main)
   set_target_properties(sniper-tests PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")
   install(TARGETS sniper-tests RUNTIME DESTINATION .)
   target_compile_definitions(sniper-tests PRIVATE FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
   enable_testing()
   add_test(NAME native_suite COMMAND sniper-tests)
+  add_test(NAME comparison_cli COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_cli_tests.sh
+    $<TARGET_FILE:sniper-cpp> $<TARGET_FILE:sniper-replay>)
+  add_test(NAME runtime_io COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime_io_tests.sh
+    $<TARGET_FILE:sniper-cpp>)
   add_executable(sniper-bench tests/benchmark.cpp)
   target_link_libraries(sniper-bench PRIVATE sniper_core benchmark::benchmark_main)
 endif()

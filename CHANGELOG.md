@@ -1,5 +1,43 @@
 # Changelog
 
+## 7 November 2026 — complete-system audit fixes
+
+See [the full audit](reports/AUDIT_2026-11-07.md) for findings, source locations,
+regression coverage and validation. No funded order or production deployment
+was performed for this audit.
+
+* Retain HTTP/2 upload providers through stream closure after early responses;
+  record full-wire send timing only after the complete upload is written.
+  Bound connection setup and keep uncertain orders reserved and never retried.
+* Close REST order-firewall path variants, validate URL/proxy/TLS inputs, and
+  repair stale active-market rules and accumulating account subscriptions.
+* Prevent confirmed fills from reusing stale sampled collateral. Restore
+  released fill slots on late positive evidence without charging a different
+  canary session. Validate settlements and check monetary overflow before
+  durable commits and during recovery.
+* Pin initial capital before the first intent and verify checksummed v2
+  snapshots. Read legacy v1 snapshots; older binaries cannot read v2. Back up
+  the complete stopped state before upgrading and read the recovery notes.
+* Reject unsupported market protocols, inconsistent rule/book identities,
+  unsupported tiny ticks and malformed fee, timestamp and private-fill data.
+  Remove spot-price substitution for official Chainlink TWAP calibration.
+* Fix depleted-own-liquidity and absent-tick paper crashes, exact decimal and
+  float boundaries, large formatting, cent-sizing overflow, decimal token-ID
+  parsing and signing-context cleanup on constructor errors.
+* Report confirmed fills, actual wire/ACK timing, fee-inclusive marks and
+  collateral freshness accurately; strengthen terminal secret redaction.
+* Read effective live configuration in preflight, honor selected paths, reject
+  launcher configuration overrides and count uninterrupted paper history.
+  Fail closed on audit/recording failure and incompatible state-file paths.
+* Strengthen replay comparison and clock fidelity, fail replay output errors,
+  pin development simulator dependencies and use a synthetic 60-second TWAP
+  in the local fixture. Add native, CLI, launcher and simulator regressions.
+
+Strategy thresholds, five-share baseline, cent alignment, the $1 marketable
+minimum, strict arrival-book policy and configured risk protections are kept.
+Offline parity verifies the tested normal-domain decisions; it does not prove
+future profitability or live exchange acceptance.
+
 ## Unreleased — fixes, live safety checks and a terminal dashboard
 
 The programs in `bin/` were rebuilt from this source on Ubuntu 24.04 after

@@ -9,6 +9,7 @@
 #include <boost/beast/websocket.hpp>
 #include <cstdlib>
 #include <deque>
+#include <cctype>
 #include <openssl/ssl.h>
 namespace sniper {
 namespace net = boost::asio;
@@ -22,25 +23,70 @@ Url Url::parse(std::string_view value) {
   if (p == value.npos)
     throw std::invalid_argument("URL must include a scheme");
   u.scheme = value.substr(0, p);
+  std::transform(u.scheme.begin(), u.scheme.end(), u.scheme.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
   value.remove_prefix(p + 3);
-  auto slash = value.find('/');
-  auto auth = value.substr(0, slash);
-  u.target = slash == value.npos ? "/" : std::string(value.substr(slash));
+  for (unsigned char c : value)
+    if (c <= 32 || c == 127)
+      throw std::invalid_argument("URL contains whitespace or control bytes");
+  auto end = value.find_first_of("/?#");
+  auto auth = value.substr(0, end);
+  auto target = end == value.npos ? std::string_view{} : value.substr(end);
+  target = target.substr(0, target.find('#'));
+  u.target = target.empty() ? "/" : std::string(target);
+  if (u.target.front() == '?')
+    u.target.insert(u.target.begin(), '/');
   if (auth.find('@') != auth.npos)
     throw std::invalid_argument("URL userinfo is unsupported");
-  auto colon = auth.rfind(':');
-  u.host = auth.substr(0, colon);
-  if (colon != auth.npos)
-    u.port = auth.substr(colon + 1);
-  else
+  bool explicit_port = false;
+  if (!auth.empty() && auth.front() == '[') {
+    auto close = auth.find(']');
+    if (close == auth.npos)
+      throw std::invalid_argument("invalid bracketed URL host");
+    u.host = auth.substr(1, close - 1);
+    beast::error_code ec;
+    net::ip::make_address_v6(u.host, ec);
+    if (ec)
+      throw std::invalid_argument("invalid IPv6 URL host");
+    if (close + 1 < auth.size()) {
+      if (auth[close + 1] != ':')
+        throw std::invalid_argument("invalid URL authority");
+      explicit_port = true;
+      u.port = auth.substr(close + 2);
+    }
+  } else {
+    auto colon = auth.find(':');
+    u.host = auth.substr(0, colon);
+    for (unsigned char c : u.host)
+      if (!std::isalnum(c) && c != '.' && c != '-' && c != '_')
+        throw std::invalid_argument("invalid URL host");
+    if (colon != auth.npos) {
+      explicit_port = true;
+      u.port = auth.substr(colon + 1);
+    }
+  }
+  if (!explicit_port)
     u.port = (u.scheme == "http" || u.scheme == "ws") ? "80" : "443";
   if (u.host.empty() || u.port.empty() || u.target.empty() ||
       (u.scheme != "http" && u.scheme != "https" && u.scheme != "ws" &&
        u.scheme != "wss"))
     throw std::invalid_argument("unsupported URL");
+  unsigned port = 0;
+  for (unsigned char c : u.port) {
+    if (!std::isdigit(c) || port > 6553)
+      throw std::invalid_argument("invalid URL port");
+    port = port * 10 + c - '0';
+  }
+  if (port == 0 || port > 65535)
+    throw std::invalid_argument("invalid URL port");
   return u;
 }
-static std::optional<Url> proxy_for(const Url &u) {
+std::string Url::authority(bool include_default_port) const {
+  auto name = host.find(':') == host.npos ? host : "[" + host + "]";
+  auto default_port = scheme == "http" || scheme == "ws" ? "80" : "443";
+  return name + (include_default_port || port != default_port ? ":" + port : "");
+}
+std::optional<Url> connect_proxy_for(const Url &u) {
   if (u.host == "localhost" || u.host == "127.0.0.1" || u.host == "::1")
     return {};
   auto p = std::getenv("HTTPS_PROXY");
@@ -53,18 +99,55 @@ static std::optional<Url> proxy_for(const Url &u) {
     throw std::invalid_argument("HTTPS_PROXY must be an HTTP CONNECT proxy");
   return proxy;
 }
+static bool order_path(std::string_view target) {
+  target = target.substr(0, target.find('?'));
+  std::string decoded;
+  auto hex_digit = [](unsigned char c) -> int {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+  };
+  for (std::size_t n = 0; n < target.size(); ++n) {
+    unsigned char c = target[n];
+    if (c == '%') {
+      if (n + 2 >= target.size() || hex_digit(target[n + 1]) < 0 ||
+          hex_digit(target[n + 2]) < 0)
+        throw std::invalid_argument("invalid URL path escape");
+      c = hex_digit(target[n + 1]) * 16 + hex_digit(target[n + 2]);
+      n += 2;
+    }
+    decoded += static_cast<char>(std::tolower(c));
+  }
+  std::vector<std::string_view> segments;
+  std::string_view path(decoded);
+  while (!path.empty()) {
+    auto slash = path.find('/');
+    auto part = path.substr(0, slash);
+    if (part == "..") {
+      if (!segments.empty()) segments.pop_back();
+    } else if (!part.empty() && part != ".")
+      segments.push_back(part);
+    if (slash == path.npos) break;
+    path.remove_prefix(slash + 1);
+  }
+  return !segments.empty() &&
+         (segments.front() == "order" || segments.front() == "orders");
+}
 HttpResult RestClient::request(std::string_view method,
                                std::string_view address, const Headers &headers,
                                std::string_view body, int timeout) const {
   auto u = Url::parse(address);
   if (u.scheme != "https" && u.scheme != "http")
     throw std::invalid_argument("REST needs HTTP(S)");
-  if ((u.target == "/order" || u.target == "/orders") && method != "GET") {
+  if (method != "GET" && order_path(u.target)) {
     if (blocked_)
       ++*blocked_;
     throw std::runtime_error("order-capable REST path blocked: only the "
                              "guarded native HTTP/2 sender may submit orders");
   }
+  if (timeout <= 0)
+    throw std::invalid_argument("REST timeout must be positive");
   net::io_context io;
   net::ssl::context ctx(net::ssl::context::tls_client);
   ctx.set_default_verify_paths();
@@ -83,7 +166,7 @@ HttpResult RestClient::request(std::string_view method,
   tunnel_reply.skip(true);
   bool complete = false;
   beast::error_code failure;
-  auto proxy = proxy_for(u);
+  auto proxy = connect_proxy_for(u);
   auto dest = proxy ? *proxy : u;
   auto finish = [&](beast::error_code ec) {
     if (complete)
@@ -98,7 +181,7 @@ HttpResult RestClient::request(std::string_view method,
   req.version(11);
   req.method_string(method);
   req.target(u.target);
-  req.set(http::field::host, u.host);
+  req.set(http::field::host, u.authority());
   req.set(http::field::user_agent, "sniper-native-cpp/1.0");
   req.set(http::field::accept, "application/json");
   for (auto &[k, v] : headers)
@@ -159,8 +242,8 @@ HttpResult RestClient::request(std::string_view method,
               }
               tunnel.method(http::verb::connect);
               tunnel.version(11);
-              tunnel.target(u.host + ":" + u.port);
-              tunnel.set(http::field::host, u.host + ":" + u.port);
+              tunnel.target(u.authority(true));
+              tunnel.set(http::field::host, u.authority(true));
               http::async_write(
                   beast::get_lowest_layer(stream), tunnel,
                   [&](beast::error_code ec, std::size_t) {
@@ -221,7 +304,12 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
        State s, double timeout, bool ping)
       : io(i), ctx(c), url(Url::parse(address)), message(std::move(m)),
         state(std::move(s)), silence(timeout), app_ping(ping), resolver(i),
-        retry_timer(i), watch(i) {}
+        retry_timer(i), watch(i) {
+    if (url.scheme != "wss")
+      throw std::invalid_argument("WebSocket needs WSS");
+    if (!std::isfinite(silence) || silence <= 0)
+      throw std::invalid_argument("WebSocket silence timeout must be positive");
+  }
   bool current(const std::shared_ptr<Pipe> &p) const {
     return !stopped && pipe == p && !p->failed;
   }
@@ -231,8 +319,6 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
     p->failed = true;
     bool was_up = up;
     up = p->up = false;
-    if (was_up)
-      state(false);
     watch.cancel();
     resolver.cancel();
     beast::error_code ignored;
@@ -246,13 +332,15 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
       if (!ec && !self->stopped)
         self->connect();
     });
+    if (was_up && state)
+      state(false);
   }
   void fail() {
     if (pipe)
       fail(pipe);
   }
   void connect() {
-    if (stopped)
+    if (stopped || (pipe && !pipe->failed))
       return;
     auto p = std::make_shared<Pipe>(io, ctx);
     pipe = p;
@@ -265,7 +353,7 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
       return fail(p);
     std::optional<Url> proxy;
     try {
-      proxy = proxy_for(url);
+      proxy = connect_proxy_for(url);
     } catch (...) {
       return fail(p);
     }
@@ -296,9 +384,9 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
                   return self->tls(p);
                 p->tunnel.method(http::verb::connect);
                 p->tunnel.version(11);
-                p->tunnel.target(self->url.host + ":" + self->url.port);
+                p->tunnel.target(self->url.authority(true));
                 p->tunnel.set(http::field::host,
-                              self->url.host + ":" + self->url.port);
+                              self->url.authority(true));
                 http::async_write(
                     beast::get_lowest_layer(p->socket), p->tunnel,
                     [self, p](beast::error_code ec, std::size_t) {
@@ -332,7 +420,7 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
           beast::get_lowest_layer(p->socket).expires_never();
           p->socket.set_option(
               ws::stream_base::timeout::suggested(beast::role_type::client));
-          p->socket.async_handshake(self->url.host, self->url.target,
+          p->socket.async_handshake(self->url.authority(), self->url.target,
                                     [self, p](beast::error_code ec) {
                                       if (!self->current(p))
                                         return;
@@ -343,7 +431,11 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
                                       self->retry = 0;
                                       self->last_rx = mono_s();
                                       self->last_ping = 0;
-                                      self->state(true);
+                                      try {
+                                        if (self->state) self->state(true);
+                                      } catch (...) {
+                                        return self->fail(p);
+                                      }
                                       self->read(p);
                                       self->tick(p);
                                     });

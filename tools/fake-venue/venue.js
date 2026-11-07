@@ -8,6 +8,7 @@ const https = require('https');
 const http2 = require('http2');
 const { WebSocketServer } = require('ws');
 const { keccak_256 } = require('@noble/hashes/sha3');
+const { twap60 } = require('./oracle');
 
 const env = (k, d) => (process.env[k] === undefined ? d : process.env[k]);
 const CFG = {
@@ -42,6 +43,9 @@ const bigFromBytes = (b) => BigInt('0x' + hex(b)).toString(10);
 // ---------------------------------------------------------------- BTC process
 let btc = 100000, seq = 1000000, tradeId = 5000;
 const priceAt = new Map(); // unix second -> last price in that second
+const initialSecond = Math.floor(Date.now() / 1000);
+for (let second = initialSecond - 400; second < initialSecond; ++second)
+  priceAt.set(second, btc); // Synthetic flat prehistory for the first round.
 function normal() {
   let u = 0, v = 0;
   while (u === 0) u = Math.random();
@@ -80,7 +84,11 @@ function roundFor(start) {
   r.books[up] = { bids: new Map(), asks: new Map() };
   r.books[down] = { bids: new Map(), asks: new Map() };
   rounds.set(start, r);
-  for (const k of [...rounds.keys()]) if (k < start - 3600) rounds.delete(k);
+  for (const k of [...rounds.keys()]) if (k < start - 3600) {
+    const expired = rounds.get(k);
+    tokenIndex.delete(expired.up); tokenIndex.delete(expired.down);
+    rounds.delete(k);
+  }
   return r;
 }
 const tokenIndex = new Map();
@@ -141,7 +149,7 @@ function bookJson(r, token, ts) {
 }
 function requote(r, nowMs, force) {
   const nowS = nowMs / 1000;
-  if (r.strike === null && nowS >= r.start) r.strike = priceAtSecond(r.start);
+  if (r.strike === null && nowS >= r.start) r.strike = twap60(priceAt, r.start);
   if (!force && nowS < r.nextQuote) return;
   r.nextQuote = nowS + (-Math.log(1 - Math.random()) * CFG.mmLagMean);
   r.mmFair = Math.min(0.985, Math.max(0.015, theo(r, nowS)));
@@ -251,7 +259,7 @@ if (CFG.snapshotEvery > 0)
 // ---------------------------------------------------------------- REST (gamma, clob h1/h2, rpc)
 const isoS = (s) => new Date(s * 1000).toISOString().replace('.000Z', 'Z');
 function resolved(r) { return Date.now() / 1000 >= r.end + CFG.resolveDelay; }
-function upWon(r) { return priceAtSecond(r.end) >= (r.strike ?? priceAtSecond(r.start)); }
+function upWon(r) { return twap60(priceAt, r.end) >= (r.strike ?? twap60(priceAt, r.start)); }
 function gammaEvent(start) {
   const r = roundFor(start), closed = resolved(r);
   const won = closed ? upWon(r) : null;
@@ -259,7 +267,7 @@ function gammaEvent(start) {
     id: String(start), slug: 'btc-updown-5m-' + start, active: true, closed, endDate: isoS(r.end),
     markets: [{
       id: String(6700000 + (start / 300) % 100000), conditionId: r.cid, slug: 'btc-updown-5m-' + start,
-      active: true, closed, acceptingOrders: !closed, enableOrderBook: true,
+      active: true, closed, acceptingOrders: !closed, enableOrderBook: true, version: 'v1',
       eventStartTime: isoS(start), endDate: isoS(r.end),
       outcomes: '["Up", "Down"]', clobTokenIds: JSON.stringify([r.up, r.down]),
       outcomePrices: closed ? JSON.stringify(won ? ['1', '0'] : ['0', '1']) : '["0.5", "0.5"]',

@@ -23,7 +23,14 @@ fail() {
   printf 'FAIL  %s\n' "$*"
   fails=$((fails + 1))
 }
-setting() { sed -n "s/^$1=//p" .env.live 2>/dev/null | tail -n 1; }
+stop_file="$sniper_root/STOP_LIVE"
+journal="$sniper_root/state/paper/sniper.jsonl"
+if command -v jq >/dev/null 2>&1; then
+  have_jq=1
+else
+  have_jq=0
+  fail "jq is required for preflight: install it with sudo apt-get install jq"
+fi
 
 # ---- this machine
 os=$(. /etc/os-release 2>/dev/null && printf '%s' "${VERSION_ID:-unknown}")
@@ -65,29 +72,44 @@ else
     fail "SNIPER_LIVE_CANARY=1 is not exported"
   elif [[ -z ${POLY_PRIVATE_KEY:-} ]]; then
     fail "POLY_PRIVATE_KEY is not exported (read it with: read -rsp 'Key: ' POLY_PRIVATE_KEY; export POLY_PRIVATE_KEY)"
-  elif answer=$(./bin/sniper-cpp --config .env.live --live --check 2>&1 >/dev/null); then
-    ok "live settings accepted"
   else
-    fail "live settings refused: ${answer}"
-  fi
-  loss=$(setting SNIPER_CANARY_MAX_LOSS_USD)
-  if [[ ! -e state/live/live_canary_state.json ]] &&
-    ! awk -v v="${loss:-999}" 'BEGIN { exit !(v + 0 <= 5) }'; then
-    fail "first live session: the loss budget is \$${loss:-unset}, above \$5 (run bash scripts/prepare-live.sh)"
-  else
-    ok "loss budget is \$${loss:-unset}"
-  fi
-  if [[ $(setting SNIPER_CANARY_HARD_STOP) == 0 ]]; then
-    warn "SNIPER_CANARY_HARD_STOP=0: a reached budget grows after each pause"
+    mode=(--live)
+    ((dry == 0)) || mode+=(--dry-run)
+    if answer=$(./bin/sniper-cpp --config .env.live "${mode[@]}" --check 2>&1); then
+      if ((have_jq)) &&
+        jq -e '.live_canary.max_loss_usd | type == "number"' <<< "$answer" >/dev/null &&
+        jq -e '.live_canary.hard_stop | type == "boolean"' <<< "$answer" >/dev/null &&
+        jq -e '.paths | [.state_dir, .stop_file, .paper_journal] | all(type == "string" and length > 0)' <<< "$answer" >/dev/null; then
+        ok "live settings accepted"
+        loss=$(jq -r '.live_canary.max_loss_usd' <<< "$answer")
+        state_dir=$(jq -r '.paths.state_dir' <<< "$answer")
+        stop_file=$(jq -r '.paths.stop_file' <<< "$answer")
+        journal=$(jq -r '.paths.paper_journal' <<< "$answer")
+        if [[ ! -e "$state_dir/live_canary_state.json" ]] &&
+          ! jq -e '.live_canary.max_loss_usd <= 5' <<< "$answer" >/dev/null; then
+          fail "first live session: the loss budget is \$${loss}, above \$5 (run bash scripts/prepare-live.sh)"
+        else
+          ok "loss budget is \$${loss}"
+        fi
+        if jq -e '.live_canary.hard_stop == false' <<< "$answer" >/dev/null; then
+          warn "SNIPER_CANARY_HARD_STOP=0: a reached budget grows after each pause"
+        fi
+      else
+        fail "could not read effective live settings; rebuild bin/ and install jq"
+      fi
+    else
+      fail "live settings refused (inspect with ./bin/sniper-cpp --config .env.live --live --check)"
+    fi
   fi
 fi
-if [[ -e STOP_LIVE ]]; then
-  fail "STOP_LIVE exists, which blocks new orders: rm STOP_LIVE when you are ready"
+if [[ -e STOP_LIVE || -e $stop_file ]]; then
+  fail "STOP_LIVE exists ($stop_file), which blocks new orders: remove it only when you are ready"
 fi
 
 # ---- the venue, from this server
-server=$(curl -sS --max-time 10 https://clob.polymarket.com/time 2>/dev/null | tr -cd '0-9')
-if [[ -n $server ]]; then
+server=$(curl --fail --silent --show-error --max-time 10 https://clob.polymarket.com/time 2>/dev/null) || server=""
+if [[ $server =~ ^[0-9]{9,12}$ ]]; then
+  server=$((10#$server))
   skew=$(($(date +%s) - server))
   if ((skew >= -2 && skew <= 2)); then
     ok "venue clock within 2 seconds of this server"
@@ -101,12 +123,19 @@ fi
 # ---- the 24-hour paper run (required unless explicitly skipped)
 # The longest unbroken stretch of the once-a-minute summaries, so short runs days
 # apart do not add up to 24 hours.
-journal=state/paper/sniper.jsonl
 span=0
 if [[ -f $journal ]]; then
-  span=$(grep '"result":"summary"' "$journal" | grep -o '"wall":[0-9.]*' | cut -d: -f2 |
-    awk 'NR > 1 { gap = $1 - prev; run = gap <= 180 ? run + gap : 0; if (run > best) best = run }
-         { prev = $1 } END { printf "%d", best }')
+  span=$(awk '
+    /"result"[[:space:]]*:[[:space:]]*"summary"/ {
+      if ($0 ~ /"final"[[:space:]]*:[[:space:]]*true/) { run = 0; prev = 0; next }
+      if (!match($0, /"wall"[[:space:]]*:[[:space:]]*[0-9]+([.][0-9]+)?/)) { run = 0; prev = 0; next }
+      stamp = substr($0, RSTART, RLENGTH); sub(/.*:/, "", stamp); now = stamp + 0
+      gap = now - prev
+      run = prev > 0 && gap > 0 && gap <= 180 ? run + gap : 0
+      if (run > best) best = run
+      prev = now
+    }
+    END { printf "%d", best }' "$journal")
 fi
 span=${span:-0}
 hours=$((span / 3600))

@@ -1,0 +1,2 @@
+20000 cases {'fak': 2362, 'factors': 1141, 'repr': 1231, 'kelly': 1146, 'budget': 1181, 'fair': 1179, 'fee': 1141, 'fair_limit': 1165, 'dd_stop': 1218, 'fok': 2370, 'risk_total': 1119, 'min_entry': 1205, 'fak_shares': 1175, 'round': 1196, 'cent': 1171}; refusals compared {'fak': 1408, 'fok': 1841, 'fak_shares': 849}
+mismatches: 0

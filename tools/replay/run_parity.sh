@@ -32,7 +32,9 @@ printf '%-14s %-6s %8s %8s %10s\n' config seed rows decisions parity
 for seed in $seeds; do
   for entry in "${configs[@]}"; do
     name=${entry%%|*} cfg=${entry#*|}
-    rec="$out/rec-$seed${name/drawdown/-dd}.jsonl"
+    suffix=""
+    [[ $name != drawdown ]] || suffix="-dd"
+    rec="$out/rec-$seed$suffix.jsonl"
     flags=""
     [[ $name == drawdown ]] && flags="--drawdown"
     [[ -f $rec ]] || python3 "$here/make_recording.py" "$rec" --seed "$seed" --rounds 4 $flags >/dev/null

@@ -1,0 +1,30 @@
+ BTC SNIPER   PAPER   btc-updown-5m-1794067200  T-47s   ACTIVE                          11:04:13 ET
+┌─ TRIGGER ────────────────────┐┌─ MARKET ──────────────────────────┐┌─ ACCOUNT PAPER ─────────────┐
+│feed      coinbase LIVE       ││round     btc-updown-5m-1794067200 ││cash      $996.76            │
+│BTC mid   99,763.52           ││left      ██▋░░░░░░░░░░░░░░   47s  ││pos value $0.17              │
+│fair      vol 1.50bp  UP .04->││          UP          DOWN         ││equity    $996.93            │
+│move      -0.41bp /250ms k0.5 ││best bid  0.010       0.970        ││realized  $0.00              │
+│signals   981  242.5/min  last││best ask  0.030       0.990        ││unrealzd  -$3.07             │
+│orders    4  fill 1  miss 3  2││book      LIVE 1086ms LIVE 1086ms  ││total P/L -$3.07             │
+│order     FAK +0.02 snd N/A ac││this rnd  fills 1/20  UP 17  DN 0 /││fees      $0.18  0/0         │
+│                              ││                                   ││                             │
+└──────────────────────────────┘└───────────────────────────────────┘└─────────────────────────────┘
+┌─ ORDERS ───────────────────────────────────────────────┐┌─ HEALTH ───────────────────────────────┐
+│TIME     SIDE BTC     ASK   LIMIT RESULT  FILLED        ││NET ms    coinbase 1  clob 1            │
+│11:02:47 DOWN -3.45   0.870 0.870 REFUSED               ││COINBASE  LIVE         sockets 2/2 behin│
+│11:01:37 DOWN -4.21   0.790 0.800 REFUSED               ││POLY BOOK LIVE         resync waiting 0 │
+│11:01:36 UP   +3.58   0.180 0.180 FILLED  17.0@0.180    ││CLOB H2   OK                            │
+│11:01:24 DOWN -3.26   0.780 0.780 MISSED                ││USER WS   ABSENT       paper            │
+│                                                        ││SETTLE    OK           pending 0        │
+│                                                        ││LEDGER    OK           entries 3        │
+│                                                        ││JOURNAL   OK                            │
+└────────────────────────────────────────────────────────┘└────────────────────────────────────────┘
+┌─ POSITION ─────────────────────────┐┌─ SETTLEMENT ────── 11:00-11:05 ┐┌─ MARKETS ────────────────┐
+│SIDE   SHARES   COST   VALUE     P/L││MARKET STATUS ACTIVE            ││ACTIVE MARKET             │
+│UP     17.000  $3.24   $0.17  -$3.07││RESULT        --                ││11:00 ACTIVE       T-47s  │
+│DOWN    0.000  $0.00   $0.00   $0.00││PENDING AGE   --                ││PREVIOUS MARKETS          │
+│                                    ││LAST SETTLED  --                ││  none yet this session   │
+│                                    ││                                ││                          │
+│                                    ││                                ││                          │
+│                                    ││                                ││                          │
+└────────────────────────────────────┘└────────────────────────────────┘└──────────────────────────┘

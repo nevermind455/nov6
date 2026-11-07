@@ -161,6 +161,10 @@ int main(int argc, char **argv) {
     return 1;
   ReplayEnv env;
   env.out.open(argv[2]);
+  if (!env.out) {
+    std::cerr << "could not open replay output\n";
+    return 1;
+  }
   env.now_mono = events[0]["t"].get<double>();
   env.offset = events[0]["w"].get<double>() - env.now_mono;
   SniperSettings s;
@@ -184,6 +188,25 @@ int main(int argc, char **argv) {
   std::optional<Json> current, prepared;
   std::map<std::string, BookView> rest_views;
   std::set<std::string> fetched;
+  auto cache_rules = [&](const Json &r, bool refresh) {
+    auto c = r["cond"].get<std::string>();
+    if (!refresh && fetched.count(c))
+      return;
+    fetched.insert(c);
+    const Json &x = r["rules"];
+    MarketRules m;
+    m.condition_id = x["condition_id"].get<std::string>();
+    m.fee_rate = D(std::string_view(x["fee_rate"].get<std::string>()));
+    m.fee_exponent = x["fee_exponent"].get<int>();
+    m.min_order_size = D(std::string_view(x["min_order_size"].get<std::string>()));
+    m.tick_size = D(std::string_view(x["tick_size"].get<std::string>()));
+    m.up_token_id = x["up_token_id"].get<std::string>();
+    m.down_token_id = x["down_token_id"].get<std::string>();
+    m.taker_delay_ms = x["taker_delay_ms"].get<double>();
+    m.taker_delay_flagged = x["taker_delay_flagged"].get<bool>();
+    m.fetched_wall = env.wall();
+    env.rules[c] = std::move(m);
+  };
 
   auto collect = [&] {
     for (auto &p : sn.take_dispatched())
@@ -259,6 +282,9 @@ int main(int argc, char **argv) {
   for (auto &e : events) {
     double t = e["t"].get<double>();
     settle(t);
+    // Timers before this event use the preceding clock sample. Apply the
+    // recorded wall clock at receipt, including NTP corrections.
+    env.offset = e["w"].get<double>() - t;
     env.now_mono = t;
     std::string k = e["k"].get<std::string>();
     if (k == "cb") {
@@ -296,24 +322,9 @@ int main(int argc, char **argv) {
       } else
         prepared = r;
       env.books.set_active(tokens());
-      std::string c = r["cond"].get<std::string>();
-      if (!fetched.count(c)) {
-        fetched.insert(c);
-        const Json &x = r["rules"];
-        MarketRules m;
-        m.condition_id = x["condition_id"].get<std::string>();
-        m.fee_rate = D(std::string_view(x["fee_rate"].get<std::string>()));
-        m.fee_exponent = x["fee_exponent"].get<int>();
-        m.min_order_size =
-            D(std::string_view(x["min_order_size"].get<std::string>()));
-        m.tick_size = D(std::string_view(x["tick_size"].get<std::string>()));
-        m.up_token_id = x["up_token_id"].get<std::string>();
-        m.down_token_id = x["down_token_id"].get<std::string>();
-        m.taker_delay_ms = x["taker_delay_ms"].get<double>();
-        m.taker_delay_flagged = x["taker_delay_flagged"].get<bool>();
-        m.fetched_wall = env.wall();
-        env.rules[c] = m;
-      }
+      cache_rules(r, false);
+    } else if (k == "rules") {
+      cache_rules(e, true);
     } else if (k == "rest_req") {
       std::string token = e["token"].get<std::string>();
       BookView v = env.books.view(token);
@@ -339,8 +350,10 @@ int main(int argc, char **argv) {
           o.source = "rest";
           o.ts_ms = e["timestamp"];
           o.received_mono = env.now_mono;
-          o.tick = e["tick"].get<double>();
-          o.hash = e["hash"].get<std::string>();
+          if (!e["tick"].is_null())
+            o.tick = e["tick"].get<double>();
+          if (!e["hash"].is_null())
+            o.hash = e["hash"].get<std::string>();
           o.require_exchange_ts = true;
           env.books.apply_snapshot(token, e["bids"], e["asks"], o);
         }
@@ -353,5 +366,10 @@ int main(int argc, char **argv) {
     }
   }
   settle(events.back()["t"].get<double>() + 30.0);
+  env.out.flush();
+  if (!env.out) {
+    std::cerr << "replay output write failed\n";
+    return 1;
+  }
   return 0;
 }

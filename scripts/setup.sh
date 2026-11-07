@@ -10,4 +10,9 @@ chmod 600 .env
 chmod 755 bin/sniper-cpp bin/sniper-tests
 ./bin/sniper-cpp --self-test
 ./bin/sniper-cpp --check
+for utility in curl jq; do
+  if ! command -v "$utility" >/dev/null 2>&1; then
+    printf 'Live preflight needs %s; install with: sudo apt-get install curl jq\n' "$utility"
+  fi
+done
 printf '%s\n' 'Ready for paper evaluation: bash scripts/run-paper.sh'

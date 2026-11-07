@@ -4,23 +4,33 @@
 namespace sniper {
 bool ServerClock::sample(double server, double sent, double received,
                          double rtt, double mono) {
+  constexpr double timestamp_limit = 0x1p63;
   if (!std::isfinite(server) || !std::isfinite(sent) ||
-      !std::isfinite(received) || !std::isfinite(rtt) || server <= 0 ||
+      !std::isfinite(received) || !std::isfinite(rtt) || !std::isfinite(mono) ||
+      server <= 0 || server >= timestamp_limit || sent < 0 ||
+      received >= timestamp_limit || mono < 0 || (at >= 0 && mono < at) ||
       rtt < 0 || rtt > 500 || received < sent ||
       std::abs((received - sent) * 1000 - rtt) > 1000)
     return false;
   double mid = server + (server == std::floor(server) ? .5 : 0);
-  offsets.push_back(mid - (sent + received) / 2);
-  if (offsets.size() > 5)
-    offsets.pop_front();
-  auto sorted = std::vector<double>(offsets.begin(), offsets.end());
+  auto next_offsets = offsets;
+  next_offsets.push_back(mid - (sent + received) / 2);
+  if (next_offsets.size() > 5)
+    next_offsets.pop_front();
+  auto sorted = std::vector<double>(next_offsets.begin(), next_offsets.end());
   std::sort(sorted.begin(), sorted.end());
-  offset =
+  double next_offset =
       sorted.size() % 2
           ? sorted[sorted.size() / 2]
           : (sorted[sorted.size() / 2 - 1] + sorted[sorted.size() / 2]) / 2;
+  double next_server_at = received + next_offset;
+  if (!std::isfinite(next_server_at) || next_server_at < 0 ||
+      next_server_at >= timestamp_limit)
+    return false;
+  offsets = std::move(next_offsets);
+  offset = next_offset;
   at = mono;
-  server_at = received + offset;
+  server_at = next_server_at;
   rtts.push_back(rtt);
   if (rtts.size() > 50)
     rtts.pop_front();
@@ -29,9 +39,12 @@ bool ServerClock::sample(double server, double sent, double received,
 std::int64_t ServerClock::now(double mono) const {
   if (at < 0)
     throw std::runtime_error("server clock never synced");
-  if (mono - at < 0 || mono - at > 60)
+  if (!std::isfinite(mono) || mono - at < 0 || mono - at > 60)
     throw std::runtime_error("server clock stale");
-  return static_cast<std::int64_t>(server_at + mono - at);
+  double stamp = server_at + (mono - at);
+  if (!std::isfinite(stamp) || stamp < 0 || stamp >= 0x1p63)
+    throw std::runtime_error("server clock timestamp out of range");
+  return static_cast<std::int64_t>(stamp);
 }
 double ServerClock::median_rtt() const {
   if (rtts.empty())
@@ -43,7 +56,10 @@ double ServerClock::median_rtt() const {
 }
 Credentials derive_credentials(const RestClient &rest, const Signer &signer) {
   auto time = rest.get("https://clob.polymarket.com/time");
-  auto stamp = static_cast<std::int64_t>(number(time));
+  double server = number(time);
+  if (server <= 0 || server >= 0x1p63)
+    throw std::runtime_error("invalid credential server timestamp");
+  auto stamp = static_cast<std::int64_t>(server);
   auto signature = signer.sign(auth_digest(signer.address(), stamp));
   Headers headers{{"POLY_ADDRESS", signer.address()},
                   {"POLY_NONCE", "0"},
@@ -209,6 +225,8 @@ ParsedTrade parse_trade(const Json &j,
   t.token = j.at("asset_id");
   t.condition = j.at("market");
   t.status = j.at("status");
+  if (t.id.empty())
+    throw std::runtime_error("private fill omitted its trade id");
   auto it = intents.find(t.order);
   if (it == intents.end())
     throw std::runtime_error("fill the native bot did not authorize");
@@ -219,14 +237,22 @@ ParsedTrade parse_trade(const Json &j,
   auto price = as_units(j.at("price"));
   if (t.shares <= 0 || price <= 0 || price >= U)
     throw std::runtime_error("invalid private fill");
+  if (i.fee_rate < 0 || i.fee_rate > U || i.fee_exponent < 1 ||
+      i.fee_exponent > 8)
+    throw std::runtime_error("invalid authorized fee rules");
   t.cost = multiply(t.shares, price);
   t.fee = fee_total(t.shares, price, i.fee_rate, i.fee_exponent);
+  if (j.contains("maker_orders") && !j.at("maker_orders").is_null() &&
+      !j.at("maker_orders").is_array())
+    throw std::runtime_error("invalid maker-leg collection");
   if (j.contains("maker_orders") && j.at("maker_orders").is_array() &&
       !j.at("maker_orders").empty()) {
     Units size = 0, cost = 0, fees = 0;
     for (auto &leg : j.at("maker_orders")) {
       auto p = as_units(leg.at("price")),
            sh = as_units(leg.at("matched_amount"));
+      if (sh <= 0 || p <= 0 || p >= U)
+        throw std::runtime_error("invalid maker leg");
       if (leg.at("asset_id") != t.token) {
         auto opposite = i.up == t.token ? i.down : i.up;
         if (opposite.empty() || leg.at("asset_id") != opposite)
@@ -234,11 +260,14 @@ ParsedTrade parse_trade(const Json &j,
               "maker leg token is outside this binary market");
         p = U - p;
       }
-      if (sh <= 0 || p <= 0 || p >= U)
-        throw std::runtime_error("invalid maker leg");
-      size += sh;
-      cost += multiply(sh, p);
-      fees += fee_total(sh, p, i.fee_rate, i.fee_exponent);
+      auto add = [](Units &total, Units amount) {
+        if (amount < 0 || total > std::numeric_limits<Units>::max() - amount)
+          throw std::runtime_error("private maker-leg total overflow");
+        total += amount;
+      };
+      add(size, sh);
+      add(cost, multiply(sh, p));
+      add(fees, fee_total(sh, p, i.fee_rate, i.fee_exponent));
     }
     if (std::abs(size - t.shares) > 1)
       throw std::runtime_error("maker legs do not match trade size");

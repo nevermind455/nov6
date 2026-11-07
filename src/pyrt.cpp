@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 
 namespace sniper::py {
 namespace {
@@ -84,6 +85,25 @@ std::string strip(std::string_view s) {
     --b;
   return std::string(s.substr(a, b - a));
 }
+// Decimal(str(x)) is deliberately used for strategy arithmetic, but Python's
+// round(float, negative_digits) rounds the exact binary value instead.
+Dec exact_float(double x) {
+  int exponent;
+  const double fraction = std::frexp(std::abs(x), &exponent);
+  constexpr int bits = std::numeric_limits<double>::digits;
+  Dec d;
+  d.neg = std::signbit(x);
+  d.coef = static_cast<unsigned long long>(std::ldexp(fraction, bits));
+  const int shift = exponent - bits;
+  if (shift >= 0)
+    d.coef <<= shift;
+  else {
+    d.coef *= boost::multiprecision::pow(BigInt(5),
+                                         static_cast<unsigned>(-shift));
+    d.exp = shift;
+  }
+  return d;
+}
 } // namespace
 
 std::string repr(double x) {
@@ -137,21 +157,27 @@ double round(double x, int ndigits) {
     return x;
   if (ndigits < -308)
     return 0.0 * x;
-  char buf[512];
+  char buf[1024]; // max double integer digits plus up to 323 fractional digits
   if (ndigits >= 0) {
     auto res = std::to_chars(buf, buf + sizeof buf, x,
                              std::chars_format::fixed, ndigits);
+    if (res.ec != std::errc{} || res.ptr == buf + sizeof buf)
+      throw std::overflow_error("rounded float formatting overflow");
     *res.ptr = 0;
     return std::strtod(buf, nullptr);
   }
   // negative ndigits: round to tens/hundreds with ties to even
-  Dec d = Dec::from_double(x);
+  Dec d = exact_float(x);
   Dec r = rescale(d, -ndigits, Rounding::HalfEven);
   double v = r.to_double();
+  if (!std::isfinite(v))
+    throw std::overflow_error("rounded value too large to represent");
   return v == 0 ? std::copysign(0.0, x) : v;
 }
 
 std::string fixed(double x, int places) {
+  if (places < 0)
+    throw ValueError("fixed precision must be nonnegative");
   if (std::isnan(x))
     return "nan";
   if (std::isinf(x))
@@ -159,7 +185,19 @@ std::string fixed(double x, int places) {
   char buf[512];
   auto res = std::to_chars(buf, buf + sizeof buf, x, std::chars_format::fixed,
                            places);
-  return std::string(buf, res.ptr);
+  if (res.ec == std::errc{})
+    return std::string(buf, res.ptr);
+  if (res.ec != std::errc::value_too_large)
+    throw ValueError("float formatting failed");
+  std::string out(static_cast<std::size_t>(places) +
+                      std::numeric_limits<double>::max_exponent10 + 5,
+                  '\0');
+  res = std::to_chars(out.data(), out.data() + out.size(), x,
+                      std::chars_format::fixed, places);
+  if (res.ec != std::errc{})
+    throw ValueError("float formatting failed");
+  out.resize(res.ptr - out.data());
+  return out;
 }
 
 std::string fmt_g(double x) {
@@ -326,8 +364,12 @@ long long Dec::to_ll() const {
     v *= pow10(exp);
   else if (exp < 0)
     v /= pow10(-exp);
-  long long r = v.convert_to<long long>();
-  return neg ? -r : r;
+  if (neg)
+    v = -v;
+  if (v < std::numeric_limits<long long>::min() ||
+      v > std::numeric_limits<long long>::max())
+    throw ValueError("decimal integer is outside native integer range");
+  return v.convert_to<long long>();
 }
 
 bool Dec::integral() const {

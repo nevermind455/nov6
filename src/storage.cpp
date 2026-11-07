@@ -8,6 +8,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 namespace sniper {
+static Units checked_money(__int128 value) {
+  if (value > std::numeric_limits<Units>::max() || value < std::numeric_limits<Units>::min())
+    throw std::overflow_error("ledger monetary total overflow");
+  return static_cast<Units>(value);
+}
 static void all_write(int fd, std::string_view text) {
   while (!text.empty()) {
     auto n = ::write(fd, text.data(), text.size());
@@ -77,6 +82,8 @@ DurableLog::~DurableLog() {
 void DurableLog::replay(
     const std::function<void(std::uint64_t, const Json &)> &apply) {
   std::ifstream in(path_, std::ios::binary);
+  if (!in)
+    throw std::runtime_error("cannot read durable journal");
   std::string line;
   std::uint64_t next = 1;
   while (std::getline(in, line)) {
@@ -88,6 +95,8 @@ void DurableLog::replay(
       throw std::runtime_error("damaged durable journal: sequence or checksum");
     apply(next++, row.at("event"));
   }
+  if (in.bad())
+    throw std::runtime_error("error reading durable journal");
   seq_ = next - 1;
 }
 std::uint64_t DurableLog::append(const Json &event) {
@@ -220,6 +229,8 @@ Json intent_json(const Intent &i) {
           {"fee_exponent", i.fee_exponent},
           {"trades", i.trades},
           {"fill_slot", i.fill_slot},
+          {"canary_slot_owned", i.canary_slot_owned},
+          {"canary_session", i.canary_session},
           {"min_entry", i.min_entry},
           {"sent_wall", i.sent_wall}};
 }
@@ -248,6 +259,8 @@ Intent intent_from_json(const Json &j) {
   i.matched_cost = j.at("matched_cost");
   i.trades = j.at("trades").get<std::vector<std::string>>();
   i.fill_slot = j.at("fill_slot");
+  i.canary_slot_owned = j.value("canary_slot_owned", false);
+  i.canary_session = j.value("canary_session", 0.0);
   i.min_entry = j.at("min_entry");
   i.sent_wall = j.at("sent_wall");
   return i;
@@ -257,13 +270,22 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
       reference_cash(live ? 0 : start), high_water(live ? 0 : start) {
   lock_ = std::make_unique<FileLock>(p.string() + ".lock");
   std::uint64_t snapshot_seq = 0;
-  if (std::filesystem::exists(p)) {
+  const bool has_snapshot = std::filesystem::exists(p);
+  if (has_snapshot) {
     std::ifstream f(p);
     Json j;
     f >> j;
-    if (j.at("format") != "sniper-native-ledger-1")
+    if (j.at("format") != "sniper-native-ledger-1" &&
+        j.at("format") != "sniper-native-ledger-2")
       throw std::runtime_error(
           "ledger format differs: use separate native ledger files");
+    if (j.at("format") == "sniper-native-ledger-2") {
+      auto expected = j.at("sha256").get<std::string>();
+      auto body = j;
+      body.erase("sha256");
+      if (expected != sha256(body.dump()))
+        throw std::runtime_error("damaged ledger snapshot: checksum mismatch");
+    }
     snapshot_seq = j.at("sequence");
     cash = j.at("cash");
     reference_cash = j.at("reference_cash");
@@ -295,12 +317,30 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
   for (auto &[id, i] : orders)
     reindex(id);
   wal_.replay([&](std::uint64_t seq, const Json &e) {
+    // The retained authorization event identifies the original session even
+    // for snapshots written before slot ownership fields were introduced.
+    if (e.at("type") == "intent") {
+      auto id = e.at("intent").at("id").get<std::string>();
+      auto it = orders.find(id);
+      if (it != orders.end() && e.at("intent").value("fill_slot", false)) {
+        it->second.canary_slot_owned = true;
+        it->second.canary_session = e.at("canary").value("started", 0.0);
+      }
+    }
     if (seq > snapshot_seq)
       apply(e);
   });
+  if (!has_snapshot && wal_.sequence() != 0)
+    throw std::runtime_error("ledger snapshot missing for existing history; initial cash is ambiguous");
   if (snapshot_seq > wal_.sequence())
     throw std::runtime_error("snapshot is ahead of durable journal");
   entries = wal_.sequence();
+  if (!has_snapshot)
+    snapshot(); // Pin the initial bankroll before any authorization can commit.
+  for (const auto &[id, i] : orders) {
+    (void)i;
+    restore_fill_slot(id);
+  }
 }
 void Ledger::commit(Json e) {
   wal_.append(e);
@@ -311,6 +351,10 @@ void Ledger::apply(const Json &e) {
   auto type = e.at("type").get<std::string>();
   if (type == "intent") {
     auto i = intent_from_json(e.at("intent"));
+    if (i.fill_slot) {
+      i.canary_slot_owned = true;
+      i.canary_session = e.at("canary").value("started", 0.0);
+    }
     orders[i.id] = i;
     canary.load(e.at("canary"));
     if (i.min_entry)
@@ -339,14 +383,14 @@ void Ledger::apply(const Json &e) {
     auto &p = positions[i.token];
     p.token = i.token;
     p.condition = i.condition;
-    p.shares += sh;
-    p.cost += cost;
-    p.fees += fee;
-    cash -= cost + fee;
-    fees += fee;
-    i.booked_shares += sh;
-    i.booked_cost += cost;
-    i.booked_fee += fee;
+    p.shares = checked_money(static_cast<__int128>(p.shares) + sh);
+    p.cost = checked_money(static_cast<__int128>(p.cost) + cost);
+    p.fees = checked_money(static_cast<__int128>(p.fees) + fee);
+    cash = checked_money(static_cast<__int128>(cash) - cost - fee);
+    fees = checked_money(static_cast<__int128>(fees) + fee);
+    i.booked_shares = checked_money(static_cast<__int128>(i.booked_shares) + sh);
+    i.booked_cost = checked_money(static_cast<__int128>(i.booked_cost) + cost);
+    i.booked_fee = checked_money(static_cast<__int128>(i.booked_fee) + fee);
     reindex(i.id);
   } else if (type == "settle") {
     auto condition = e.at("condition").get<std::string>();
@@ -357,15 +401,17 @@ void Ledger::apply(const Json &e) {
       if (p == positions.end() || p->second.settled)
         continue;
       auto &v = p->second;
+      if (v.condition != condition)
+        throw std::runtime_error("settlement history contains another condition's position");
       Units payout = multiply(v.shares, it.value().get<Units>());
-      cash += payout;
-      auto pnl = payout - v.cost - v.fees;
-      realized += pnl;
+      cash = checked_money(static_cast<__int128>(cash) + payout);
+      auto pnl = checked_money(static_cast<__int128>(payout) - v.cost - v.fees);
+      realized = checked_money(static_cast<__int128>(realized) + pnl);
       if (pnl < 0)
-        canary.settled_loss -= pnl;
+        canary.settled_loss = checked_money(static_cast<__int128>(canary.settled_loss) - pnl);
       v.settled = true;
     }
-    high_water = std::max(high_water, reference_cash + realized);
+    high_water = std::max(high_water, checked_money(static_cast<__int128>(reference_cash) + realized));
   } else if (type == "risk") {
     reference_cash = e.at("reference_cash");
     high_water = e.at("high_water");
@@ -375,8 +421,19 @@ void Ledger::apply(const Json &e) {
     auto &i = orders.at(e.at("id").get<std::string>());
     if (i.fill_slot && i.matched_shares == 0 && i.booked_shares == 0) {
       i.fill_slot = false;
-      if (canary.fills > 0)
+      if (i.canary_slot_owned && i.canary_session == canary.started && canary.fills > 0)
         --canary.fills;
+    }
+  } else if (type == "restore_slot") {
+    auto &i = orders.at(e.at("id").get<std::string>());
+    if (!i.fill_slot && i.canary_slot_owned &&
+        (i.matched_shares > 0 || i.booked_shares > 0)) {
+      i.fill_slot = true;
+      if (i.canary_session == canary.started) {
+        if (canary.fills == std::numeric_limits<Units>::max())
+          throw std::overflow_error("canary fill count overflow");
+        ++canary.fills;
+      }
     }
   } else if (type == "canary")
     canary.load(e.at("state"));
@@ -403,11 +460,14 @@ void Ledger::status(std::string_view id, std::string_view s, Units shares,
                     Units cost) {
   if (!orders.count(std::string(id)))
     throw std::runtime_error("unauthorized order status");
+  if (shares < 0 || cost < 0)
+    throw std::invalid_argument("negative order match totals");
   commit({{"type", "status"},
           {"id", id},
           {"status", s},
           {"shares", shares},
           {"cost", cost}});
+  restore_fill_slot(id);
 }
 bool Ledger::fill(std::string_view trade, std::string_view id, Units shares,
                   Units cost, Units fee) {
@@ -420,23 +480,47 @@ bool Ledger::fill(std::string_view trade, std::string_view id, Units shares,
     throw std::runtime_error("new fill arrived after recorded settlement");
   if (trade_ids.size() >= 200000)
     throw std::runtime_error("native trade capacity reached");
-  if (cost > multiply(shares, it->second.limit) + 1)
+  if (static_cast<__int128>(cost) > static_cast<__int128>(multiply(shares, it->second.limit)) + 1)
     throw std::runtime_error("fill exceeds signed price cap");
-  if (it->second.booked_cost + cost > it->second.stake + 1)
+  if (static_cast<__int128>(it->second.booked_cost) + cost > static_cast<__int128>(it->second.stake) + 1)
     throw std::runtime_error("fill total exceeds signed collateral");
   if (it->second.matched_cost > 0 &&
-      it->second.booked_cost + cost > it->second.matched_cost + 1)
+      static_cast<__int128>(it->second.booked_cost) + cost > static_cast<__int128>(it->second.matched_cost) + 1)
     throw std::runtime_error("fill cost exceeds reply total");
+  const auto &intent = it->second;
+  checked_money(static_cast<__int128>(intent.booked_shares) + shares);
+  checked_money(static_cast<__int128>(intent.booked_cost) + cost);
+  checked_money(static_cast<__int128>(intent.booked_fee) + fee);
+  checked_money(static_cast<__int128>(intent.booked_cost) + intent.booked_fee + cost + fee);
+  checked_money(static_cast<__int128>(cost) + fee);
+  auto pos = positions.find(intent.token);
+  if (pos != positions.end()) {
+    if (pos->second.condition != intent.condition || pos->second.settled)
+      throw std::runtime_error("fill position identity or settlement disagrees");
+    checked_money(static_cast<__int128>(pos->second.shares) + shares);
+    checked_money(static_cast<__int128>(pos->second.cost) + cost);
+    checked_money(static_cast<__int128>(pos->second.fees) + fee);
+    checked_money(static_cast<__int128>(pos->second.cost) + pos->second.fees + cost + fee);
+  }
+  checked_money(static_cast<__int128>(cash) - cost - fee);
+  checked_money(static_cast<__int128>(fees) + fee);
   commit({{"type", "fill"},
           {"trade", trade},
           {"id", id},
           {"shares", shares},
           {"cost", cost},
           {"fee", fee}});
+  restore_fill_slot(id);
   return true;
 }
 bool Ledger::settle(std::string_view condition,
                     const std::map<std::string, Units> &payouts) {
+  for (const auto &[token, payout] : payouts) {
+    auto position = positions.find(token);
+    if (payout < 0 || payout > U ||
+        (position != positions.end() && position->second.condition != condition))
+      throw std::invalid_argument("settlement payout or condition is invalid");
+  }
   if (settled_conditions.count(std::string(condition)))
     return false;
   for (auto &[id, i] : orders)
@@ -445,6 +529,23 @@ bool Ledger::settle(std::string_view condition,
   for (auto &[name, p] : positions)
     if (p.condition == condition && !p.settled && !payouts.count(name))
       return false;
+  __int128 next_cash = cash, next_realized = realized, next_loss = canary.settled_loss;
+  for (const auto &[token, payout] : payouts) {
+    auto pos = positions.find(token);
+    if (pos == positions.end() || pos->second.settled) continue;
+    auto value = multiply(pos->second.shares, payout);
+    auto pnl = static_cast<__int128>(value) - pos->second.cost - pos->second.fees;
+    next_cash += value;
+    next_realized += pnl;
+    if (pnl < 0) next_loss -= pnl;
+    checked_money(next_cash);
+    checked_money(next_realized);
+    checked_money(next_loss);
+  }
+  checked_money(next_cash);
+  checked_money(next_realized);
+  checked_money(next_loss);
+  checked_money(static_cast<__int128>(reference_cash) + next_realized);
   commit({{"type", "settle"}, {"condition", condition}, {"payouts", payouts}});
   return true;
 }
@@ -452,7 +553,7 @@ void Ledger::risk_rebase(Units equity, double pause_until) {
   if (equity < 0)
     equity = 0;
   commit({{"type", "risk"},
-          {"reference_cash", equity - realized},
+          {"reference_cash", checked_money(static_cast<__int128>(equity) - realized)},
           {"high_water", equity},
           {"epoch", wall_s()},
           {"pause_until", pause_until}});
@@ -473,6 +574,15 @@ void Ledger::release_fill_slot(std::string_view id) {
       it->second.matched_shares > 0 || it->second.booked_shares > 0)
     return;
   commit({{"type", "release_slot"}, {"id", id}});
+}
+void Ledger::restore_fill_slot(std::string_view id) {
+  const auto &i = orders.at(std::string(id));
+  if (i.canary_slot_owned && !i.fill_slot &&
+      (i.matched_shares > 0 || i.booked_shares > 0)) {
+    if (i.canary_session == canary.started && canary.fills == std::numeric_limits<Units>::max())
+      throw std::overflow_error("canary fill count overflow");
+    commit({{"type", "restore_slot"}, {"id", id}});
+  }
 }
 Units Ledger::holding(std::string_view token_id) const {
   auto i = positions.find(std::string(token_id));
@@ -506,7 +616,7 @@ int Ledger::round_fills(std::string_view condition) const {
   return i == round_fills_.end() ? 0 : i->second;
 }
 Units Ledger::risk_shares(std::string_view t) const {
-  auto held = holding(t);
+  __int128 held = holding(t);
   auto p = pending_.find(std::string(t));
   if (p != pending_.end())
     for (auto &id : p->second) {
@@ -514,23 +624,23 @@ Units Ledger::risk_shares(std::string_view t) const {
       held += std::max<Units>(0, std::max(i.target, i.matched_shares) -
                                      i.booked_shares);
     }
-  return held;
+  return checked_money(held);
 }
 Units Ledger::reserved() const {
-  Units total = 0;
+  __int128 total = 0;
   for (auto &[t, ids] : pending_)
     for (auto &id : ids) {
       auto &i = orders.at(id);
-      total += std::max<Units>(0, i.reserve - i.booked_cost - i.booked_fee);
+      total += std::max<__int128>(0, static_cast<__int128>(i.reserve) - i.booked_cost - i.booked_fee);
     }
-  return total;
+  return checked_money(total);
 }
 Units Ledger::open_cost() const {
-  Units total = 0;
+  __int128 total = 0;
   for (auto &[name, p] : positions)
     if (!p.settled)
-      total += p.cost + p.fees;
-  return total + reserved();
+      total += static_cast<__int128>(p.cost) + p.fees;
+  return checked_money(total + reserved());
 }
 bool Ledger::awaiting(std::string_view t) const {
   auto i = pending_.find(std::string(t));
@@ -547,7 +657,7 @@ Json Ledger::json() const {
                  {"settled", v.settled}});
   for (auto &[id, i] : orders)
     o.push_back(intent_json(i));
-  return {{"format", "sniper-native-ledger-1"},
+  Json snapshot{{"format", "sniper-native-ledger-2"},
           {"sequence", wal_.sequence()},
           {"cash", cash},
           {"reference_cash", reference_cash},
@@ -562,6 +672,8 @@ Json Ledger::json() const {
           {"settled_conditions", settled_conditions},
           {"minimum_attempts", minimum_attempts},
           {"canary", canary.json()}};
+  snapshot["sha256"] = sha256(snapshot.dump());
+  return snapshot;
 }
 void Ledger::snapshot() { atomic_file(path_, json().dump()); }
 } // namespace sniper

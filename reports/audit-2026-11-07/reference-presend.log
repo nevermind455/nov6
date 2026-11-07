@@ -1,0 +1,12 @@
+{"case": "ok", "spend": "5.0", "cap": "0.5", "shares": "10.0", "reserve": "5.35", "est_shares": "10.638297872340425", "est_price": "0.47", "est_fee": "0.1855"}
+{"case": "clamped", "spend": "9.5", "cap": "0.95", "shares": "10.0", "reserve": "10.165", "est_shares": "10.555555555555555", "est_price": "0.9", "est_fee": "0.0665"}
+{"case": "spread", "refused": "Refused: pre-send check: spread exceeds the limit"}
+{"case": "one-sided", "refused": "Refused: pre-send check: one-sided book"}
+{"case": "rules-changed", "refused": "Refused: pre-send check: market rules changed; background refresh requested"}
+{"case": "below-min", "refused": "Refused: pre-send check: order size 3 shares is below venue minimum 5"}
+{"case": "override-min", "spend": "1.5", "cap": "0.5", "shares": "3.0", "reserve": "1.605", "est_shares": "3.1914893617021276", "est_price": "0.47", "est_fee": "0.05565"}
+{"case": "not-cent", "refused": "Refused: pre-send check: 7 shares at 0.475 is not a whole-cent amount"}
+{"case": "under-1usd", "refused": "Refused: pre-send check: invalid amount for a marketable BUY order ($0.50), min size: $1"}
+{"case": "nothing-under-cap", "refused": "Refused: pre-send check: FAK no-fill: nothing at or below 0.5"}
+{"case": "thin", "spend": "5.0", "cap": "0.5", "shares": "10.0", "reserve": "5.35", "est_shares": "5.0", "est_price": "0.478", "est_fee": "0.0873"}
+{"case": "crossed", "refused": "Refused: pre-send check: public order book is crossed or locked"}

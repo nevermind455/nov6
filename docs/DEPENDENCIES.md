@@ -21,6 +21,12 @@ Ubuntu package source paths and SHA-256 values are retained in
 build; source builds using current Ubuntu packages may receive security updates.
 CMake enforces the listed non-system library release versions.
 
+The live shell launcher also requires `curl` and `jq` (`sudo apt-get install
+curl jq`). Preflight reads the native program's effective `--check` JSON, so
+exported settings and resolved state, journal and stop-file paths are checked
+with the same configuration that the live process uses. It does not source
+configuration as shell code.
+
 `third_party/sha3.c` and `sha3.h` come from `mjosaarinen/tiny_sha3` at commit
 `dcbb3192047c2a721f5f851db591871d428036a9`. The native wrapper uses Keccak-256
 domain separation for Ethereum. Known-answer tests cover the empty and `abc`
