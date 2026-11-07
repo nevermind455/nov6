@@ -805,16 +805,55 @@ std::optional<double> exchange_ms(const Json &j) {
       double n = std::stod(s);
       return std::isfinite(n) ? std::optional(n) : std::nullopt;
     }
+    if (s.size() < 19)
+      return {};
     std::tm tm{};
     std::istringstream in(s.substr(0, 19));
     in >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
     if (in.fail())
       return {};
     double ms = static_cast<double>(timegm(&tm)) * 1000;
-    if (s.size() > 19 && s[19] == '.') {
-      auto end = s.find_first_not_of("0123456789", 20);
-      ms += std::stod("0." + s.substr(20, end - 20)) * 1000;
+    std::size_t suffix = 19;
+    if (suffix < s.size() && s[suffix] == '.') {
+      auto first = ++suffix;
+      while (suffix < s.size() &&
+             std::isdigit(static_cast<unsigned char>(s[suffix])))
+        ++suffix;
+      if (suffix == first)
+        return {};
+      ms += std::stod("0." + s.substr(first, suffix - first)) * 1000;
     }
+    // timegm interprets the date and time as UTC; apply the ISO 8601 offset
+    // separately. A timestamp without a zone retains the historical UTC default.
+    if (suffix == s.size())
+      return ms;
+    if (s[suffix] == 'Z')
+      return suffix + 1 == s.size() ? std::optional(ms) : std::nullopt;
+    int sign = s[suffix] == '+' ? 1 : (s[suffix] == '-' ? -1 : 0);
+    if (!sign)
+      return {};
+    ++suffix;
+    auto two_digits = [&](int &value) {
+      if (suffix + 2 > s.size() ||
+          !std::isdigit(static_cast<unsigned char>(s[suffix])) ||
+          !std::isdigit(static_cast<unsigned char>(s[suffix + 1])))
+        return false;
+      value = (s[suffix] - '0') * 10 + (s[suffix + 1] - '0');
+      suffix += 2;
+      return true;
+    };
+    int hours = 0, minutes = 0;
+    if (!two_digits(hours))
+      return {};
+    if (suffix < s.size()) {
+      if (s[suffix] == ':')
+        ++suffix;
+      if (!two_digits(minutes))
+        return {};
+    }
+    if (suffix != s.size() || hours > 23 || minutes > 59)
+      return {};
+    ms -= sign * (hours * 3600 + minutes * 60) * 1000.0;
     return ms;
   } catch (...) {
     return {};
