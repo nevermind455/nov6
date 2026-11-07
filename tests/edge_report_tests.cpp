@@ -244,3 +244,67 @@ TEST(EdgeReport, MinimumRoundArgumentRequiresACompletePositiveInteger) {
   for (const auto *invalid : {"0", "-1", "1x", "", "9999999999999999999"})
     EXPECT_THROW(parse_min_rounds(invalid), std::invalid_argument) << invalid;
 }
+
+TEST(EdgeReport, MetadataConditionMustMatchTheJournalDecision) {
+  for (bool ledger_metadata : {false, true}) {
+    Collector c;
+    if (ledger_metadata)
+      c.add_ledger({{"orders", Json::array({{{"id", "o"}, {"token", "tok"},
+                                            {"condition", "LOSS"}}})}});
+    else
+      c.add_audit({{"order_id", "o"}, {"token_id", "tok"}, {"condition_id", "LOSS"}});
+    c.add({{"result", "filled"}, {"order_id", "o"}, {"condition_id", "WIN"},
+           {"fair", 0.6}, {"shares", 10}, {"cost", 5}, {"fee", 0}, {"wall", 100}});
+    c.add({{"result", "settlement"}, {"condition_id", "WIN"},
+           {"payouts", {{"tok", 1000000}}}});
+    auto report = c.report(1);
+    EXPECT_GT(report.invalid_rows, 0);
+    EXPECT_EQ(report.verdict, "INCOMPLETE DATA");
+    EXPECT_FALSE(report.has_profit);
+  }
+}
+
+TEST(EdgeReport, AnOutcomeTokenCannotSettleInTwoConditions) {
+  Collector c;
+  c.add({{"result", "filled"}, {"order_id", "o"}, {"condition_id", "WIN"},
+         {"fair", 0.6}, {"shares", 10}, {"cost", 5}, {"fee", 0}, {"wall", 100}});
+  c.add_audit({{"order_id", "o"}, {"token_id", "tok"}});
+  c.add({{"result", "settlement"}, {"condition_id", "WIN"},
+         {"payouts", {{"tok", 1000000}}}});
+  c.add({{"result", "settlement"}, {"condition_id", "LOSS"},
+         {"payouts", {{"tok", 0}}}});
+  auto report = c.report(1);
+  EXPECT_GT(report.invalid_rows, 0);
+  EXPECT_EQ(report.verdict, "INCOMPLETE DATA");
+  EXPECT_FALSE(report.has_profit);
+}
+
+TEST(EdgeReport, StatusOnlyPendingAcknowledgementsPreserveTheOriginalDecision) {
+  Collector c;
+  c.add_ledger({{"orders", Json::array({{{"id", "o"}, {"token", "tok"},
+                                        {"condition", "c"}}})}});
+  c.add({{"result", "pending"}, {"order_id", "o"}, {"condition_id", "c"},
+         {"fair", 0.7}, {"wall", 100}});
+  c.add({{"result", "pending"}, {"order_id", "o"}, {"acknowledged", false},
+         {"reason", "unknown native order outcome"}, {"wall", 101}});
+  c.add({{"result", "pending"}, {"order_id", "o"}, {"acknowledged", true},
+         {"reason", "awaiting FAK fill size"}, {"T6_ns", 120}, {"wall", 102}});
+  c.add({{"result", "live_fill"}, {"order_id", "o"}, {"trade_id", "t"},
+         {"shares", 10}, {"amount", 6}, {"fee", 0.1}});
+  c.add({{"result", "settlement"}, {"condition_id", "c"},
+         {"payouts", {{"tok", 1000000}}}});
+  auto report = c.report(300);
+  EXPECT_EQ(report.invalid_rows, 0);
+  EXPECT_EQ(report.fills_settled, 1);
+  EXPECT_EQ(report.scored, 1);
+  EXPECT_TRUE(report.has_profit);
+  EXPECT_NEAR(report.net, 3.9, 1e-9);
+  for (const auto &provided : {Json{{"condition_id", "other"}}, Json{{"fair", 0.2}}}) {
+    auto conflicting = c;
+    Json row{{"result", "pending"}, {"order_id", "o"}};
+    row.update(provided);
+    conflicting.add(row);
+    EXPECT_GT(conflicting.report(300).invalid_rows, 0);
+    EXPECT_EQ(conflicting.report(300).verdict, "INCOMPLETE DATA");
+  }
+}

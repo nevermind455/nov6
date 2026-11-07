@@ -1,86 +1,18 @@
-[0/1] Re-running CMake...
--- Configuring done (0.0s)
--- Generating done (0.0s)
--- Build files have been written to: /src/build-audit-asan
-[1/38] Building CXX object CMakeFiles/sniper_core.dir/src/crypto.cpp.o
-[2/38] Building CXX object CMakeFiles/sniper_core.dir/src/config.cpp.o
-[3/38] Building CXX object CMakeFiles/sniper_core.dir/src/book.cpp.o
-[4/38] Building CXX object CMakeFiles/sniper_core.dir/src/storage.cpp.o
-[5/38] Building CXX object CMakeFiles/sniper_core.dir/src/strategy.cpp.o
-[6/38] Building CXX object CMakeFiles/sniper_core.dir/src/pyrt.cpp.o
-[7/38] Building CXX object CMakeFiles/sniper_core.dir/src/paper.cpp.o
-[8/38] Building CXX object CMakeFiles/sniper_core.dir/src/settings.cpp.o
-[9/38] Building CXX object CMakeFiles/sniper_core.dir/src/sniper.cpp.o
-[10/38] Building CXX object CMakeFiles/sniper_core.dir/src/h2.cpp.o
-[11/38] Building CXX object CMakeFiles/sniper_core.dir/src/venue.cpp.o
-[12/38] Building CXX object CMakeFiles/sniper_core.dir/src/runtime.cpp.o
-[13/38] Building CXX object CMakeFiles/sniper_core.dir/src/dashboard.cpp.o
-In file included from /usr/include/c++/13/functional:59,
-                 from /usr/include/nlohmann/json.hpp:23,
-                 from /src/include/sniper/dashboard.hpp:48,
-                 from /src/src/dashboard.cpp:4:
-In constructor 'std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]',
-    inlined from 'std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]' at /usr/include/c++/13/bits/regex_automaton.h:149:4,
-    inlined from 'std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_alt(std::__detail::_StateIdT, std::__detail::_StateIdT, bool) [with _TraitsT = std::__cxx11::regex_traits<char>]' at /usr/include/c++/13/bits/regex_automaton.h:251:24,
-    inlined from 'void std::__detail::_Compiler<_TraitsT>::_M_disjunction() [with _TraitsT = std::__cxx11::regex_traits<char>]' at /usr/include/c++/13/bits/regex_compiler.tcc:103:18:
-/usr/include/c++/13/bits/std_function.h:405:42: warning: '*(std::function<bool(char)>*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::function<bool(char)>::_M_invoker' may be used uninitialized [-Wmaybe-uninitialized]
-  405 |       : _Function_base(), _M_invoker(__x._M_invoker)
-      |                                      ~~~~^~~~~~~~~~
-In file included from /usr/include/c++/13/regex:65,
-                 from /src/src/dashboard.cpp:15:
-/usr/include/c++/13/bits/regex_automaton.h: In member function 'void std::__detail::_Compiler<_TraitsT>::_M_disjunction() [with _TraitsT = std::__cxx11::regex_traits<char>]':
-/usr/include/c++/13/bits/regex_automaton.h:246:17: note: '__tmp' declared here
-  246 |         _StateT __tmp(_S_opcode_alternative);
-      |                 ^~~~~
-In member function 'bool std::_Function_base::_M_empty() const',
-    inlined from 'std::function<_Res(_ArgTypes ...)>::operator bool() const [with _Res = bool; _ArgTypes = {char}]' at /usr/include/c++/13/bits/std_function.h:574:25,
-    inlined from 'std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]' at /usr/include/c++/13/bits/std_function.h:407:6,
-    inlined from 'std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]' at /usr/include/c++/13/bits/regex_automaton.h:149:4,
-    inlined from 'std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_alt(std::__detail::_StateIdT, std::__detail::_StateIdT, bool) [with _TraitsT = std::__cxx11::regex_traits<char>]' at /usr/include/c++/13/bits/regex_automaton.h:251:24,
-    inlined from 'void std::__detail::_Compiler<_TraitsT>::_M_disjunction() [with _TraitsT = std::__cxx11::regex_traits<char>]' at /usr/include/c++/13/bits/regex_compiler.tcc:103:18:
-/usr/include/c++/13/bits/std_function.h:247:37: warning: '*(const std::_Function_base*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::_Function_base::_M_manager' may be used uninitialized [-Wmaybe-uninitialized]
-  247 |     bool _M_empty() const { return !_M_manager; }
-      |                                     ^~~~~~~~~~
-/usr/include/c++/13/bits/regex_automaton.h: In member function 'void std::__detail::_Compiler<_TraitsT>::_M_disjunction() [with _TraitsT = std::__cxx11::regex_traits<char>]':
-/usr/include/c++/13/bits/regex_automaton.h:246:17: note: '__tmp' declared here
-  246 |         _StateT __tmp(_S_opcode_alternative);
-      |                 ^~~~~
-[14/38] Building CXX object CMakeFiles/sniper_core.dir/src/dashboard_terminal.cpp.o
-[15/38] Building C object CMakeFiles/sniper_core.dir/third_party/sha3.c.o
-[16/38] Building CXX object CMakeFiles/sniper-cpp.dir/src/main.cpp.o
-[17/38] Building CXX object CMakeFiles/sniper_core.dir/src/network.cpp.o
-[18/38] Linking CXX static library libsniper_core.a
-[19/38] Linking CXX executable sniper-cpp
-[20/38] Building CXX object CMakeFiles/sniper-replay.dir/tools/replay/sniper_replay.cpp.o
-[21/38] Linking CXX executable sniper-replay
-[22/38] Building CXX object CMakeFiles/sniper-diff.dir/tools/replay/diff_tool.cpp.o
-[23/38] Linking CXX executable sniper-diff
-[24/38] Building CXX object CMakeFiles/sniper-edge-report.dir/tools/report/edge_report.cpp.o
-[25/38] Linking CXX executable sniper-edge-report
-[26/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/transport_tests.cpp.o
-[27/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/native_tests.cpp.o
-[28/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/discovery_tests.cpp.o
-[29/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/dashboard_tests.cpp.o
-[30/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/audit_strategy_tests.cpp.o
-[31/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/audit_ledger_crypto_tests.cpp.o
-[32/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/audit_market_tests.cpp.o
-[33/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/audit_runtime_tests.cpp.o
-[34/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/audit_network_tests.cpp.o
-[35/38] Building CXX object CMakeFiles/sniper-bench.dir/tests/benchmark.cpp.o
-[36/38] Linking CXX executable sniper-bench
-[37/38] Building CXX object CMakeFiles/sniper-tests.dir/tests/edge_report_tests.cpp.o
-[38/38] Linking CXX executable sniper-tests
+[1/4] Building CXX object CMakeFiles/sniper-edge-report.dir/tools/report/edge_report.cpp.o
+[2/4] Linking CXX executable sniper-edge-report
+[3/4] Building CXX object CMakeFiles/sniper-tests.dir/tests/edge_report_tests.cpp.o
+[4/4] Linking CXX executable sniper-tests
 Internal ctest changing into directory: /src/build-audit-asan
 Test project /src/build-audit-asan
     Start 1: native_suite
-1/4 Test #1: native_suite .....................   Passed   16.50 sec
+1/4 Test #1: native_suite .....................   Passed   15.78 sec
     Start 2: comparison_cli
-2/4 Test #2: comparison_cli ...................   Passed    0.38 sec
+2/4 Test #2: comparison_cli ...................   Passed    0.44 sec
     Start 3: runtime_io
 3/4 Test #3: runtime_io .......................   Passed    0.23 sec
     Start 4: edge_report_cli
-4/4 Test #4: edge_report_cli ..................   Passed    0.08 sec
+4/4 Test #4: edge_report_cli ..................   Passed    0.09 sec
 
 100% tests passed, 0 tests failed out of 4
 
-Total Test time (real) =  17.19 sec
+Total Test time (real) =  16.54 sec

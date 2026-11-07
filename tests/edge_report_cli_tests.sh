@@ -23,4 +23,15 @@ if "$report" "$test_dir/journal.jsonl" > /dev/null 2>&1; then
   printf '%s\n' 'malformed evidence accepted as a clean report' >&2
   exit 1
 fi
+fixtures=$(dirname -- "$0")/fixtures
+if "$report" "$fixtures/edge_conflicting_condition.jsonl" \
+    --ledger "$fixtures/edge_conflicting_ledger.json" > "$test_dir/out"; then
+  printf '%s\n' 'conflicting market identity accepted as profit evidence' >&2
+  exit 1
+fi
+grep -qF 'INCOMPLETE DATA' "$test_dir/out"
+if grep -q '^PROFIT ' "$test_dir/out"; then
+  printf '%s\n' 'conflicting identity produced a profit calculation' >&2
+  exit 1
+fi
 printf '%s\n' 'Edge report input and argument checks passed.'

@@ -4,7 +4,7 @@ These artifacts belong to the 7 November 2026 audit, rather than the historical
 release measurements in the parent directory. They contain synthetic test
 evidence and public, unauthenticated market data. No funded order was sent.
 
-* `native-tests.log`: complete normal CTest output (146 GoogleTests plus CLI
+* `native-tests.log`: complete normal CTest output (149 GoogleTests plus CLI
   and process I/O regressions).
 * `sanitizer-tests.log`: the same suite with ASan, UBSan, float-cast-overflow,
   `detect_leaks=1`, `abort_on_error=1` and `halt_on_error=1`.
@@ -57,3 +57,8 @@ were discarded; the final artifacts above are successful reruns after freeing
 reproducible build files. This was a verification-host resource failure, not a
 suppressed sanitizer finding. Compiler warnings in pinned fmt/libstdc++ headers
 were not converted into claims of a warning-free build.
+
+`report-identity-before.log` is a deliberately inconsistent synthetic fixture
+that demonstrated the pre-fix false-profit calculation. The same fixture now
+produces `report-identity-after.log`, exits 1 and refuses any profit conclusion.
+It is covered by both native and CLI regressions; it is not trading evidence.

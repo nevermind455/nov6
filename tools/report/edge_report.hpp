@@ -162,15 +162,23 @@ public:
       ++invalid_rows_;
       return;
     }
-    for (auto &o : *it)
-      if (!text(o, "id").empty() && !text(o, "token").empty())
-        add_token(text(o, "id"), text(o, "token"));
-      else
+    for (auto &o : *it) {
+      const auto id = text(o, "id"), token = text(o, "token");
+      if (!id.empty() && !token.empty()) {
+        add_token(id, token);
+        if (auto condition = text(o, "condition"); !condition.empty())
+          add_condition(id, condition);
+      } else
         ++invalid_rows_;
+    }
   }
   void add_audit(const Json &row) {
-    if (!text(row, "order_id").empty() && !text(row, "token_id").empty())
-      add_token(text(row, "order_id"), text(row, "token_id"));
+    const auto id = text(row, "order_id"), token = text(row, "token_id");
+    if (!id.empty() && !token.empty()) {
+      add_token(id, token);
+      if (auto condition = text(row, "condition_id"); !condition.empty())
+        add_condition(id, condition);
+    }
   }
   void add(const Json &row) {
     auto result = text(row, "result");
@@ -202,9 +210,22 @@ public:
       }
       if (previous == payouts_.end())
         settlement_order_[condition] = settlement_order_.size();
+      for (const auto &[token, amount] : pay) {
+        (void)amount;
+        bind_token_condition(token, condition);
+      }
       payouts_[condition] = std::move(pay);
     } else if (result == "filled" || result == "pending") {
       const auto id = text(row, "order_id");
+      // Reply/unknown audit rows reuse "pending" for a status update. They
+      // carry an ID, reason and timing evidence, not a replacement decision.
+      // Provided decision fields still go through the validation below.
+      if (result == "pending" && !id.empty() &&
+          !row.contains("condition_id") && !row.contains("fair") &&
+          !row.contains("side") && !row.contains("shares") &&
+          !row.contains("cost") && !row.contains("fee") &&
+          !row.contains("token_id"))
+        return;
       Decision d;
       d.condition = text(row, "condition_id");
       d.fair = number(row, "fair");
@@ -233,6 +254,7 @@ public:
         invalid_orders_.insert(id);
         return;
       }
+      add_condition(id, d.condition);
       decisions_[id] = d;
     } else if (result == "live_fill") {
       auto trade = text(row, "trade_id"), id = text(row, "order_id");
@@ -273,6 +295,25 @@ private:
       ++invalid_rows_;
       invalid_orders_.insert(id);
     }
+    if (auto condition = order_conditions_.find(id); condition != order_conditions_.end())
+      bind_token_condition(token, condition->second);
+  }
+  void add_condition(const std::string &id, const std::string &condition) {
+    auto [it, added] = order_conditions_.emplace(id, condition);
+    if (!added && it->second != condition) {
+      ++invalid_rows_;
+      invalid_orders_.insert(id);
+    }
+    if (auto token = tokens_.find(id); token != tokens_.end())
+      bind_token_condition(token->second, condition);
+  }
+  void bind_token_condition(const std::string &token, const std::string &condition) {
+    auto [it, added] = token_conditions_.emplace(token, condition);
+    if (!added && it->second != condition) {
+      ++invalid_rows_;
+      invalid_conditions_.insert(it->second);
+      invalid_conditions_.insert(condition);
+    }
   }
   struct Decision {
     std::string condition;
@@ -281,6 +322,7 @@ private:
     bool paper_filled = false;
   };
   std::map<std::string, std::string> tokens_;
+  std::map<std::string, std::string> order_conditions_, token_conditions_;
   std::map<std::string, std::map<std::string, double>> payouts_;
   std::map<std::string, Decision> decisions_;
   std::map<std::string, std::array<double, 3>> live_;
