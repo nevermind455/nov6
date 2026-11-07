@@ -132,3 +132,12 @@ TEST(AuditRuntime, IncompatibleStateAndAuditFilesCannotOverwriteEachOther) {
   EXPECT_THROW(dir.config("PAPER_AUDIT_PATH=paper_audit.jsonl\n"), std::invalid_argument);
   EXPECT_NO_THROW(dir.config());
 }
+TEST(AuditRuntime, PrepareLeadDefaultsToSixtySecondsAndIsBounded) {
+  RuntimeDirectory dir;
+  EXPECT_EQ(dir.config().prepare_lead, 60.0);
+  EXPECT_EQ(dir.config().public_view()["prepare_lead_s"], 60.0);
+  EXPECT_EQ(dir.config("SNIPER_PREPARE_LEAD_S=120\n").prepare_lead, 120.0);
+  for (const auto *bad : {"10", "241", "nan"})
+    EXPECT_THROW(dir.config(std::string("SNIPER_PREPARE_LEAD_S=") + bad + "\n"),
+                 std::invalid_argument) << bad;
+}

@@ -1425,7 +1425,10 @@ struct Runtime::Impl {
       }
     }
     double remain = static_cast<double>(window + 300) - now_w;
-    if (!prepared && remain >= 25.0 && remain <= 30.0) {
+    // Prepare the next round anywhere inside the lead window, not only in a
+    // fixed 25-30 s slot: a discovery pass that lands outside that slot
+    // otherwise leaves the next round cold until its boundary.
+    if (!prepared && remain > 0.0 && remain <= c.prepare_lead) {
       auto it = rounds.find(window + 300);
       if (it != rounds.end() && it->second.rules[0].loaded) {
         prepared = it->second;

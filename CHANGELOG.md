@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — configurable next-round preparation
+
+* Prepare the next round (subscribe both books, cache its rules) anywhere in
+  the last `SNIPER_PREPARE_LEAD_S` seconds of the current round (default 60,
+  allowed 30-240), instead of only in a fixed 25-30 s slot that a late
+  discovery pass could miss. Strategy, sizing and risk are unchanged.
+
 ## 7 November 2026 — complete-system audit fixes
 
 See [the full audit](reports/AUDIT_2026-11-07.md) for findings, source locations,
