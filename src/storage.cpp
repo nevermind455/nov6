@@ -318,15 +318,17 @@ void Ledger::apply(const Json &e) {
     reindex(i.id);
   } else if (type == "status") {
     auto &i = orders.at(e.at("id").get<std::string>());
+    const bool was_confirmed = i.status == "confirmed";
     i.status = e.at("status");
-    if (i.status == "aborted" && i.min_entry)
-      minimum_attempts.erase(i.condition + ":" + i.token);
     i.matched_shares = std::max(i.matched_shares, e.at("shares").get<Units>());
     i.matched_cost = std::max(i.matched_cost, e.at("cost").get<Units>());
-    if (i.status == "matched" && i.matched_shares > 0 &&
-        i.booked_shares >= i.matched_shares)
-      i.status = "confirmed";
+    // A late acknowledgement cannot undo confirmed fills. Reindex still
+    // reopens the order if this update reveals additional unbooked shares.
+    if (was_confirmed && i.unresolved())
+      i.status = "matched";
     reindex(i.id);
+    if (i.status == "aborted" && i.min_entry)
+      minimum_attempts.erase(i.condition + ":" + i.token);
   } else if (type == "fill") {
     auto trade = e.at("trade").get<std::string>();
     if (!trade_ids.insert(trade).second)
@@ -345,9 +347,6 @@ void Ledger::apply(const Json &e) {
     i.booked_shares += sh;
     i.booked_cost += cost;
     i.booked_fee += fee;
-    if (i.status == "matched" && i.matched_shares > 0 &&
-        i.booked_shares >= i.matched_shares)
-      i.status = "confirmed";
     reindex(i.id);
   } else if (type == "settle") {
     auto condition = e.at("condition").get<std::string>();
@@ -374,7 +373,7 @@ void Ledger::apply(const Json &e) {
     dd_pause_until = e.at("pause_until");
   } else if (type == "release_slot") {
     auto &i = orders.at(e.at("id").get<std::string>());
-    if (i.fill_slot) {
+    if (i.fill_slot && i.matched_shares == 0 && i.booked_shares == 0) {
       i.fill_slot = false;
       if (canary.fills > 0)
         --canary.fills;
@@ -470,7 +469,8 @@ void Ledger::set_canary(const CanaryState &s) {
 }
 void Ledger::release_fill_slot(std::string_view id) {
   auto it = orders.find(std::string(id));
-  if (it == orders.end() || !it->second.fill_slot)
+  if (it == orders.end() || !it->second.fill_slot ||
+      it->second.matched_shares > 0 || it->second.booked_shares > 0)
     return;
   commit({{"type", "release_slot"}, {"id", id}});
 }
@@ -480,6 +480,19 @@ Units Ledger::holding(std::string_view token_id) const {
 }
 void Ledger::reindex(const std::string &id) {
   auto &i = orders.at(id);
+  // Independent HTTP, websocket and REST updates can arrive out of order.
+  // A zero-fill terminal result must not release known execution exposure.
+  // Also normalize snapshots written before this invariant was enforced.
+  if ((i.matched_shares > 0 || i.booked_shares > 0) &&
+      (i.status == "no_match" || i.status == "refused" ||
+       i.status == "cancelled" || i.status == "aborted"))
+    i.status = "matched";
+  if (i.status == "confirmed" && i.matched_shares > i.booked_shares)
+    i.status = "matched";
+  if (i.status == "matched" &&
+      (i.matched_shares > 0 || i.booked_shares > 0) &&
+      i.booked_shares >= i.matched_shares)
+    i.status = "confirmed";
   if (i.unresolved() || i.status == "matched")
     pending_[i.token].insert(id);
   else

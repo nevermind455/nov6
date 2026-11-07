@@ -3,8 +3,16 @@
 ## Unreleased — fixes, live safety checks and a terminal dashboard
 
 The programs in `bin/` were rebuilt from this source on Ubuntu 24.04 after
-removing the location check. Everything in `reports/` except `SHA256SUMS`
-still describes release 1.1.0.
+the accounting, HTTP/2 and timestamp fixes below. Existing release reports
+still describe release 1.1.0; `reports/REVIEW_TEST_REPORT.md` records this review.
+
+* Out-of-order empty order results no longer release known fills, collateral
+  reservations or canary fill slots, and late acknowledgements cannot reopen
+  fully confirmed orders without evidence of additional matched shares.
+* An HTTP/2 `GOAWAY` now reconnects the sender even if TCP stays open. Outstanding
+  orders remain unknown for reconciliation and are never resubmitted.
+* Market discovery now honors ISO timestamp timezone offsets when validating
+  round boundaries and rejects malformed timezone suffixes.
 
 * Live safety, ahead of a first live run (`docs/GO_LIVE.md`):
   * Canary budgets are now hard stops by default (`SNIPER_CANARY_HARD_STOP=1`).

@@ -19,7 +19,7 @@ struct FakeClob {
   net::ssl::context tls{net::ssl::context::tls_server};
   tcp::acceptor acceptor{io, {net::ip::make_address("127.0.0.1"), 0}};
   std::thread thread;
-  bool drop = false;
+  bool drop = false, goaway = false, goaway_accepts_request = false;
   int http_status = 200;
   std::atomic<int> requests{0};
   std::string received,
@@ -101,6 +101,14 @@ struct FakeClob {
         s->close = true;
         return 0;
       }
+      if (s->server->goaway) {
+        // Keep TCP open after GOAWAY, as a draining HTTP/2 peer may do.
+        nghttp2_submit_goaway(
+            session, NGHTTP2_FLAG_NONE,
+            s->server->goaway_accepts_request ? frame->hd.stream_id : 0,
+            NGHTTP2_NO_ERROR, nullptr, 0);
+        return 0;
+      }
       s->stream = frame->hd.stream_id;
       std::string key = ":status",
                   value = std::to_string(s->server->http_status);
@@ -166,10 +174,13 @@ struct FakeClob {
   }
   ~FakeClob() { join(); }
 };
-void exercise(bool drop, int status) {
+void exercise(bool drop, int status, bool goaway = false,
+              bool goaway_accepts_request = false) {
   net::io_context io;
   net::ssl::context tls(net::ssl::context::tls_client);
   FakeClob fake(tls, drop, status);
+  fake.goaway = goaway;
+  fake.goaway_accepts_request = goaway_accepts_request;
   auto port = std::to_string(fake.acceptor.local_endpoint().port());
   fake.start();
   std::atomic<std::uint64_t> blocked{0};
@@ -210,6 +221,9 @@ void exercise(bool drop, int status) {
   client.start();
   ready();
   io.run_for(std::chrono::seconds(5));
+  if (goaway) {
+    EXPECT_FALSE(client.ready());
+  }
   client.stop();
   io.restart();
   io.poll();
@@ -219,7 +233,7 @@ void exercise(bool drop, int status) {
   EXPECT_EQ(fake.received, R"({"offline":true})");
   EXPECT_EQ(fake.requests, 1);
   EXPECT_EQ(blocked, 0);
-  if (drop) {
+  if (drop || goaway) {
     EXPECT_TRUE(unknown);
     EXPECT_FALSE(replied);
   } else {
@@ -232,3 +246,9 @@ void exercise(bool drop, int status) {
 TEST(NativeHttp2, LocalTlsMatchedReply) { exercise(false, 200); }
 TEST(NativeHttp2, LocalTlsHttp400Reply) { exercise(false, 400); }
 TEST(NativeHttp2, UncertainWriteIsNeverRetried) { exercise(true, 200); }
+TEST(NativeHttp2, GoawayAfterPossibleProcessingClosesConnection) {
+  exercise(false, 200, true, true);
+}
+TEST(NativeHttp2, GoawayBeforeProcessingClosesConnection) {
+  exercise(false, 200, true, false);
+}

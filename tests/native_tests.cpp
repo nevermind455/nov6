@@ -374,6 +374,91 @@ TEST(Ledger, PendingPartialFillBlocksSettlementAcrossRestart) {
   }
   std::filesystem::remove_all(p.parent_path());
 }
+TEST(Ledger, StaleEmptyOutcomesKeepKnownFillsReservedAcrossRestart) {
+  auto p = tempdir() / "ledger.json";
+  auto i = intent();
+  i.fill_slot = true;
+  CanaryState c;
+  c.fills = 1;
+  {
+    Ledger l(p, 100 * U, false);
+    l.register_intent(i, nullptr, c);
+    l.status(i.id, "matched", 6 * U, 3 * U);
+    l.fill("partial-1", i.id, 2 * U, U, 35000);
+    // HTTP replies, private cancellations and REST results can arrive in
+    // different orders. An older zero-fill result cannot erase a known fill.
+    for (const auto *status : {"no_match", "refused", "cancelled", "aborted"}) {
+      l.status(i.id, status);
+      EXPECT_EQ(l.orders.at(i.id).status, "matched") << status;
+      EXPECT_TRUE(l.awaiting(i.token)) << status;
+      EXPECT_EQ(l.reserved(), 4315000) << status;
+      EXPECT_FALSE(l.settle(i.condition, {{i.token, U}})) << status;
+      l.release_fill_slot(i.id);
+      EXPECT_EQ(l.canary.fills, 1) << status;
+      EXPECT_TRUE(l.orders.at(i.id).fill_slot) << status;
+    }
+    l.snapshot();
+  }
+  {
+    Ledger l(p, 100 * U, false);
+    EXPECT_TRUE(l.awaiting(i.token));
+    EXPECT_EQ(l.reserved(), 4315000);
+    EXPECT_FALSE(l.settle(i.condition, {{i.token, U}}));
+    EXPECT_TRUE(l.fill("partial-2", i.id, 4 * U, 2 * U, 70000));
+    EXPECT_EQ(l.orders.at(i.id).status, "confirmed");
+    EXPECT_EQ(l.reserved(), 0);
+    EXPECT_TRUE(l.settle(i.condition, {{i.token, U}}));
+    EXPECT_EQ(l.cash, 102895000);
+  }
+  std::filesystem::remove_all(p.parent_path());
+}
+TEST(Ledger, ConfirmedFillsSurviveLatePendingUpdates) {
+  auto p = tempdir() / "ledger.json";
+  auto i = intent();
+  {
+    Ledger l(p, 100 * U, false);
+    l.register_intent(i, nullptr, {});
+    l.status(i.id, "matched", 6 * U, 3 * U);
+    l.fill("fill-1", i.id, 6 * U, 3 * U, 105000);
+    for (const auto *status : {"pending", "sent", "intent", "unknown"}) {
+      l.status(i.id, status);
+      EXPECT_EQ(l.orders.at(i.id).status, "confirmed") << status;
+      EXPECT_FALSE(l.awaiting(i.token)) << status;
+      EXPECT_EQ(l.reserved(), 0) << status;
+    }
+    // consume_trade passes the current status when another private trade
+    // raises the cumulative match total, including after confirmation.
+    l.status(i.id, "confirmed", 8 * U, 4 * U);
+    EXPECT_EQ(l.orders.at(i.id).status, "matched");
+    EXPECT_TRUE(l.awaiting(i.token));
+    EXPECT_FALSE(l.settle(i.condition, {{i.token, U}}));
+    EXPECT_TRUE(l.fill("fill-2", i.id, 2 * U, U, 35000));
+    EXPECT_EQ(l.orders.at(i.id).status, "confirmed");
+    EXPECT_TRUE(l.settle(i.condition, {{i.token, U}}));
+  }
+  std::filesystem::remove_all(p.parent_path());
+}
+TEST(Ledger, ConfirmedTradeBeforeReplyIsNotAnEmptyOrder) {
+  auto p = tempdir() / "ledger.json";
+  auto i = intent();
+  i.fill_slot = true;
+  CanaryState c;
+  c.fills = 1;
+  {
+    Ledger l(p, 100 * U, false);
+    l.register_intent(i, nullptr, c);
+    // The private confirmed trade can precede the HTTP/status result.
+    l.fill("fill-1", i.id, 6 * U, 3 * U, 105000);
+    l.status(i.id, "no_match");
+    l.release_fill_slot(i.id);
+    EXPECT_EQ(l.orders.at(i.id).status, "confirmed");
+    EXPECT_EQ(l.canary.fills, 1);
+    EXPECT_TRUE(l.orders.at(i.id).fill_slot);
+    EXPECT_EQ(l.holding(i.token), 6 * U);
+    EXPECT_TRUE(l.settle(i.condition, {{i.token, U}}));
+  }
+  std::filesystem::remove_all(p.parent_path());
+}
 TEST(Ledger, DurableDrawdownPauseDoesNotRebaseCapital) {
   auto p = tempdir() / "ledger.json";
   {
