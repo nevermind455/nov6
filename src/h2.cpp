@@ -36,7 +36,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     nghttp2_session *session = nullptr;
     std::map<int32_t, std::shared_ptr<Request>> requests;
     std::deque<Write> writes;
-    bool up = false, writing = false;
+    bool up = false, writing = false, goaway = false;
     Impl *owner;
     Pipe(net::io_context &i, net::ssl::context &c, Impl *o)
         : stream(i, c), owner(o) {
@@ -111,6 +111,8 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
   }
   static int frame(nghttp2_session *, const nghttp2_frame *frame, void *user) {
     auto *p = static_cast<Pipe *>(user);
+    if (frame->hd.type == NGHTTP2_GOAWAY)
+      p->goaway = true;
     if ((frame->hd.type == NGHTTP2_DATA || frame->hd.type == NGHTTP2_HEADERS) &&
         (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)) {
       auto i = p->requests.find(frame->hd.stream_id);
@@ -325,6 +327,12 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
           auto used = nghttp2_session_mem_recv(p->session, p->rx.data(), n);
           if (used < 0)
             return self->fail(p, "invalid HTTP/2 reply");
+          // A GOAWAY connection cannot accept new streams even while TCP stays
+          // open. Reconnect instead of advertising it as ready. Requests whose
+          // replies have not completed remain unknown and are never resent,
+          // including streams the peer says it may already have processed.
+          if (p->goaway)
+            return self->fail(p, "HTTP/2 peer sent GOAWAY");
           self->flush(p);
           self->read(p);
         });
