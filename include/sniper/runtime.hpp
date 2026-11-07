@@ -20,6 +20,21 @@ std::set<std::string> round_tokens(const std::optional<Round> &current,
                                    const std::optional<Round> &prepared);
 // Start (unix seconds) of the five-minute round containing `now_wall`.
 std::int64_t round_window(double now_wall);
+// Whether the round state, last switched at `current_window`, is behind the
+// clock: checked on every trigger message so no trigger after a boundary is
+// decided against the previous round.
+bool round_switch_due(double now_wall, std::int64_t current_window);
+// Debounces a fault pause per reason: the same reason cannot re-pause while
+// its own pause still runs, and pauses again once it has expired.
+class PauseLatch {
+public:
+  bool admit(const std::string &why, double now) const;
+  void hold(const std::string &why, double until);
+  std::size_t size() const { return until_.size(); }
+
+private:
+  std::map<std::string, double> until_;
+};
 bool cache_round_rules(std::map<std::string, MarketRules> &, const Round &,
                        double fetched_wall);
 } // namespace execution

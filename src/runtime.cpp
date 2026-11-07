@@ -57,6 +57,19 @@ std::set<std::string> round_tokens(const std::optional<Round> &current,
     }
   return out;
 }
+bool PauseLatch::admit(const std::string &why, double now) const {
+  auto it = until_.find(why);
+  return it == until_.end() || now >= it->second;
+}
+void PauseLatch::hold(const std::string &why, double until) {
+  // Expired reasons are dropped, so the map holds only running pauses.
+  for (auto it = until_.begin(); it != until_.end();)
+    it = it->second <= until - 300 ? until_.erase(it) : std::next(it);
+  until_[why] = until;
+}
+bool round_switch_due(double now_wall, std::int64_t current_window) {
+  return round_window(now_wall) != current_window;
+}
 bool prepare_due(double now_wall, double lead) {
   double remain = static_cast<double>(round_window(now_wall) + 300) - now_wall;
   return remain > 0.0 && remain <= lead;
@@ -163,7 +176,7 @@ struct Runtime::Impl {
   }
   std::map<std::string, Big> allowances;
   std::string pause_reason;
-  std::set<std::string> pause_latches;
+  execution::PauseLatch pause_latches;
   std::deque<double> slow_replies;
   std::map<std::string, double> sent_at, skip_last;
   std::map<std::string, std::array<std::int64_t, 8>> stamps;
@@ -1673,6 +1686,12 @@ struct Runtime::Impl {
   void on_coinbase(int n, std::string_view raw, int backlog) {
     auto t0 = mono_ns();
     double tm = static_cast<double>(t0) / 1e9;
+    // A trigger after a five-minute boundary must be decided against the new
+    // round. The 50 ms timer alone left up to 50 ms of each round judged as
+    // the previous one ("too late in round"). Switch first, and before the
+    // frame is recorded, so a replay sees the round change in the same order.
+    if (!stopping && execution::round_switch_due(wall_s(), hub_window))
+      update_hub();
     rec_frame("cb", raw, backlog);
     try {
       sniper->cb_fresh.note_message(tm, backlog);
@@ -1903,8 +1922,14 @@ struct Runtime::Impl {
     return true;
   }
   void pause(std::string why, bool once) {
-    if (once && !pause_latches.insert(why).second)
+    // A repeat of the same reason while its pause still runs neither extends
+    // it nor writes another guard row; once it has expired the same reason
+    // pauses again. (It used to latch for the whole process, so only the first
+    // unknown order outcome of a run paused new orders.)
+    if (once && !pause_latches.admit(why, wall_s()))
       return;
+    if (once)
+      pause_latches.hold(why, wall_s() + 300);
     pause_reason = std::move(why);
     pause_until = wall_s() + 300;
     if (c.live) {

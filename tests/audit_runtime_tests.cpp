@@ -177,3 +177,35 @@ TEST(AuditRuntime, SubscriptionsFollowOnlyTheCurrentAndPreparedRounds) {
             (std::set<std::string>{"next-up", "next-down"}));
   EXPECT_TRUE(execution::round_tokens(std::nullopt, std::nullopt).empty());
 }
+TEST(AuditRuntime, TriggersAfterABoundarySwitchTheRoundFirst) {
+  const double start = 1'762'500'000;
+  const auto window = execution::round_window(start);
+  EXPECT_FALSE(execution::round_switch_due(start + 299.999, window));
+  // 10 ms into the next round, before the 50 ms timer: the trigger handler
+  // must switch instead of deciding against the old round.
+  EXPECT_TRUE(execution::round_switch_due(start + 300.010, window));
+  EXPECT_FALSE(execution::round_switch_due(start + 300.010, window + 300));
+  // Before the first switch (startup) the state is always behind.
+  EXPECT_TRUE(execution::round_switch_due(start, -1));
+}
+TEST(AuditRuntime, ARepeatedFaultPausesAgainOnceItsPauseHasExpired) {
+  execution::PauseLatch latch;
+  const std::string unknown = "unknown native order outcome";
+  ASSERT_TRUE(latch.admit(unknown, 1000));
+  latch.hold(unknown, 1300);
+  // A repeat inside the running pause does not extend it or log again...
+  EXPECT_FALSE(latch.admit(unknown, 1100));
+  EXPECT_FALSE(latch.admit(unknown, 1299.9));
+  // ...a different reason is independent...
+  EXPECT_TRUE(latch.admit("private trade failed; reconciliation required", 1100));
+  // ...and the same reason hours later pauses again (it used to latch for the
+  // whole process, so a second unknown outcome paused nothing).
+  EXPECT_TRUE(latch.admit(unknown, 1300));
+  EXPECT_TRUE(latch.admit(unknown, 15400));
+  latch.hold(unknown, 15700);
+  EXPECT_FALSE(latch.admit(unknown, 15500));
+  // Expired reasons are dropped, so the latch cannot grow without bound.
+  for (int i = 0; i < 100; ++i)
+    latch.hold("fault in native handler " + std::to_string(i), 20000.0 + 400.0 * i);
+  EXPECT_LE(latch.size(), 2u);
+}

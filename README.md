@@ -29,6 +29,11 @@ audit. Run `./bin/sniper-edge-report state/paper/sniper.jsonl` to analyze
 settled fills with round-clustered intervals. Incomplete/untraceable evidence
 returns a nonzero status; a profitable simulated sample does not establish
 future live returns.
+`./bin/sniper-miss-report state/paper/sniper.jsonl` explains every signal:
+each skip and refusal gets a reason code and a verdict (correct filter, risk
+control, missed opportunity, unfilled, venue rejection, software failure or
+unknown outcome), and live orders are followed from send to acknowledgement
+to fill with per-stage latency. See `docs/MISSED_ORDERS.md`.
 
 ## What changed in 1.1.0
 

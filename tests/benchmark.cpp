@@ -3,6 +3,7 @@
 // TickToIntent adds what live mode does before the socket write: EIP-712
 // signing and the durable intent (with and without fdatasync). Nothing here
 // opens a network connection or can submit an order.
+#include "sniper/runtime.hpp"
 #include "sniper/math.hpp"
 #include "sniper/sniper.hpp"
 #include "sniper/storage.hpp"
@@ -364,6 +365,14 @@ static void BookUpdatePercentiles(benchmark::State &state) {
   state.counters["p95_us"] = at(.95);
   state.counters["p99_us"] = at(.99);
 }
+// The per-trigger round check added to the Coinbase handler: one wall-clock
+// read and a division; it must stay negligible next to the decision path.
+static void RoundSwitchCheck(benchmark::State &state) {
+  auto window = execution::round_window(wall_s());
+  for (auto _ : state)
+    benchmark::DoNotOptimize(execution::round_switch_due(wall_s(), window));
+}
+BENCHMARK(RoundSwitchCheck);
 BENCHMARK(BookUpdatePercentiles)->Iterations(1)->Unit(benchmark::kMillisecond);
 BENCHMARK(TickToWirePercentiles)->Arg(0)->Arg(1)->Iterations(1)->Unit(benchmark::kMillisecond);
 BENCHMARK(Maths);
