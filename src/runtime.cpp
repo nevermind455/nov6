@@ -1917,7 +1917,8 @@ struct Runtime::Impl {
         audit({{"result", "refused"},
                {"order_id", id},
                {"reason", miss ? "FAK no match" : "venue refused native order"},
-               {"http_status", reply.status}});
+               {"http_status", reply.status},
+               {"venue_reply", j.dump(-1, ' ', true).substr(0, 300)}});
       } else if (success) {
         ledger.status(id, "pending");
         release(id);
