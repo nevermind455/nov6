@@ -40,7 +40,8 @@ bash scripts/prepare-live.sh
 ```
 
 This writes `.env.live`, leaving `.env` alone: quarter-Kelly orders sized from
-the wallet (up to 200 shares per outcome), a $100 loss budget, and a limit of 10000 orders, 10000 fills, 10000 rounds and
+the wallet (up to 200 shares per outcome), a $5 first-session loss budget
+($100 when a previous canary state already exists), and a limit of 10000 orders, 10000 fills, 10000 rounds and
 $100 spent for the session. When a budget is reached, new orders stop until you deliberately
 start a new session. Your limit of ask + 0.02 carries over from `.env`.
 

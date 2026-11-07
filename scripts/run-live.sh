@@ -10,6 +10,10 @@ preflight=()
 runtime=()
 for argument in "$@"; do
   case "$argument" in
+    --config|--config=*|--paper|--health)
+      printf '%s\n' 'Live launcher settings are fixed to .env.live and --live; mode or --config overrides would bypass preflight.' >&2
+      exit 2
+      ;;
     --skip-paper-check) preflight+=("$argument") ;;
     --dry-run)
       preflight+=("$argument")

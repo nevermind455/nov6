@@ -104,6 +104,14 @@ static Hash raw32(std::string_view s) {
   std::copy(b.begin(), b.end(), h.begin());
   return h;
 }
+static Big decimal_token(std::string_view token) {
+  if (!valid_token(token))
+    throw std::invalid_argument("invalid decimal token id");
+  Big value = 0;
+  for (char digit : token)
+    value = value * 10 + (digit - '0');
+  return value;
+}
 Hash order_digest(const UnsignedOrder &o) {
   if (o.signature_type < 0 || o.signature_type > 2)
     throw std::invalid_argument("signature type 3 is unsupported");
@@ -118,7 +126,7 @@ Hash order_digest(const UnsignedOrder &o) {
                   word(137), address_word(o.exchange)});
   auto structure = hash_words(
       {type, word(o.salt), address_word(o.maker), address_word(o.signer),
-       word(Big(o.token)), word(o.maker_amount), word(o.taker_amount),
+       word(decimal_token(o.token)), word(o.maker_amount), word(o.taker_amount),
        word(o.side), word(o.signature_type), word(o.timestamp),
        raw32(o.metadata), raw32(o.builder)});
   Bytes message{0x19, 0x01};
@@ -142,6 +150,8 @@ Hash auth_digest(std::string_view address, std::int64_t timestamp,
   return keccak(message);
 }
 Signer::Signer(std::string_view key) {
+  std::array<unsigned char, 32> seed{};
+  try {
   auto b = unhex(key);
   if (b.size() != 32)
     throw std::invalid_argument("POLY_PRIVATE_KEY must be 32 bytes");
@@ -151,10 +161,9 @@ Signer::Signer(std::string_view key) {
                                   SECP256K1_CONTEXT_VERIFY);
   if (!ctx_ || !secp256k1_ec_seckey_verify(ctx_, key_.data()))
     throw std::invalid_argument("invalid POLY_PRIVATE_KEY");
-  unsigned char seed[32];
-  if (RAND_bytes(seed, 32) != 1 || !secp256k1_context_randomize(ctx_, seed))
+  if (RAND_bytes(seed.data(), 32) != 1 || !secp256k1_context_randomize(ctx_, seed.data()))
     throw std::runtime_error("signing context randomization failed");
-  OPENSSL_cleanse(seed, 32);
+  OPENSSL_cleanse(seed.data(), seed.size());
   secp256k1_pubkey pub{};
   if (!secp256k1_ec_pubkey_create(ctx_, &pub, key_.data()))
     throw std::runtime_error("public key derivation failed");
@@ -164,7 +173,15 @@ Signer::Signer(std::string_view key) {
                                 SECP256K1_EC_UNCOMPRESSED);
   auto h = keccak(std::span(encoded + 1, 64));
   address_ = checksum_address(hex(std::span(h.data() + 12, 20)));
+  } catch (...) {
+    OPENSSL_cleanse(seed.data(), seed.size());
+    OPENSSL_cleanse(key_.data(), key_.size());
+    if (ctx_) secp256k1_context_destroy(ctx_);
+    ctx_ = nullptr;
+    throw;
+  }
 }
+
 Signer::~Signer() {
   OPENSSL_cleanse(key_.data(), key_.size());
   if (ctx_)
@@ -310,7 +327,7 @@ SignedOrder build_order(const Signer &signer, std::string_view maker,
                         const Credentials &creds, std::string_view type) {
   if (!rules.loaded || !valid_token(token_id))
     throw std::invalid_argument("order rules or token unavailable");
-  Big token{std::string(token_id)};
+  Big token = decimal_token(token_id);
   if ((token & (((Big(1) << 64) - 1) << 40)) == 0)
     throw std::invalid_argument(
         "protocol-v2 position IDs require exchange-v3; native baseline trades "
@@ -348,6 +365,9 @@ Units fee_total(Units shares, Units price, Units rate, int exponent) {
     throw std::invalid_argument("invalid fee input");
   D p = D(price) / U;
   D fee = D(shares) / U * D(rate) / U * pow(p * (1 - p), exponent);
-  return floor(fee * 100000 + D("0.5")).convert_to<Units>() * 10;
+  D rounded = floor(fee * 100000 + D("0.5"));
+  if (rounded > D(std::numeric_limits<Units>::max() / 10))
+    throw std::overflow_error("fee total overflow");
+  return rounded.convert_to<Units>() * 10;
 }
 } // namespace sniper

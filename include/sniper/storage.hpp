@@ -24,6 +24,7 @@ public:
   explicit FileLock(const std::filesystem::path &);
   ~FileLock();
   FileLock(const FileLock &) = delete;
+  FileLock &operator=(const FileLock &) = delete;
 };
 void atomic_file(const std::filesystem::path &, std::string_view);
 class DurableLog {
@@ -38,6 +39,8 @@ public:
   static inline bool benchmark_without_sync = false;
   explicit DurableLog(const std::filesystem::path &);
   ~DurableLog();
+  DurableLog(const DurableLog &) = delete;
+  DurableLog &operator=(const DurableLog &) = delete;
   void replay(const std::function<void(std::uint64_t, const Json &)> &);
   std::uint64_t append(const Json &);
   std::uint64_t sequence() const { return seq_; }
@@ -75,6 +78,9 @@ struct Intent {
   int fee_exponent = 1;
   std::vector<std::string> trades;
   bool fill_slot = false, min_entry = false;
+  bool canary_slot_owned = false;
+  bool canary_spend_released = false;
+  double canary_session = 0;
   double sent_wall = 0;
   bool unresolved() const {
     return status == "intent" || status == "sent" || status == "unknown" ||
@@ -100,6 +106,7 @@ class Ledger {
   void apply(const Json &event);
   void commit(Json event);
   void reindex(const std::string &);
+  void restore_fill_slot(std::string_view);
 
 public:
   std::map<std::string, Position> positions;
@@ -123,6 +130,7 @@ public:
   void drawdown_pause(double deadline);
   void set_canary(const CanaryState &);
   void release_fill_slot(std::string_view id);
+  void release_missed_spend(std::string_view id);
   Units holding(std::string_view token) const;
   Units risk_shares(std::string_view token) const;
   Units reserved() const;

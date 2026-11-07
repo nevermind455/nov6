@@ -72,13 +72,15 @@ way: `sniper-replay rec.jsonl out.jsonl` and `py_replay.py REPO rec.jsonl out.js
 
 ## Reference behaviours reproduced on purpose (worth knowing)
 
-* **Fee rules expire inside the round.** The reference fetches a market's
+* **Fee rules expire inside the round when metadata is not refreshed.** The reference fetches a market's
   rules once, when the round is prepared (~30 s before it starts), and its
   fair-value gate only trusts them for 300 s. From ~30 s to 10 s before each
   round ends every signal is skipped as `fair value unknown: market fee rules
   not loaded` (seen in the reference's own replays: 46 skips, all at 10.5-29.4 s
-  left). This build does the same so decisions match; it is likely
-  unintended upstream.
+  left). The decision engine retains that 300-second gate and reproduces it
+  on the same replay metadata. The audited runtime now propagates newly
+  discovered rules to its active and prepared round copies, so stale copies
+  do not defeat successful metadata refreshes.
 * **Strict arrival book.** A paper order whose arrival instant the market feed
   has not passed within 500 ms is `UNKNOWN_BOOK_STATE`, and an order whose last
   book state is a REST refresh is unknown too. `SNIPER_BOOK_QUIET=1` is the
@@ -99,10 +101,13 @@ traces, markout rows, guard diagnostics.
 
 ## Remaining differences from the reference
 
-* The price-to-beat fields are the reference's legacy trigger-TWAP estimate.
-  Python production attaches the Polymarket RTDS reference instead, so the
-  `ptb*` journal fields differ there (they only gate trades with
-  `SNIPER_PTB_SKIP_CLOSE=1`).
+* The optional price-to-beat estimate uses the reference's legacy trigger-TWAP
+  model, calibrated only with Gamma-published `priceToBeat` values. A first
+  RTDS spot tick is not an official 60-second Chainlink TWAP; the audited build
+  removes that misleading fallback. An authenticated PolyBolt TWAP client is
+  not implemented. The `ptb*` fields therefore differ from production paths
+  with an official streaming oracle (they only gate trades with
+  `SNIPER_PTB_SKIP_CLOSE=1`, disabled by default).
 * The paper broker's decision book is the live websocket view; the reference
   falls back to a REST fetch when that view has no asks (rare; refused here).
 * A tick that disagrees with cached rules is taken from the book; the reference
@@ -118,6 +123,18 @@ traces, markout rows, guard diagnostics.
   `sniper_live.py`'s: an unknown outcome keeps its reservation, blocks its
   token until reconciled and pauses all new orders for 5 minutes, where the
   reference halts all new orders until the unknown is reconciled.
+* Live collateral uses a confirmed-outflow watermark against the sampled
+  venue balance. A confirmed fill cannot make its just-spent cash available
+  again while the next balance request is in flight. The correction can
+  temporarily understate available cash until the following refresh.
+* Market discovery explicitly requires CTF protocol v1 and validates book,
+  token, condition, tick, minimum and fee metadata together. Protocol v2,
+  exchange-v3 signing and deposit-wallet signature type 3 remain unsupported.
+* Execution reports distinguish durable intent, full HTTP/2 upload completion,
+  HTTP acknowledgement and confirmed private fills. Historical benchmark
+  numbers below exclude the HTTP write and network and are not new audit
+  measurements. The audit's ledger snapshots use native format v2 with
+  integrity checks; legacy v1 snapshots remain readable.
 
 ## Not verifiable here
 

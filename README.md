@@ -19,6 +19,17 @@ sessions the bot recorded itself, with every journal field identical; see
 before live money: the 24-hour VPS paper run and the staged live canary.
 No real orders were placed while preparing this package.
 
+The [7 November system audit](reports/AUDIT_2026-11-07.md) records subsequent
+transport, recovery, balance, market-validation and reporting fixes, their
+regressions, and the limits of the available trading evidence. The native
+strategy thresholds and risk protections remain in place. Only legacy CTF v1
+markets are supported; newer market protocols refuse trading.
+It also covers the native read-only `sniper-edge-report` received during the
+audit. Run `./bin/sniper-edge-report state/paper/sniper.jsonl` to analyze
+settled fills with round-clustered intervals. Incomplete/untraceable evidence
+returns a nonzero status; a profitable simulated sample does not establish
+future live returns.
+
 ## What changed in 1.1.0
 
 * **Decisions now follow the reference exactly**: gate order, skip texts,
@@ -41,9 +52,11 @@ No real orders were placed while preparing this package.
   quiet book at the order's arrival by default; the reference does not. On a
   sparse feed many paper orders now end `UNKNOWN_BOOK_STATE`, exactly as the
   Python bot reports them. `SNIPER_BOOK_QUIET=1` is the reference's own opt-in.
-* **Reference quirk kept for parity:** fee rules are cached once, ~30 s before
-  a round starts, and trusted for 300 s, so the last ~20 s of every round skip
-  as `fair value unknown: market fee rules not loaded` (in the Python bot too).
+* **Reference cache policy kept for parity:** fair-value rules expire after
+  300 seconds. A recording supplying rules only before a round can therefore
+  skip its final seconds. The audited runtime refreshes active venue-rule
+  snapshots when discovery returns new metadata; it does not extend expired
+  rules or weaken the freshness gate.
 * New tools: `sniper-replay`, `tools/replay/py_replay.py`, `compare.py`,
   `run_parity.sh` (decision parity) and `sniper-diff` + `diff_cases.py`
   (20,000-case differential test). `--record FILE` writes the replay format.
@@ -56,8 +69,8 @@ Android/Termux, Windows, macOS, ARM, or Ubuntu 22.04 binary. Termux can connect 
 your Ubuntu VPS using SSH; run the bot on the VPS.
 
 ```bash
-unzip BTC_5Minute_Sniper_Native_CPP_v1.1.0.zip
-cd BTC_5Minute_Sniper_Native_CPP/sniper-native-cpp
+git clone https://github.com/nevermind455/nov6.git
+cd nov6
 bash scripts/setup.sh
 bash scripts/run-paper.sh --run-for 300
 ```
@@ -289,6 +302,12 @@ never resubmitted. Redemption of actual winning tokens is manual.
 The native ledger format is intentionally different from the Python ledger.
 Never reuse Python ledger paths or delete live state to resolve an accounting
 error. A corrupted native durable log refuses startup for investigation.
+The audited build reads legacy v1 snapshots and writes checksummed v2
+snapshots. Before upgrading an existing installation, stop it and back up its
+complete state directory. Older binaries cannot read v2 snapshots; rollback
+requires a compatible binary or the matching pre-upgrade snapshot and journal,
+with any subsequent trading reconciled. Never restore old accounting over
+later live activity. See the audit report for recovery details.
 
 `--record PATH` writes every input the decision engine sees (Coinbase and market
 frames, REST book snapshots, round changes, socket connects and drops) as JSON

@@ -1,0 +1,3 @@
+{"k":"cbconn","t":0,"w":1900000000,"up":true}
+{"k":"cb","t":0.1,"w":1900000000.1,"backlog":0,"raw":"{\"type\":\"ticker\",\"sequence\":1,\"product_id\":\"BTC-USD\",\"price\":\"100000\",\"best_bid\":\"100000\",\"best_ask\":\"100000.01\",\"time\":\"2030-03-17T17:46:40.100000Z\",\"trade_id\":1,\"last_size\":\"0.001\"}"}
+{"k":"cb","t":0.4,"w":1900000060.4,"backlog":0,"raw":"{\"type\":\"ticker\",\"sequence\":2,\"product_id\":\"BTC-USD\",\"price\":\"100010\",\"best_bid\":\"100010\",\"best_ask\":\"100010.01\",\"time\":\"2030-03-17T17:46:40.400000Z\",\"trade_id\":2,\"last_size\":\"0.001\"}"}

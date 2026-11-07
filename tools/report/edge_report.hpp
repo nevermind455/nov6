@@ -9,16 +9,22 @@
 #pragma once
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <cstddef>
 #include <fmt/format.h>
 #include <functional>
+#include <istream>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <random>
 #include <set>
 #include <string>
+#include <string_view>
+#include <stdexcept>
+#include <system_error>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -36,6 +42,7 @@ struct Order {
   double shares = 0, spent = 0, fee = 0, wall = 0;
   double payout = 0, net = 0;
   bool won = false, clean = false; // clean: resolved fully one way, not 50/50
+  std::size_t settlement_order = 0;
   double paid() const { return spent / shares; }
 };
 
@@ -44,12 +51,13 @@ struct Bin {
   int fills = 0, rounds = 0;
   double predicted = 0, actual = 0, low = 0, high = 0, paid = 0;
   bool inside = false;
+  bool has_interval = false;
 };
 
 struct Report {
-  int fills_settled = 0, rounds = 0, scored = 0;
+  int fills_settled = 0, rounds = 0, scored = 0, calibration_rounds = 0;
   int unsettled = 0, untraceable = 0, voided = 0;
-  int errors = 0, refused = 0, skipped = 0, bad_lines = 0;
+  int errors = 0, refused = 0, skipped = 0, bad_lines = 0, invalid_rows = 0;
   bool has_profit = false, has_calibration = false;
   double net = 0, spent = 0, fees = 0, return_on_spend = 0, per_round = 0;
   double max_drawdown = 0, first_half = 0, second_half = 0;
@@ -63,11 +71,40 @@ inline std::optional<double> number(const Json &row, const char *name) {
   auto it = row.find(name);
   if (it == row.end() || !it->is_number())
     return std::nullopt;
-  return it->get<double>();
+  double value = it->get<double>();
+  return std::isfinite(value) ? std::optional(value) : std::nullopt;
 }
 inline std::string text(const Json &row, const char *name) {
   auto it = row.find(name);
   return it != row.end() && it->is_string() ? it->get<std::string>() : std::string();
+}
+
+inline int parse_min_rounds(std::string_view value) {
+  int result = 0;
+  auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), result);
+  if (error != std::errc() || end != value.data() + value.size() || result <= 0)
+    throw std::invalid_argument("--min-rounds must be a positive integer");
+  return result;
+}
+
+template <class F> int read_json_lines(std::istream &in, F use) {
+  if (!in)
+    throw std::runtime_error("cannot read report input");
+  int bad = 0;
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty())
+      continue;
+    Json row = Json::parse(line, nullptr, false);
+    if (row.is_discarded() || !row.is_object()) {
+      ++bad;
+      continue;
+    }
+    use(row);
+  }
+  if (in.bad())
+    throw std::runtime_error("error reading report input");
+  return bad;
 }
 
 inline std::pair<double, double> wilson(double wins, double n, double z = 1.96) {
@@ -106,7 +143,7 @@ bootstrap(const Groups &groups,
       auto &group = groups[pick(rng)];
       sample.insert(sample.end(), group.begin(), group.end());
     }
-    if (auto v = stat(sample, static_cast<int>(groups.size())))
+    if (auto v = stat(sample, static_cast<int>(groups.size())); v && std::isfinite(*v))
       values.push_back(*v);
   }
   if (values.empty())
@@ -121,15 +158,27 @@ class Collector {
 public:
   void add_ledger(const Json &ledger) {
     auto it = ledger.find("orders");
-    if (it == ledger.end() || !it->is_array())
+    if (it == ledger.end() || !it->is_array()) {
+      ++invalid_rows_;
       return;
-    for (auto &o : *it)
-      if (!text(o, "id").empty() && !text(o, "token").empty())
-        tokens_[text(o, "id")] = text(o, "token");
+    }
+    for (auto &o : *it) {
+      const auto id = text(o, "id"), token = text(o, "token");
+      if (!id.empty() && !token.empty()) {
+        add_token(id, token);
+        if (auto condition = text(o, "condition"); !condition.empty())
+          add_condition(id, condition);
+      } else
+        ++invalid_rows_;
+    }
   }
   void add_audit(const Json &row) {
-    if (!text(row, "order_id").empty() && !text(row, "token_id").empty())
-      tokens_[text(row, "order_id")] = text(row, "token_id");
+    const auto id = text(row, "order_id"), token = text(row, "token_id");
+    if (!id.empty() && !token.empty()) {
+      add_token(id, token);
+      if (auto condition = text(row, "condition_id"); !condition.empty())
+        add_condition(id, condition);
+    }
   }
   void add(const Json &row) {
     auto result = text(row, "result");
@@ -141,13 +190,42 @@ public:
       ++skipped_;
     else if (result == "settlement") {
       auto it = row.find("payouts");
-      auto &pay = payouts_[text(row, "condition_id")];
-      if (it != row.end() && it->is_object())
-        for (auto p = it->begin(); p != it->end(); ++p)
-          if (p->is_number())
-            pay[p.key()] = p->get<double>();
-    } else if ((result == "filled" || result == "pending") &&
-               !text(row, "condition_id").empty() && !text(row, "order_id").empty()) {
+      auto condition = text(row, "condition_id");
+      std::map<std::string, double> pay;
+      bool valid = !condition.empty() && it != row.end() && it->is_object() && !it->empty();
+      if (valid)
+        for (auto p = it->begin(); p != it->end(); ++p) {
+          auto amount = number(*it, p.key().c_str());
+          if (p.key().empty() || !amount || *amount < 0 || *amount > UNIT) {
+            valid = false;
+            break;
+          }
+          pay[p.key()] = *amount;
+        }
+      auto previous = payouts_.find(condition);
+      if (!valid || (previous != payouts_.end() && previous->second != pay)) {
+        ++invalid_rows_;
+        invalid_conditions_.insert(condition);
+        return;
+      }
+      if (previous == payouts_.end())
+        settlement_order_[condition] = settlement_order_.size();
+      for (const auto &[token, amount] : pay) {
+        (void)amount;
+        bind_token_condition(token, condition);
+      }
+      payouts_[condition] = std::move(pay);
+    } else if (result == "filled" || result == "pending") {
+      const auto id = text(row, "order_id");
+      // Reply/unknown audit rows reuse "pending" for a status update. They
+      // carry an ID, reason and timing evidence, not a replacement decision.
+      // Provided decision fields still go through the validation below.
+      if (result == "pending" && !id.empty() &&
+          !row.contains("condition_id") && !row.contains("fair") &&
+          !row.contains("side") && !row.contains("shares") &&
+          !row.contains("cost") && !row.contains("fee") &&
+          !row.contains("token_id"))
+        return;
       Decision d;
       d.condition = text(row, "condition_id");
       d.fair = number(row, "fair");
@@ -156,19 +234,87 @@ public:
       d.shares = number(row, "shares").value_or(0);
       d.cost = number(row, "cost");
       d.fee = number(row, "fee").value_or(0);
-      decisions_[text(row, "order_id")] = d;
+      const bool invalid_optional =
+          (row.contains("fair") && !row.at("fair").is_null() && !d.fair) ||
+          (row.contains("wall") && !number(row, "wall")) ||
+          (row.contains("fee") && !number(row, "fee"));
+      if (id.empty() || d.condition.empty() || invalid_optional ||
+          (d.fair && (*d.fair < 0 || *d.fair > 1)) || d.wall < 0 || d.fee < 0 ||
+          (d.paper_filled && (d.shares <= 0 || !d.cost || *d.cost <= 0 || d.fee > *d.cost))) {
+        ++invalid_rows_;
+        invalid_orders_.insert(id);
+        return;
+      }
+      auto old = decisions_.find(id);
+      if (old != decisions_.end() &&
+          (old->second.condition != d.condition || old->second.fair != d.fair ||
+           old->second.paper_filled != d.paper_filled || old->second.shares != d.shares ||
+           old->second.cost != d.cost || old->second.fee != d.fee)) {
+        ++invalid_rows_;
+        invalid_orders_.insert(id);
+        return;
+      }
+      add_condition(id, d.condition);
+      decisions_[id] = d;
     } else if (result == "live_fill") {
-      if (!trades_.insert(text(row, "trade_id")).second)
+      auto trade = text(row, "trade_id"), id = text(row, "order_id");
+      auto shares = number(row, "shares"), amount = number(row, "amount"), fee = number(row, "fee");
+      if (trade.empty() || id.empty() || !shares || *shares <= 0 ||
+          !amount || *amount <= 0 || !fee || *fee < 0) {
+        ++invalid_rows_;
+        invalid_orders_.insert(id);
+        return;
+      }
+      Json evidence{{"order_id", id}, {"shares", *shares}, {"amount", *amount}, {"fee", *fee}};
+      auto old = trades_.find(trade);
+      if (old != trades_.end()) {
+        if (old->second != evidence) {
+          ++invalid_rows_;
+          invalid_orders_.insert(id);
+          invalid_orders_.insert(text(old->second, "order_id"));
+        }
         return; // a repeated trade counts once
-      auto &got = live_[text(row, "order_id")];
-      got[0] += number(row, "shares").value_or(0);
-      got[1] += number(row, "amount").value_or(0);
-      got[2] += number(row, "fee").value_or(0);
+      }
+      trades_[trade] = std::move(evidence);
+      auto &got = live_[id];
+      std::array<double, 3> next{got[0] + *shares, got[1] + *amount, got[2] + *fee};
+      if (!std::all_of(next.begin(), next.end(), [](double n) { return std::isfinite(n); })) {
+        ++invalid_rows_;
+        invalid_orders_.insert(id);
+        return;
+      }
+      got = next;
     }
   }
   Report report(int min_rounds, int bad_lines = 0) const;
 
 private:
+  void add_token(const std::string &id, const std::string &token) {
+    auto [it, added] = tokens_.emplace(id, token);
+    if (!added && it->second != token) {
+      ++invalid_rows_;
+      invalid_orders_.insert(id);
+    }
+    if (auto condition = order_conditions_.find(id); condition != order_conditions_.end())
+      bind_token_condition(token, condition->second);
+  }
+  void add_condition(const std::string &id, const std::string &condition) {
+    auto [it, added] = order_conditions_.emplace(id, condition);
+    if (!added && it->second != condition) {
+      ++invalid_rows_;
+      invalid_orders_.insert(id);
+    }
+    if (auto token = tokens_.find(id); token != tokens_.end())
+      bind_token_condition(token->second, condition);
+  }
+  void bind_token_condition(const std::string &token, const std::string &condition) {
+    auto [it, added] = token_conditions_.emplace(token, condition);
+    if (!added && it->second != condition) {
+      ++invalid_rows_;
+      invalid_conditions_.insert(it->second);
+      invalid_conditions_.insert(condition);
+    }
+  }
   struct Decision {
     std::string condition;
     std::optional<double> fair, cost;
@@ -176,14 +322,22 @@ private:
     bool paper_filled = false;
   };
   std::map<std::string, std::string> tokens_;
+  std::map<std::string, std::string> order_conditions_, token_conditions_;
   std::map<std::string, std::map<std::string, double>> payouts_;
   std::map<std::string, Decision> decisions_;
   std::map<std::string, std::array<double, 3>> live_;
-  std::set<std::string> trades_;
-  int errors_ = 0, refused_ = 0, skipped_ = 0;
+  std::map<std::string, Json> trades_;
+  std::map<std::string, std::size_t> settlement_order_;
+  std::set<std::string> invalid_orders_, invalid_conditions_;
+  int errors_ = 0, refused_ = 0, skipped_ = 0, invalid_rows_ = 0;
 };
 
 inline void judge(Report &r, int min_rounds) {
+  if (r.bad_lines || r.invalid_rows || r.untraceable) {
+    r.verdict = "INCOMPLETE DATA";
+    r.why = "unreadable, invalid or untraceable evidence prevents an edge conclusion";
+    return;
+  }
   if (!r.has_profit) {
     r.verdict = "NO DATA";
     r.why = "no settled fills to judge";
@@ -198,6 +352,12 @@ inline void judge(Report &r, int min_rounds) {
     r.why = fmt::format("{} rounds settled, {} needed.", r.rounds, min_rounds);
     if (overconfident)
       r.why += " The model is already overconfident, so Kelly would oversize.";
+  } else if (!r.has_calibration || !r.gap_ci) {
+    r.verdict = "UNPROVEN";
+    r.why = "settled profit is available, but model calibration needs 2+ scored rounds";
+  } else if (r.calibration_rounds < min_rounds) {
+    r.verdict = "TOO EARLY";
+    r.why = fmt::format("{} scored rounds, {} needed to judge calibration", r.calibration_rounds, min_rounds);
   } else if (overconfident) {
     r.verdict = "OVERCONFIDENT";
     r.why = "it wins less often than predicted, so Kelly oversizes orders";
@@ -216,9 +376,17 @@ inline Report Collector::report(int min_rounds, int bad_lines) const {
   r.refused = refused_;
   r.skipped = skipped_;
   r.bad_lines = bad_lines;
+  r.invalid_rows = invalid_rows_;
+  for (const auto &[id, fills] : live_) {
+    (void)fills;
+    if (!decisions_.count(id))
+      ++r.untraceable;
+  }
 
   std::vector<Order> settled;
   for (auto &[id, d] : decisions_) {
+    if (invalid_orders_.count(id) || invalid_conditions_.count(d.condition))
+      continue;
     Order o;
     o.id = id;
     o.condition = d.condition;
@@ -258,10 +426,18 @@ inline Report Collector::report(int min_rounds, int bad_lines) const {
     o.won = per_share == 1.0;
     o.payout = per_share * o.shares;
     o.net = o.payout - o.spent;
+    if (!std::isfinite(o.spent) || !std::isfinite(o.payout) || !std::isfinite(o.net)) {
+      ++r.invalid_rows;
+      continue;
+    }
+    o.settlement_order = settlement_order_.at(d.condition);
     settled.push_back(std::move(o));
   }
   std::sort(settled.begin(), settled.end(),
-            [](const Order &a, const Order &b) { return a.wall < b.wall; });
+            [](const Order &a, const Order &b) {
+              return std::tie(a.settlement_order, a.wall, a.id) <
+                     std::tie(b.settlement_order, b.wall, b.id);
+            });
 
   std::vector<const Order *> all, scored;
   for (auto &o : settled) {
@@ -276,14 +452,10 @@ inline Report Collector::report(int min_rounds, int bad_lines) const {
 
   if (!all.empty()) {
     r.has_profit = true;
-    double curve = 0, peak = 0;
     for (auto *o : all) {
       r.net += o->net;
       r.spent += o->spent;
       r.fees += o->fee;
-      curve += o->net;
-      peak = std::max(peak, curve);
-      r.max_drawdown = std::max(r.max_drawdown, peak - curve);
     }
     r.return_on_spend = r.spent > 0 ? r.net / r.spent : 0;
     r.per_round = r.net / r.rounds;
@@ -305,16 +477,24 @@ inline Report Collector::report(int min_rounds, int bad_lines) const {
     });
     Groups ordered = groups;
     std::sort(ordered.begin(), ordered.end(), [](const auto &a, const auto &b) {
-      return a.front()->wall < b.front()->wall;
+      return a.front()->settlement_order < b.front()->settlement_order;
     });
     std::size_t half = ordered.size() / 2;
-    for (std::size_t i = 0; i < ordered.size(); ++i)
+    double curve = 0, peak = 0;
+    for (std::size_t i = 0; i < ordered.size(); ++i) {
+      double net = 0;
       for (auto *o : ordered[i])
-        (i < half ? r.first_half : r.second_half) += o->net;
+        net += o->net;
+      (i < half ? r.first_half : r.second_half) += net;
+      curve += net;
+      peak = std::max(peak, curve);
+      r.max_drawdown = std::max(r.max_drawdown, peak - curve);
+    }
   }
 
   if (!scored.empty()) {
     r.has_calibration = true;
+    r.calibration_rounds = static_cast<int>(by_round(scored).size());
     double n = static_cast<double>(scored.size());
     auto price = [](const Order *o) { return std::min(o->paid(), 1.0); };
     for (auto *o : scored) {
@@ -338,6 +518,7 @@ inline Report Collector::report(int min_rounds, int bad_lines) const {
     for (auto [low, high] : edges) {
       Bin b;
       std::set<std::string> rounds;
+      std::vector<const Order *> bin_orders;
       double wins = 0;
       for (auto *o : scored)
         if (*o->fair >= low && *o->fair < high) {
@@ -346,6 +527,7 @@ inline Report Collector::report(int min_rounds, int bad_lines) const {
           wins += o->won ? 1 : 0;
           b.predicted += *o->fair;
           b.paid += o->paid();
+          bin_orders.push_back(o);
         }
       if (!b.fills)
         continue;
@@ -354,11 +536,23 @@ inline Report Collector::report(int min_rounds, int bad_lines) const {
       b.predicted /= b.fills;
       b.paid /= b.fills;
       b.actual = wins / b.fills;
-      std::tie(b.low, b.high) = wilson(wins, b.fills);
-      b.inside = b.low <= b.predicted && b.predicted <= b.high;
+      auto ci = bootstrap(by_round(bin_orders), [](const auto &s, int) -> std::optional<double> {
+        double wins = 0;
+        for (auto *o : s)
+          wins += o->won ? 1 : 0;
+        return wins / static_cast<double>(s.size());
+      });
+      if (ci) {
+        std::tie(b.low, b.high) = *ci;
+        b.has_interval = true;
+        b.inside = b.low <= b.predicted && b.predicted <= b.high;
+      }
       r.bins.push_back(b);
     }
   }
+  if (!std::isfinite(r.net) || !std::isfinite(r.spent) || !std::isfinite(r.fees) ||
+      !std::isfinite(r.max_drawdown))
+    throw std::overflow_error("report totals are not representable");
   judge(r, min_rounds);
   return r;
 }
@@ -379,6 +573,8 @@ inline std::string render(const Report &r, const std::string &path) {
                    r.refused, r.skipped, r.errors);
   if (r.bad_lines)
     s += fmt::format("  unreadable journal lines {}\n", r.bad_lines);
+  if (r.invalid_rows)
+    s += fmt::format("  invalid/conflicting evidence rows {}\n", r.invalid_rows);
   if (r.untraceable)
     s += "  ! copy paper_audit.jsonl or ledger.json beside the journal to match them\n";
   if (r.has_profit) {
@@ -386,16 +582,18 @@ inline std::string render(const Report &r, const std::string &path) {
     s += fmt::format("  net              {} on {} spent (fees {})\n", money(r.net), money(r.spent), money(r.fees));
     s += fmt::format("  return on spend  {}   95% interval {}\n", pct(r.return_on_spend), span(r.return_ci, pct));
     s += fmt::format("  per round        {}   95% interval {}\n", money(r.per_round), span(r.per_round_ci, money));
-    s += fmt::format("  max drawdown     {}\n", money(r.max_drawdown));
+    s += fmt::format("  max round drawdown {} (settlement journal order)\n", money(r.max_drawdown));
     s += fmt::format("  first/second half of rounds  {} / {}\n", money(r.first_half), money(r.second_half));
   }
   if (r.has_calibration) {
     s += "\nCALIBRATION (does the predicted win chance come true?)\n";
     s += "  predicted   fills rounds   pred.  actual  95% interval    paid\n";
-    for (auto &b : r.bins)
-      s += fmt::format("  {:<10} {:>6} {:>6} {:>7} {:>7} {:>6}-{:<7} {:>6.3f}{}\n", b.label, b.fills,
-                       b.rounds, pct(b.predicted), pct(b.actual), pct(b.low), pct(b.high), b.paid,
-                       b.inside ? "" : "  <- off");
+    for (auto &b : r.bins) {
+      const auto interval = b.has_interval ? pct(b.low) + "-" + pct(b.high) : "needs 2+ rounds";
+      s += fmt::format("  {:<10} {:>6} {:>6} {:>7} {:>7} {:>15} {:>6.3f}{}\n", b.label, b.fills,
+                       b.rounds, pct(b.predicted), pct(b.actual), interval, b.paid,
+                       b.has_interval && !b.inside ? "  <- off" : "");
+    }
     s += fmt::format("  overall: predicted {}, actual {}, average price paid {:.3f}\n", pct(r.predicted),
                      pct(r.actual), r.paid);
     s += fmt::format("  actual minus predicted, 95% interval {}\n", span(r.gap_ci, pct));
@@ -404,7 +602,8 @@ inline std::string render(const Report &r, const std::string &path) {
     if (r.brier_model >= r.brier_price)
       s += "  ! the model predicts no better than the price it pays\n";
   }
-  s += "\nPaper fills are simulated: live fills and slippage are usually worse.\n";
+  s += "\nPaper fills are simulated. Intervals describe the supplied settled sample,\n"
+       "not a guarantee of future or live profitability.\n";
   return s;
 }
 } // namespace sniper::edge

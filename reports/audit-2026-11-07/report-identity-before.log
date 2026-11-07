@@ -1,0 +1,26 @@
+EDGE REPORT  /tmp/release-edge-9qxqo9mm/journal.jsonl
+
+VERDICT: TOO EARLY
+  1 rounds settled, 300 needed.
+
+SAMPLE
+  settled fills 1 in 1 rounds
+  left out: 0 not settled yet, 0 with no token match
+  50/50 resolutions 0, refused 0, skipped rows 0, error rows 0
+
+PROFIT (after fees, at settlement)
+  net              $5.00 on $5.00 spent (fees $0.00)
+  return on spend  100.0%   95% interval needs 2+ rounds
+  per round        $5.00   95% interval needs 2+ rounds
+  max round drawdown $0.00 (settlement journal order)
+  first/second half of rounds  $0.00 / $5.00
+
+CALIBRATION (does the predicted win chance come true?)
+  predicted   fills rounds   pred.  actual  95% interval    paid
+  60%-70%         1      1   60.0%  100.0% needs 2+ rounds  0.500
+  overall: predicted 60.0%, actual 100.0%, average price paid 0.500
+  actual minus predicted, 95% interval needs 2+ rounds
+  Brier score (lower is better): model 0.1600, price paid 0.2500
+
+Paper fills are simulated. Intervals describe the supplied settled sample,
+not a guarantee of future or live profitability.

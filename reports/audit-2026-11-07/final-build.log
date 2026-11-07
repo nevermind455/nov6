@@ -1,0 +1,124 @@
+[1/4] Building CXX object CMakeFiles/sniper-edge-report.dir/tools/report/edge_report.cpp.o
+In file included from /usr/include/c++/13/algorithm:60,
+                 from /src/tools/report/edge_report.hpp:10,
+                 from /src/tools/report/edge_report.cpp:6:
+In static member function 'static constexpr _Up* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(_Tp*, _Tp*, _Up*) [with _Tp = unsigned int; _Up = unsigned int; bool _IsMove = false]',
+    inlined from 'constexpr _OI std::__copy_move_a2(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:506:30,
+    inlined from 'constexpr _OI std::__copy_move_a1(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:533:42,
+    inlined from 'constexpr _OI std::__copy_move_a(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:540:31,
+    inlined from 'constexpr _OI std::copy(_II, _II, _OI) [with _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:633:7,
+    inlined from 'static _ForwardIterator std::__uninitialized_copy<true>::__uninit_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:147:27,
+    inlined from '_ForwardIterator std::uninitialized_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:185:15,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::grow(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:925:26,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:928:39,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:927:24,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_resize(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:919:16,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::resize(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:897:63,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign(UInt) [with UInt = long unsigned int; typename std::enable_if<(std::is_same<UInt, long unsigned int>::value || std::is_same<_Tp, __int128 unsigned>::value), int>::type <anonymous> = 0]' at /usr/include/fmt/format.h:2792:19,
+    inlined from 'constexpr void fmt::v9::detail::bigint::operator=(Int) [with Int = int]' at /usr/include/fmt/format.h:2813:11,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign_pow10(int)' at /usr/include/fmt/format.h:2886:32:
+/usr/include/c++/13/bits/stl_algobase.h:437:30: warning: 'void* __builtin_memmove(void*, const void*, long unsigned int)' forming offset 4 is out of the bounds [0, 4] [-Warray-bounds=]
+  437 |             __builtin_memmove(__result, __first, sizeof(_Tp) * _Num);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In static member function 'static constexpr _Up* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(_Tp*, _Tp*, _Up*) [with _Tp = unsigned int; _Up = unsigned int; bool _IsMove = false]',
+    inlined from 'constexpr _OI std::__copy_move_a2(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:506:30,
+    inlined from 'constexpr _OI std::__copy_move_a1(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:533:42,
+    inlined from 'constexpr _OI std::__copy_move_a(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:540:31,
+    inlined from 'constexpr _OI std::copy(_II, _II, _OI) [with _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:633:7,
+    inlined from 'static _ForwardIterator std::__uninitialized_copy<true>::__uninit_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:147:27,
+    inlined from '_ForwardIterator std::uninitialized_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:185:15,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::grow(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:925:26,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:928:39,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:927:24,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_resize(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:919:16,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::resize(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:897:63,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign(UInt) [with UInt = long unsigned int; typename std::enable_if<(std::is_same<UInt, long unsigned int>::value || std::is_same<_Tp, __int128 unsigned>::value), int>::type <anonymous> = 0]' at /usr/include/fmt/format.h:2792:19,
+    inlined from 'constexpr void fmt::v9::detail::bigint::operator=(Int) [with Int = int]' at /usr/include/fmt/format.h:2813:11,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign_pow10(int)' at /usr/include/fmt/format.h:2893:11:
+/usr/include/c++/13/bits/stl_algobase.h:437:30: warning: 'void* __builtin_memmove(void*, const void*, long unsigned int)' forming offset 4 is out of the bounds [0, 4] [-Warray-bounds=]
+  437 |             __builtin_memmove(__result, __first, sizeof(_Tp) * _Num);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[2/4] Linking CXX executable sniper-edge-report
+[3/4] Building CXX object CMakeFiles/sniper-tests.dir/tests/edge_report_tests.cpp.o
+In file included from /usr/include/c++/13/algorithm:60,
+                 from /src/tools/report/edge_report.hpp:10,
+                 from /src/tests/edge_report_tests.cpp:2:
+In static member function 'static constexpr _Up* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(_Tp*, _Tp*, _Up*) [with _Tp = unsigned int; _Up = unsigned int; bool _IsMove = false]',
+    inlined from 'constexpr _OI std::__copy_move_a2(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:506:30,
+    inlined from 'constexpr _OI std::__copy_move_a1(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:533:42,
+    inlined from 'constexpr _OI std::__copy_move_a(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:540:31,
+    inlined from 'constexpr _OI std::copy(_II, _II, _OI) [with _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:633:7,
+    inlined from 'static _ForwardIterator std::__uninitialized_copy<true>::__uninit_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:147:27,
+    inlined from '_ForwardIterator std::uninitialized_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:185:15,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::grow(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:925:26,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:928:39,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:927:24,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_resize(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:919:16,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::resize(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:897:63,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign(UInt) [with UInt = long unsigned int; typename std::enable_if<(std::is_same<UInt, long unsigned int>::value || std::is_same<_Tp, __int128 unsigned>::value), int>::type <anonymous> = 0]' at /usr/include/fmt/format.h:2792:19,
+    inlined from 'constexpr void fmt::v9::detail::bigint::operator=(Int) [with Int = int]' at /usr/include/fmt/format.h:2813:11,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign_pow10(int)' at /usr/include/fmt/format.h:2886:32:
+/usr/include/c++/13/bits/stl_algobase.h:437:30: warning: 'void* __builtin_memmove(void*, const void*, long unsigned int)' forming offset 4 is out of the bounds [0, 4] [-Warray-bounds=]
+  437 |             __builtin_memmove(__result, __first, sizeof(_Tp) * _Num);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In static member function 'static constexpr _Up* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(_Tp*, _Tp*, _Up*) [with _Tp = unsigned int; _Up = unsigned int; bool _IsMove = false]',
+    inlined from 'constexpr _OI std::__copy_move_a2(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:506:30,
+    inlined from 'constexpr _OI std::__copy_move_a1(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:533:42,
+    inlined from 'constexpr _OI std::__copy_move_a(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:540:31,
+    inlined from 'constexpr _OI std::copy(_II, _II, _OI) [with _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:633:7,
+    inlined from 'static _ForwardIterator std::__uninitialized_copy<true>::__uninit_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:147:27,
+    inlined from '_ForwardIterator std::uninitialized_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:185:15,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::grow(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:925:26,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:928:39,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:927:24,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_resize(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:919:16,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::resize(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:897:63,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign(UInt) [with UInt = long unsigned int; typename std::enable_if<(std::is_same<UInt, long unsigned int>::value || std::is_same<_Tp, __int128 unsigned>::value), int>::type <anonymous> = 0]' at /usr/include/fmt/format.h:2792:19,
+    inlined from 'constexpr void fmt::v9::detail::bigint::operator=(Int) [with Int = int]' at /usr/include/fmt/format.h:2813:11,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign_pow10(int)' at /usr/include/fmt/format.h:2893:11:
+/usr/include/c++/13/bits/stl_algobase.h:437:30: warning: 'void* __builtin_memmove(void*, const void*, long unsigned int)' forming offset 4 is out of the bounds [0, 4] [-Warray-bounds=]
+  437 |             __builtin_memmove(__result, __first, sizeof(_Tp) * _Num);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In static member function 'static constexpr _Up* std::__copy_move<_IsMove, true, std::random_access_iterator_tag>::__copy_m(_Tp*, _Tp*, _Up*) [with _Tp = unsigned int; _Up = unsigned int; bool _IsMove = false]',
+    inlined from 'constexpr _OI std::__copy_move_a2(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:506:30,
+    inlined from 'constexpr _OI std::__copy_move_a1(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:533:42,
+    inlined from 'constexpr _OI std::__copy_move_a(_II, _II, _OI) [with bool _IsMove = false; _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:540:31,
+    inlined from 'constexpr _OI std::copy(_II, _II, _OI) [with _II = unsigned int*; _OI = unsigned int*]' at /usr/include/c++/13/bits/stl_algobase.h:633:7,
+    inlined from 'static _ForwardIterator std::__uninitialized_copy<true>::__uninit_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:147:27,
+    inlined from '_ForwardIterator std::uninitialized_copy(_InputIterator, _InputIterator, _ForwardIterator) [with _InputIterator = unsigned int*; _ForwardIterator = unsigned int*]' at /usr/include/c++/13/bits/stl_uninitialized.h:185:15,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::grow(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:925:26,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:928:39,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_reserve(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:927:24,
+    inlined from 'constexpr void fmt::v9::detail::buffer<T>::try_resize(size_t) [with T = unsigned int]' at /usr/include/fmt/core.h:919:16,
+    inlined from 'constexpr void fmt::v9::basic_memory_buffer<T, SIZE, Allocator>::resize(size_t) [with T = unsigned int; long unsigned int SIZE = 32; Allocator = std::allocator<unsigned int>]' at /usr/include/fmt/format.h:897:63,
+    inlined from 'constexpr void fmt::v9::detail::bigint::assign(UInt) [with UInt = long unsigned int; typename std::enable_if<(std::is_same<UInt, long unsigned int>::value || std::is_same<_Tp, __int128 unsigned>::value), int>::type <anonymous> = 0]' at /usr/include/fmt/format.h:2792:19,
+    inlined from 'constexpr void fmt::v9::detail::bigint::operator=(Int) [with Int = int]' at /usr/include/fmt/format.h:2813:11,
+    inlined from 'constexpr void fmt::v9::detail::format_dragon(basic_fp<__int128 unsigned>, unsigned int, int, buffer<char>&, int&)' at /usr/include/fmt/format.h:2987:11:
+/usr/include/c++/13/bits/stl_algobase.h:437:30: warning: 'void* __builtin_memmove(void*, const void*, long unsigned int)' forming offset 4 is out of the bounds [0, 4] [-Warray-bounds=]
+  437 |             __builtin_memmove(__result, __first, sizeof(_Tp) * _Num);
+      |             ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[4/4] Linking CXX executable sniper-tests
+Internal ctest changing into directory: /src/build-audit
+Test project /src/build-audit
+    Start 1: native_suite
+1/4 Test #1: native_suite .....................   Passed    3.26 sec
+    Start 2: comparison_cli
+2/4 Test #2: comparison_cli ...................   Passed    0.03 sec
+    Start 3: runtime_io
+3/4 Test #3: runtime_io .......................   Passed    0.15 sec
+    Start 4: edge_report_cli
+4/4 Test #4: edge_report_cli ..................   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Total Test time (real) =   3.46 sec
+-- Install configuration: ""
+-- Installing: /src/bin/./sniper-edge-report
+-- Installing: /src/bin/./sniper-diff
+-- Set non-toolchain portion of runtime path of "/src/bin/./sniper-diff" to "$ORIGIN/lib:$ORIGIN/../lib"
+-- Installing: /src/bin/./sniper-replay
+-- Set non-toolchain portion of runtime path of "/src/bin/./sniper-replay" to "$ORIGIN/lib:$ORIGIN/../lib"
+-- Installing: /src/bin/./sniper-cpp
+-- Set non-toolchain portion of runtime path of "/src/bin/./sniper-cpp" to "$ORIGIN/lib:$ORIGIN/../lib"
+-- Installing: /src/bin/./sniper-tests
+-- Set non-toolchain portion of runtime path of "/src/bin/./sniper-tests" to "$ORIGIN/lib:$ORIGIN/../lib"

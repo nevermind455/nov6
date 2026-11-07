@@ -1,0 +1,13 @@
+EDGE REPORT  tests/fixtures/edge_conflicting_condition.jsonl
+
+VERDICT: INCOMPLETE DATA
+  unreadable, invalid or untraceable evidence prevents an edge conclusion
+
+SAMPLE
+  settled fills 0 in 0 rounds
+  left out: 0 not settled yet, 0 with no token match
+  50/50 resolutions 0, refused 0, skipped rows 0, error rows 0
+  invalid/conflicting evidence rows 3
+
+Paper fills are simulated. Intervals describe the supplied settled sample,
+not a guarantee of future or live profitability.

@@ -21,6 +21,62 @@
 #include <unistd.h>
 namespace sniper {
 namespace net = boost::asio;
+namespace execution {
+Units spendable_collateral(Units sampled_balance, Units sampled_outflow,
+                           Units current_outflow) {
+  if (sampled_balance < 0 || sampled_outflow < 0 || current_outflow < sampled_outflow)
+    throw std::invalid_argument("invalid collateral snapshot watermark");
+  auto available = static_cast<__int128>(sampled_balance) -
+                   (static_cast<__int128>(current_outflow) - sampled_outflow);
+  return available > 0 ? static_cast<Units>(available) : 0;
+}
+std::set<std::string> account_markets(const Ledger &ledger,
+                                     std::set<std::string> active) {
+  for (const auto &[id, intent] : ledger.orders) {
+    (void)id;
+    if (!ledger.settled_conditions.count(intent.condition) &&
+        (intent.unresolved() || intent.status == "matched" || intent.booked_shares > 0))
+      active.insert(intent.condition);
+  }
+  return active;
+}
+bool pending_trade_status(std::string_view status) {
+  return status == "MATCHED" || status == "MATCHED_NOT_BROADCASTED" ||
+         status == "MINED" || status == "RETRYING";
+}
+bool refresh_round_rules(Round &current, const Round &fresh) {
+  if (current.condition != fresh.condition || current.up != fresh.up ||
+      current.down != fresh.down || current.start != fresh.start || current.end != fresh.end)
+    return false;
+  current.rules[0] = fresh.rules[0];
+  current.rules[1] = fresh.rules[1];
+  if (fresh.ptb) current.ptb = fresh.ptb;
+  return true;
+}
+bool cache_round_rules(std::map<std::string, MarketRules> &cache,
+                       const Round &round, double fetched_wall) {
+  if (!round.rules[0].loaded || !round.rules[1].loaded)
+    return false;
+  MarketRules rules;
+  rules.condition_id = round.condition;
+  rules.fee_rate = py::D(dollars(round.rules[0].rate));
+  rules.fee_exponent = round.rules[0].exponent;
+  rules.min_order_size = py::D(dollars(round.rules[0].min_shares));
+  rules.tick_size = py::D(dollars(round.rules[0].tick));
+  rules.up_token_id = round.up;
+  rules.down_token_id = round.down;
+  rules.taker_delay_ms = 0.0;
+  rules.taker_delay_flagged = true;
+  rules.fetched_wall = fetched_wall;
+  cache[round.condition] = std::move(rules);
+  while (cache.size() > 64)
+    cache.erase(std::min_element(
+        cache.begin(), cache.end(), [](auto &a, auto &b) {
+          return a.second.fetched_wall < b.second.fetched_wall;
+        }));
+  return true;
+}
+} // namespace execution
 struct Runtime::Impl {
   Config c;
   net::io_context io;
@@ -35,7 +91,7 @@ struct Runtime::Impl {
   std::unique_ptr<FileLock> wallet_lock;
   std::unique_ptr<H2Client> sender;
   std::vector<std::unique_ptr<WebSocket>> coinbase;
-  std::unique_ptr<WebSocket> market, user, rtds;
+  std::unique_ptr<WebSocket> market, user;
   BookState book{8.0, 30.0, nullptr, nullptr, [this] { return venue_wall(); }};
   ServerClock clock;
   // the reference's decision engine, paper broker and hub state
@@ -83,6 +139,11 @@ struct Runtime::Impl {
   double balance_at = -1, risk_at = 0, user_pong = -1, last_sub = 0,
          pause_until = 0, stop_started = 0, dd_started = 0;
   std::optional<Units> balance;
+  Units booked_outflow = 0, balance_outflow = 0;
+  std::optional<Units> effective_balance() const {
+    return balance ? std::optional(execution::spendable_collateral(*balance, balance_outflow, booked_outflow))
+                   : std::nullopt;
+  }
   std::map<std::string, Big> allowances;
   std::string pause_reason;
   std::set<std::string> pause_latches;
@@ -96,8 +157,6 @@ struct Runtime::Impl {
   std::uint64_t snapshot_entries = 0;
   std::map<std::string, std::uint64_t> skips;
   double last_recovery = -1e30;
-  double twap_at = -1, twap_price = 0;
-  std::map<std::int64_t, double> twap_open;
   bool stopping = false, startup_ok = false;
   int exit_code = 0;
 
@@ -107,6 +166,8 @@ struct Runtime::Impl {
     std::vector<std::string> unresolved;
     double since = 0;
     std::int64_t auth_time = 0;
+    double auth_mono = 0;
+    Units booked_outflow = 0;
   };
   std::atomic<std::shared_ptr<const Work>> work;
   std::atomic<bool> workers_stop{false}, worker_done{false},
@@ -138,6 +199,11 @@ struct Runtime::Impl {
   Json dash_latency_json = Json::object();
   bool dash_latency_dirty = false;
   DashQuality dash_quality;
+  double dash_started_wall = wall_s();
+  std::set<std::string> dash_live_acknowledged;
+  std::map<std::string, double> dash_live_decision_asks;
+  std::string dash_live_last_fill_order;
+  std::set<std::pair<std::string, std::string>> dash_live_latency_recorded;
   long long dash_wins = 0, dash_losses = 0;
   std::vector<std::string> dash_faults;
   std::uint64_t dry_orders = 0;
@@ -211,7 +277,11 @@ struct Runtime::Impl {
         throw std::runtime_error(
             "CLOB account is closed-only or could not be verified");
     }
-    for (auto &[id, i] : ledger.orders)
+    for (auto &[id, i] : ledger.orders) {
+      auto total = static_cast<__int128>(booked_outflow) + i.booked_cost + i.booked_fee;
+      if (total < 0 || total > std::numeric_limits<Units>::max())
+        throw std::overflow_error("historical collateral outflow overflow");
+      booked_outflow = static_cast<Units>(total);
       if (!ledger.settled_conditions.count(i.condition)) {
         Round r;
         r.condition = i.condition;
@@ -228,10 +298,14 @@ struct Runtime::Impl {
             ledger.status(id, "cancelled");
         }
       }
+    }
     H2Callbacks cb;
     cb.written = [this](auto id, auto t) {
-      if (auto it = stamps.find(std::string(id)); it != stamps.end())
+      if (auto it = stamps.find(std::string(id)); it != stamps.end()) {
         it->second[5] = t;
+        if (dashboard)
+          dash_live_timings(std::string(id), timing_fields(id));
+      }
     };
     cb.reply = [this](auto id, const HttpResult &result) {
       on_reply(id, result);
@@ -323,18 +397,9 @@ struct Runtime::Impl {
             }
           },
           25, true);
-    if (c.ptb_skip)
-      rtds = std::make_unique<WebSocket>(
-          io, tls, "wss://ws-live-data.polymarket.com",
-          [this](auto raw, int) { on_twap(raw); },
-          [this](bool up) {
-            if (up)
-              rtds->send(
-                  R"({"action":"subscribe","subscriptions":[{"topic":"crypto_prices_chainlink","type":"*","filters":"{\"symbol\":\"btc/usd\"}"}]})");
-          },
-          25, true);
     work.store(std::make_shared<Work>());
     build_engine();
+    refresh_work();
   }
   ~Impl() {
     if (dashboard)
@@ -358,8 +423,6 @@ struct Runtime::Impl {
       market->stop();
     if (user)
       user->stop();
-    if (rtds)
-      rtds->stop();
   }
   void audit(Json row) {
     if (dashboard)
@@ -433,6 +496,12 @@ struct Runtime::Impl {
     }
     dash_quality_last(row, slip);
   }
+  void dash_live_timings(const std::string &id, const Json &row) {
+    const auto samples = dash::execution_latencies(row);
+    for (const auto &[metric, sample] : samples.items())
+      if (dash_live_latency_recorded.emplace(id, metric).second)
+        dash_sample(metric.c_str(), sample.get<double>(), false);
+  }
   // A row that adds to an order already listed: live, its reply and its fills
   // arrive after the row that listed it.
   bool dash_update_order(const Json &row, const std::string &result) {
@@ -442,37 +511,33 @@ struct Runtime::Impl {
     for (auto &old : dash_orders) {
       if (dash_str(old, "order_id") != id)
         continue;
-      double shares = dash_number(row, "shares", 0);
       auto reason = dash_str(row, "reason");
-      auto &q = dash_quality;
-      bool first_reply = !old.value("replied", false);
-      if (first_reply && (result == "live_fill_update" || result == "refused" ||
-                          result == "pending"))
-        ++q.acked;
-      if (row.contains("reply_ms") && row["reply_ms"].is_number())
-        dash_sample("send_to_ack", row["reply_ms"].get<double>(), false);
-      if (result == "live_fill_update" && shares > 0) {
-        double amount = dash_number(row, "amount", 0), price = amount / shares;
+      auto i = ledger.orders.find(id);
+      if (c.live && i != ledger.orders.end() && i->second.booked_shares > 0) {
+        const auto &intent = i->second;
+        const double shares = dollars(intent.booked_shares);
+        const double price = dollars(intent.booked_cost) / shares;
         old["result"] = "filled";
         old["shares"] = shares;
         old["price"] = price;
-        if (first_reply) {
-          q.pending = std::max(0LL, q.pending - 1);
-          dash_filled(old, dash_number(old, "ask", 0), price);
-          q.last["ask_seen"] = old["ask"];
-        }
+        old["detail"] = intent.status == "confirmed"
+                            ? (intent.booked_cost < intent.stake &&
+                                       intent.stake - intent.booked_cost > 1
+                                   ? "partial" : "")
+                            : "confirmed trades; awaiting final total";
       } else if (result == "refused") {
         bool miss = dash_has(reason, "no match") || dash_has(reason, "no-fill");
         old["result"] = miss ? "missed" : "refused";
         old["detail"] = reason.substr(0, 120);
-        if (first_reply) {
-          q.pending = std::max(0LL, q.pending - 1);
-          ++(miss ? q.zero_fill : q.rejected);
-        }
-      } else if (!reason.empty())
-        old["detail"] = reason.substr(0, 120);
-      if (result == "live_fill_update" || result == "refused" || result == "pending")
-        old["replied"] = true;
+      } else if (c.live) {
+        old["result"] = i != ledger.orders.end() && i->second.status == "unknown"
+                            ? "unknown" : "pending";
+        old["shares"] = nullptr;
+        old["price"] = nullptr;
+        old["detail"] = !reason.empty() ? reason.substr(0, 120)
+                           : i != ledger.orders.end() && i->second.matched_shares > 0
+                               ? "matched; awaiting confirmation" : "awaiting reply";
+      }
       return true;
     }
     return false;
@@ -481,6 +546,13 @@ struct Runtime::Impl {
     auto result = dash_str(row, "result"), reason = dash_str(row, "reason"),
          side = dash_str(row, "side");
     double wall = dash_number(row, "wall", wall_s());
+    if (c.live) {
+      const auto id = dash_str(row, "order_id");
+      if (!id.empty() && row.value("acknowledged", false)) {
+        dash_live_acknowledged.insert(id);
+        dash_live_timings(id, row);
+      }
+    }
     if (!side.empty() && row.contains("bp") && row["bp"].is_number())
       dash_last_signal = std::pair{wall, row["bp"].get<double>()};
     if (!side.empty() && row.contains("fair") && row["fair"].is_number())
@@ -508,22 +580,30 @@ struct Runtime::Impl {
     else if (result == "refused" && side.empty() && !row.contains("order_id"))
       dash_event("bot", reason, "bad");
     if (result != "filled" && result != "refused" && result != "pending" &&
-        result != "error" && result != "live_fill_update")
+        result != "error" && result != "live_fill_update" && result != "live_fill")
       return;
+    if (c.live && result == "live_fill")
+      if (auto i = ledger.orders.find(dash_str(row, "order_id"));
+          i != ledger.orders.end() && i->second.sent_wall >= dash_started_wall)
+        dash_live_last_fill_order = i->first;
+    if (c.live && result == "live_fill")
+      dash_event("sniper", "CONFIRMED " + side + " " +
+                              py::fixed(dash_number(row, "shares", 0), 1) + " shares",
+                 "good");
     if (dash_update_order(row, result) || side.empty())
       return;
+    if (c.live && (result == "live_fill" || result == "live_fill_update"))
+      return; // historical fills do not become new order attempts/table rows
     // The first row of one order.
     auto &q = dash_quality;
     ++q.attempted;
-    if (row.contains("loop_lag_ms") && row["loop_lag_ms"].is_number())
+    if (!c.live && row.contains("loop_lag_ms") && row["loop_lag_ms"].is_number())
       dash_sample("trigger_to_decision", row["loop_lag_ms"].get<double>(), false);
     if (c.live) {
       if (result != "error")
         ++q.sent;
-      if (row.contains("T0_ns") && row.contains("T2_ns"))
-        dash_sample("trigger_to_send",
-                    (row["T2_ns"].get<double>() - row["T0_ns"].get<double>()) / 1e6,
-                    false);
+      if (auto ask = dash_number(row, "ask_seen", 0); ask > 0)
+        dash_live_decision_asks[dash_str(row, "order_id")] = ask;
     } else {
       if (result != "error" && !dash_has(reason, "signing failed")) {
         ++q.sent;
@@ -658,6 +738,11 @@ struct Runtime::Impl {
     };
     auto optional_json = [](std::optional<double> v) { return v ? Json(*v) : Json(); };
     dash_refresh_latency();
+    Json live_quality = c.live
+                            ? dash::live_execution_quality(ledger.orders,
+                                  dash_live_acknowledged, dash_live_decision_asks,
+                                  dash_started_wall, dash_live_last_fill_order)
+                            : Json();
     auto p50 = [&](const char *key) {
       auto it = dash_latency_json.find(key);
       return it == dash_latency_json.end() ? Json() : (*it)["p50"];
@@ -685,11 +770,17 @@ struct Runtime::Impl {
         : fresh.why_not(now).empty() ? "LIVE"
                                      : "DEGRADED";
     std::string busy;
-    if (sniper->inflight[0])
+    if (c.live && hub ? ledger.awaiting(hub->up) : sniper->inflight[0].has_value())
       busy = "UP";
-    if (sniper->inflight[1])
+    if (c.live && hub ? ledger.awaiting(hub->down) : sniper->inflight[1].has_value())
       busy += busy.empty() ? "DOWN" : "+DOWN";
-    auto filled = counter("filled"), refused = counter("refused");
+    auto filled = c.live ? live_quality["filled"].get<std::uint64_t>() +
+                              live_quality["partial"].get<std::uint64_t>()
+                         : counter("filled");
+    auto refused = c.live ? live_quality["zero_fill"].get<std::uint64_t>() +
+                               live_quality["rejected"].get<std::uint64_t>() +
+                               live_quality["failed"].get<std::uint64_t>()
+                          : counter("refused");
     Json trigger{
         {"feed", c.s.primary_feed},
         {"status", status},
@@ -699,7 +790,7 @@ struct Runtime::Impl {
         {"window_ms", c.s.window_ms},
         {"signals", signals},
         {"signals_per_min", rate},
-        {"orders", counter("orders")},
+        {"orders", c.live ? live_quality["sent"] : Json(counter("orders"))},
         {"filled", filled},
         {"refused", refused},
         {"fill_rate", filled + refused
@@ -714,6 +805,8 @@ struct Runtime::Impl {
         {"in_flight", busy.empty() ? Json() : Json(busy)},
         {"last_signal_bp", dash_last_signal ? Json(dash_last_signal->second) : Json()},
         {"last_signal_age_s", dash_last_signal ? Json(wall - dash_last_signal->first) : Json()}};
+    if (c.live)
+      trigger["fill_rate"] = live_quality["fill_rate"];
     if (c.s.fair) {
       auto v = sniper->vol.vol();
       trigger["fair"] = Json{{"vol_bp", v ? Json(*v * 1e4) : Json()},
@@ -759,6 +852,8 @@ struct Runtime::Impl {
                                             : Json()},
               {"slip_n", quality.slip_n},
               {"last", quality.last}}}};
+    if (c.live)
+      snap["exec"]["quality"] = live_quality;
     // ---- market
     double end = hub_window >= 0 ? static_cast<double>(hub_window + 300) : 0.0;
     Json market = Json::object();
@@ -784,6 +879,11 @@ struct Runtime::Impl {
     market["round_fills"] = round == sniper->rounds.end() ? 0LL : round->second.fills;
     market["round_up_sh"] = round == sniper->rounds.end() ? 0.0 : round->second.up;
     market["round_down_sh"] = round == sniper->rounds.end() ? 0.0 : round->second.down;
+    if (c.live && hub) {
+      market["round_fills"] = ledger.round_fills(hub->condition);
+      market["round_up_sh"] = dollars(ledger.holding(hub->up));
+      market["round_down_sh"] = dollars(ledger.holding(hub->down));
+    }
     market["max_fills"] = c.s.max_fills_round;
     market["max_side_shares"] = c.s.max_side_shares;
     snap["market"] = std::move(market);
@@ -797,46 +897,41 @@ struct Runtime::Impl {
     snap["orders"] = std::move(orders);
     // ---- positions and account. Positions in the market trading now are marked
     // to its live bid; ended markets are carried at cost until their result.
-    Json up_row{{"side", "UP"}, {"shares", 0.0}, {"avg", nullptr}, {"cost", 0.0}};
-    Json down_row{{"side", "DOWN"}, {"shares", 0.0}, {"avg", nullptr}, {"cost", 0.0}};
+    Json up_row{{"side", "UP"}, {"shares", 0.0}, {"avg", nullptr}, {"cost", 0.0}, {"fees", 0.0}};
+    Json down_row{{"side", "DOWN"}, {"shares", 0.0}, {"avg", nullptr}, {"cost", 0.0}, {"fees", 0.0}};
     std::set<std::string> pending_markets;
-    double pending_shares = 0, pending_cost = 0;
+    double pending_shares = 0, pending_cost = 0, pending_value = 0, pending_fees = 0;
     for (auto &[token, p] : ledger.positions) {
       if (p.settled || p.shares <= 0)
         continue;
-      double shares = dollars(p.shares), cost = dollars(p.cost);
+      double shares = dollars(p.shares), cost = dollars(p.cost), fees = dollars(p.fees);
       if (hub && p.condition == hub->condition && (token == hub->up || token == hub->down)) {
         Json &row = token == hub->up ? up_row : down_row;
         row["shares"] = shares;
         row["avg"] = cost / shares;
-        row["cost"] = cost;
+        row["cost"] = cost + fees;
+        row["fees"] = fees;
         continue;
       }
       pending_markets.insert(p.condition);
       pending_shares += shares;
-      pending_cost += cost;
+      pending_cost += cost + fees;
+      pending_value += cost; // preserve the documented notional-cost carry
+      pending_fees += fees;
     }
-    double active_value = 0, unrealized = 0;
+    double active_value = 0, unrealized = -pending_fees;
     int unmarkable = 0;
     auto mark = [&](Json &row, const std::string *token) {
-      std::optional<double> bid;
-      if (token)
-        bid = book.view(*token).best_bid();
-      row["bid"] = optional_json(bid);
       double shares = row["shares"].get<double>();
-      if (shares <= 0) {
-        row["value"] = 0.0;
-        row["pnl"] = 0.0;
-      } else if (!bid) {
-        row["value"] = nullptr;
-        row["pnl"] = nullptr;
+      const double fees = row["fees"].get<double>();
+      row.update(dash::mark_position(shares, row["cost"].get<double>() - fees,
+                                    fees, token ? book.view(*token) : BookView{},
+                                    now, c.s.stale_ms));
+      if (shares > 0 && row["value"].is_null())
         ++unmarkable;
-      } else {
-        double value = shares * *bid, pnl = value - row["cost"].get<double>();
-        row["value"] = value;
-        row["pnl"] = pnl;
-        active_value += value;
-        unrealized += pnl;
+      else if (shares > 0) {
+        active_value += row["value"].get<double>();
+        unrealized += row["pnl"].get<double>();
       }
     };
     mark(up_row, hub ? &hub->up : nullptr);
@@ -847,7 +942,7 @@ struct Runtime::Impl {
                                    {"shares", pending_shares},
                                    {"cost", pending_cost}}}};
     double realized = dollars(ledger.realized);
-    Json position_value = unmarkable ? Json() : Json(active_value + pending_cost);
+    Json position_value = unmarkable ? Json() : Json(active_value + pending_value);
     Json account{{"realized", realized},
                  {"unrealized", unmarkable ? Json() : Json(unrealized)},
                  {"position_value", position_value},
@@ -856,17 +951,20 @@ struct Runtime::Impl {
                  {"losses", dash_losses}};
     if (c.live) {
       account["kind"] = "LIVE";
-      account["balance"] = balance ? Json(dollars(*balance)) : Json();
-      account["equity"] = balance && !unmarkable
-                              ? Json(dollars(*balance) + active_value + pending_cost)
+      auto collateral = effective_balance();
+      account.update(dash::live_balance_view(collateral ? std::optional(dollars(*collateral))
+                                                       : std::nullopt,
+                                              now - balance_at));
+      account["equity"] = !account["balance"].is_null() && !unmarkable
+                              ? Json(account["balance"].get<double>() + active_value + pending_value)
                               : Json();
       account["total"] = unmarkable ? Json() : Json(realized + unrealized);
     } else {
-      double cash = dollars(ledger.cash), start = dollars(c.start_cash);
+      double cash = dollars(ledger.cash);
       account["kind"] = "PAPER";
       account["cash"] = cash;
-      account["equity"] = unmarkable ? Json() : Json(cash + active_value + pending_cost);
-      account["total"] = unmarkable ? Json() : Json(cash + active_value + pending_cost - start);
+      account["equity"] = unmarkable ? Json() : Json(cash + active_value + pending_value);
+      account["total"] = unmarkable ? Json() : Json(realized + unrealized);
     }
     snap["account"] = std::move(account);
     // ---- settlement
@@ -1043,9 +1141,10 @@ struct Runtime::Impl {
     bool live() override { return r.c.live; }
     std::optional<double> read_bankroll() override {
       if (r.c.live) {
-        if (!r.balance)
+        auto balance = r.effective_balance();
+        if (!balance)
           return std::nullopt;
-        return dollars(*r.balance - r.ledger.reserved());
+        return dollars(*balance - r.ledger.reserved());
       }
       return dollars(r.ledger.cash);
     }
@@ -1270,6 +1369,7 @@ struct Runtime::Impl {
     if (!rec_out) {
       rec_out.close();
       pause("recorder disk failure", true);
+      begin_stop(1);
     }
   }
   void rec_frame(const char *kind, std::string_view raw, int backlog = -1) {
@@ -1296,27 +1396,8 @@ struct Runtime::Impl {
                 {"taker_delay_flagged", m.taker_delay_flagged}};
   }
   // ------------------------------------------------------------ the hub
-  void activate_rules(const Round &r) {
-    if (market_rules.count(r.condition) || !r.rules[0].loaded ||
-        !r.rules[1].loaded)
-      return;
-    MarketRules m;
-    m.condition_id = r.condition;
-    m.fee_rate = py::D(dollars(r.rules[0].rate));
-    m.fee_exponent = r.rules[0].exponent;
-    m.min_order_size = py::D(dollars(r.rules[0].min_shares));
-    m.tick_size = py::D(dollars(r.rules[0].tick));
-    m.up_token_id = r.up;
-    m.down_token_id = r.down;
-    m.taker_delay_ms = 0.0;
-    m.taker_delay_flagged = true;
-    m.fetched_wall = wall_s();
-    market_rules[r.condition] = m;
-    while (market_rules.size() > 64)
-      market_rules.erase(std::min_element(
-          market_rules.begin(), market_rules.end(), [](auto &a, auto &b) {
-            return a.second.fetched_wall < b.second.fetched_wall;
-          }));
+  bool activate_rules(const Round &r) {
+    return execution::cache_round_rules(market_rules, r, wall_s());
   }
   void update_hub() {
     double now_w = wall_s();
@@ -1353,12 +1434,11 @@ struct Runtime::Impl {
     }
     if (!changed)
       return;
-    std::set<std::string> want, markets;
+    std::set<std::string> want;
     for (auto *r : {&hub, &prepared})
       if (*r) {
         want.insert((*r)->up);
         want.insert((*r)->down);
-        markets.insert((*r)->condition);
         activate_rules(**r);
         if (!(r == &hub ? hub_new : prepared_new))
           continue;
@@ -1395,21 +1475,31 @@ struct Runtime::Impl {
               Json{{"assets_ids", drop}, {"operation", "unsubscribe"}}.dump());
       }
     }
-    if (user) {
-      for (auto &m : user_markets)
-        markets.insert(m);
-      if (markets != user_markets) {
-        user_markets = markets;
-        last_sub = mono_s();
-        user_pong = -1;
-        if (user->connected()) {
-          user->send(Json{{"markets", std::vector<std::string>(markets.begin(),
-                                                               markets.end())},
-                          {"operation", "subscribe"}}
-                         .dump());
-          user->send("PING");
-        }
-      }
+    sync_user_markets();
+  }
+  void sync_user_markets() {
+    if (!user)
+      return;
+    std::set<std::string> active;
+    if (hub) active.insert(hub->condition);
+    if (prepared) active.insert(prepared->condition);
+    auto markets = execution::account_markets(ledger, std::move(active));
+    if (markets == user_markets)
+      return;
+    std::vector<std::string> add, drop;
+    std::set_difference(markets.begin(), markets.end(), user_markets.begin(),
+                        user_markets.end(), std::back_inserter(add));
+    std::set_difference(user_markets.begin(), user_markets.end(), markets.begin(),
+                        markets.end(), std::back_inserter(drop));
+    user_markets = std::move(markets);
+    last_sub = mono_s();
+    user_pong = -1;
+    if (user->connected()) {
+      if (!drop.empty())
+        user->send(Json{{"markets", drop}, {"operation", "unsubscribe"}}.dump());
+      if (!add.empty())
+        user->send(Json{{"markets", add}, {"operation", "subscribe"}}.dump());
+      user->send("PING");
     }
   }
   // feeds/hub._request_ws_snapshot
@@ -1655,7 +1745,7 @@ struct Runtime::Impl {
         return refuse(std::string("hybrid risk check: ") + e.what());
       }
     }
-    double free = dollars((balance ? *balance : 0) - ledger.reserved());
+    double free = dollars(effective_balance().value_or(0) - ledger.reserved());
     if (spend + reserve_fee > free + 1e-9)
       return refuse("collateral $" + py::fixed(free, 2) + " is below the order $" +
                     py::fixed(spend + reserve_fee, 2) + " incl. fee");
@@ -1699,7 +1789,7 @@ struct Runtime::Impl {
     auto signed_order = build_order(*signer, c.funder, c.signature_type,
                                     p->token, stake, cap, rule, creds,
                                     c.order_type);
-    ts[3] = ts[4] = mono_ns();
+    ts[3] = mono_ns();
     if (c.dry_run) {
       // Every check above ran and the order was signed. Nothing is recorded as
       // an intent, nothing counts against a budget, and nothing is sent.
@@ -1730,11 +1820,12 @@ struct Runtime::Impl {
     state.spend += stake;
     state.rounds.insert(r.condition);
     ledger.register_intent(intent, &signed_order, state); // fsynced intent
+    ts[4] = mono_ns();
     // the send guard (LiveExecution send_guard, Sniper._check_dispatch_age):
     // the durable write can take time; nothing may have gone stale meanwhile
     auto now = mono_s();
     auto gate = live_readiness(r);
-    if (gate.empty() && (!balance || ledger.reserved() > *balance))
+    if (gate.empty() && (!effective_balance() || ledger.reserved() > *effective_balance()))
       gate = "collateral fell below outstanding reservations";
     double deadline = p->dispatch_deadline > 0
                           ? p->dispatch_deadline
@@ -1778,6 +1869,7 @@ struct Runtime::Impl {
     if (!sender->post(intent.id, signed_order.body, headers)) {
       ledger.status(intent.id, "aborted");
       ledger.set_canary(unsent_state);
+      release(intent.id);
       return refuse("native HTTP/2 sender not ready before dispatch");
     }
     ++orders_sent;
@@ -1853,6 +1945,16 @@ struct Runtime::Impl {
           sniper->release(n == 0 ? "UP" : "DOWN");
       }
     sent_at.erase(std::string(id));
+    stamps.erase(std::string(id));
+  }
+  Json timing_fields(std::string_view id) const {
+    Json fields = Json::object();
+    auto it = stamps.find(std::string(id));
+    if (it != stamps.end())
+      for (int index : {0, 2, 3, 4, 5, 6})
+        if (it->second[index] > 0)
+          fields["T" + std::to_string(index) + "_ns"] = it->second[index];
+    return fields;
   }
   void on_reply(std::string_view id, const HttpResult &reply) {
     if (id == "__clock") {
@@ -1872,6 +1974,12 @@ struct Runtime::Impl {
     auto &intent = it->second;
     if (auto s = stamps.find(std::string(id)); s != stamps.end())
       s->second[6] = mono_ns();
+    auto timings = timing_fields(id);
+    auto record_reply = [&](Json row) {
+      row["acknowledged"] = true;
+      row.update(timings);
+      audit(std::move(row));
+    };
     double rtt = sent_at.count(std::string(id))
                      ? (mono_s() - sent_at.at(std::string(id))) * 1000
                      : 0;
@@ -1911,7 +2019,7 @@ struct Runtime::Impl {
           throw std::runtime_error("matched totals exceed signed limits");
         ledger.status(id, "matched", taking, making);
         release(id);
-        audit({{"result", "live_fill_update"},
+        record_reply({{"result", "live_fill_update"},
                {"order_id", id},
                {"shares", dollars(taking)},
                {"amount", dollars(making)},
@@ -1927,14 +2035,11 @@ struct Runtime::Impl {
         ledger.status(id, miss ? "no_match" : "refused");
         // The venue confirmed nothing traded, so no money was spent. A refusal
         // for any other reason keeps its spend.
-        if (miss && intent.matched_shares == 0 && intent.booked_shares == 0) {
-          auto state = ledger.canary;
-          refund_missed_spend(state, intent.stake);
-          ledger.set_canary(state);
-        }
+        if (miss)
+          ledger.release_missed_spend(id);
         ledger.release_fill_slot(id);
         release(id);
-        audit({{"result", "refused"},
+        record_reply({{"result", "refused"},
                {"order_id", id},
                {"reason", miss ? "FAK no match" : "venue refused native order"},
                {"http_status", reply.status},
@@ -1942,7 +2047,7 @@ struct Runtime::Impl {
       } else if (success) {
         ledger.status(id, "pending");
         release(id);
-        audit({{"result", "pending"},
+        record_reply({{"result", "pending"},
                {"order_id", id},
                {"reason", "awaiting FAK fill size"}});
       } else
@@ -1958,12 +2063,15 @@ struct Runtime::Impl {
     if (i == ledger.orders.end() || i->second.status == "confirmed")
       return;
     ledger.status(id, "unknown");
+    auto timings = timing_fields(id);
     release(id);
     pause("unknown native order outcome", true);
-    audit({{"result", "pending"},
+    Json row{{"result", "pending"},
            {"order_id", id},
            {"reason", std::string(why)},
-           {"never_retry", true}});
+           {"never_retry", true}, {"acknowledged", false}};
+    row.update(timings);
+    audit(std::move(row));
   }
   void consume_trade(const Json &j) {
     try {
@@ -1973,8 +2081,7 @@ struct Runtime::Impl {
         pause("private trade failed; reconciliation required", true);
         return;
       }
-      if (t.status != "MATCHED" && t.status != "MINED" &&
-          t.status != "CONFIRMED" && t.status != "RETRYING")
+      if (t.status != "CONFIRMED" && !execution::pending_trade_status(t.status))
         throw std::runtime_error("unknown private trade status");
       private_sizes[t.order][t.id] = t.shares;
       // Reconciliation re-reads every trade of the session every 5 s; one that
@@ -1982,11 +2089,18 @@ struct Runtime::Impl {
       if (ledger.trade_ids.count(t.id))
         return;
       Units delivered = 0;
-      for (auto &[id, sh] : private_sizes[t.order])
+      for (auto &[id, sh] : private_sizes[t.order]) {
+        if (sh < 0 || delivered > std::numeric_limits<Units>::max() - sh)
+          throw std::overflow_error("private trade size total overflow");
         delivered += sh;
+      }
       auto &intent = ledger.orders.at(t.order);
       if (t.status == "CONFIRMED") {
-        if (ledger.fill(t.id, t.order, t.shares, t.cost, t.fee))
+        auto outflow = static_cast<__int128>(booked_outflow) + t.cost + t.fee;
+        if (outflow > std::numeric_limits<Units>::max())
+          throw std::overflow_error("confirmed collateral outflow overflow");
+        if (ledger.fill(t.id, t.order, t.shares, t.cost, t.fee)) {
+          booked_outflow = static_cast<Units>(outflow);
           audit({{"result", "live_fill"},
                  {"order_id", t.order},
                  {"trade_id", t.id},
@@ -1995,6 +2109,7 @@ struct Runtime::Impl {
                  {"amount", dollars(t.cost)},
                  {"fee", dollars(t.fee)},
                  {"status", "CONFIRMED"}});
+        }
       } else if (delivered > intent.matched_shares)
         ledger.status(intent.id, intent.status, delivered, intent.matched_cost);
       audit({{"result", "live_fill_update"},
@@ -2041,34 +2156,6 @@ struct Runtime::Impl {
       pause("invalid private-channel event", true);
     }
   }
-  void on_twap(std::string_view raw) {
-    if (raw == "PONG")
-      return;
-    try {
-      auto j = Json::parse(raw);
-      if (j.value("topic", "") != "crypto_prices_chainlink")
-        return;
-      auto p = j.at("payload");
-      if (p.value("symbol", "") != "btc/usd")
-        return;
-      auto stamp = number(p.at("timestamp")) / 1000;
-      auto price = number(p.at("value"));
-      if (price <= 0 || stamp > wall_s() + 2 || wall_s() - stamp > 5)
-        return;
-      twap_at = stamp;
-      twap_price = price;
-      auto start = static_cast<std::int64_t>(stamp) / 300 * 300;
-      if (stamp >= start && stamp <= start + 2 && !twap_open.count(start))
-        twap_open[start] = price;
-      if (auto i = rounds.find(start);
-          i != rounds.end() && !i->second.ptb && twap_open.count(start))
-        i->second.ptb = twap_open[start];
-      while (twap_open.size() > 8)
-        twap_open.erase(twap_open.begin());
-    } catch (...) {
-      ++errors;
-    }
-  }
   void set_rounds(std::vector<Round> fresh) {
     for (auto &r : fresh) {
       auto old = rounds.find(r.start);
@@ -2079,15 +2166,22 @@ struct Runtime::Impl {
               ((r.rules[n].tick != old->second.rules[n].tick ||
                 r.rules[n].rate != old->second.rules[n].rate ||
                 r.rules[n].exponent != old->second.rules[n].exponent ||
+                r.rules[n].min_shares != old->second.rules[n].min_shares ||
                 r.rules[n].neg != old->second.rules[n].neg)
                    ? 1
                    : 0);
         if (!r.ptb)
           r.ptb = old->second.ptb;
       }
-      if (!r.ptb && twap_open.count(r.start))
-        r.ptb = twap_open[r.start];
       rounds[r.start] = r;
+      // The engine and paper/live pre-send checks share this independent
+      // cache; updating the active Round alone leaves its rules stale.
+      if (market_rules.count(r.condition) && activate_rules(r))
+        rec(Json{{"k", "rules"}, {"cond", r.condition}, {"rules", rules_json(r)}});
+      if (hub && hub->start == r.start && !execution::refresh_round_rules(*hub, r))
+        hub.reset();
+      if (prepared && prepared->start == r.start && !execution::refresh_round_rules(*prepared, r))
+        prepared.reset();
     }
     auto start = static_cast<std::int64_t>(wall_s()) / 300 * 300;
     // A published price to beat for a closed round calibrates the estimate.
@@ -2109,7 +2203,9 @@ struct Runtime::Impl {
         ++i;
   }
   void refresh_work() {
+    sync_user_markets();
     auto out = std::make_shared<Work>();
+    out->booked_outflow = booked_outflow;
     for (auto &[time, r] : rounds)
       if (!ledger.settled_conditions.count(r.condition) && r.end < wall_s()) {
         bool exposure = ledger.holding(r.up) || ledger.holding(r.down) ||
@@ -2129,15 +2225,21 @@ struct Runtime::Impl {
       if ((i.unresolved() || i.status == "matched") && i.sent_wall > 0)
         out->since = std::min(out->since, i.sent_wall - 5);
     try {
-      out->auth_time = clock.now(mono_s());
+      out->auth_mono = mono_s();
+      out->auth_time = clock.now(out->auth_mono);
     } catch (...) {
       out->auth_time = static_cast<std::int64_t>(wall_s());
     }
     work.store(out);
     wake.notify_all();
   }
-  Headers auth(std::string_view path, std::int64_t stamp) {
-    return l2_headers(*signer, creds, "GET", path, {}, stamp);
+  Headers auth(std::string_view path) {
+    auto current = work.load();
+    double elapsed = mono_s() - current->auth_mono;
+    if (elapsed < 0 || elapsed > 60)
+      throw std::runtime_error("background authentication clock stale");
+    return l2_headers(*signer, creds, "GET", path, {},
+                      current->auth_time + static_cast<std::int64_t>(elapsed));
   }
   // Results from background threads run on the event loop. An exception in
   // one of them used to escape io.run() and end the process abruptly; now it
@@ -2184,6 +2286,8 @@ struct Runtime::Impl {
                       "event does not match BTC 5m TWAP contract");
                 auto info = rest.get(
                     "https://clob.polymarket.com/clob-markets/" + r->condition);
+                if (info.value("c", "") != r->condition)
+                  throw std::runtime_error("discovered CLOB condition disagrees with Gamma");
                 for (int n = 0; n < 2; ++n) {
                   auto id = n == 0 ? r->up : r->down;
                   auto b = rest.get(
@@ -2214,7 +2318,7 @@ struct Runtime::Impl {
                 "https://clob.polymarket.com/"
                 "balance-allowance?asset_type=COLLATERAL&signature_type=" +
                     std::to_string(c.signature_type),
-                auth(path, w->auth_time));
+                auth(path));
             Big raw(j.at("balance").is_string()
                         ? j.at("balance").get<std::string>()
                         : j.at("balance").dump());
@@ -2227,8 +2331,9 @@ struct Runtime::Impl {
                   Big(it.value().is_string() ? it.value().get<std::string>()
                                              : it.value().dump());
             auto money = raw.convert_to<Units>();
-            post("balance", [this, money, allow = std::move(allow)] {
+            post("balance", [this, money, sampled_outflow = w->booked_outflow, allow = std::move(allow)] {
               balance = money;
+              balance_outflow = sampled_outflow;
               balance_at = mono_s();
               allowances = allow;
               if (ledger.reference_cash == 0 && ledger.realized == 0 &&
@@ -2244,7 +2349,7 @@ struct Runtime::Impl {
                             std::to_string(static_cast<std::int64_t>(w->since));
               if (!cursor.empty())
                 target += "&next_cursor=" + cursor;
-              auto j = rest.get(target, auth("/data/trades", w->auth_time));
+              auto j = rest.get(target, auth("/data/trades"));
               auto trades = j.at("data");
               post("trade reconciliation", [this, trades = std::move(trades)] {
                 for (auto &t : trades)
@@ -2262,7 +2367,7 @@ struct Runtime::Impl {
               try {
                 auto path = "/data/order/" + id;
                 auto j = rest.get("https://clob.polymarket.com" + path,
-                                  auth(path, w->auth_time));
+                                  auth(path));
                 post("order reconciliation", [this, id, j = std::move(j)] {
                   auto i = ledger.orders.find(id);
                   if (i == ledger.orders.end() ||
@@ -2290,7 +2395,7 @@ struct Runtime::Impl {
                 break;
               auto j = rest.get(
                   "https://clob.polymarket.com/data/orders?market=" + condition,
-                  auth("/data/orders", w->auth_time));
+                  auth("/data/orders"));
               auto open = j.at("data");
               post("open-order reconciliation", [this, open = std::move(open)] {
                 for (auto &o : open) {
@@ -2401,9 +2506,10 @@ struct Runtime::Impl {
       dash_last_tick = now;
     }
     if (!stopping) {
-      if (journal.failed()) {
+      if (journal.failed() || (paper_audit && paper_audit->failed())) {
         pause_reason = "audit or recorder failed";
         pause_until = std::numeric_limits<double>::infinity();
+        begin_stop(1);
       }
       update_hub();
       paper_poll();
@@ -2419,8 +2525,13 @@ struct Runtime::Impl {
         last_recovery = now;
         book_recovery();
       }
-      if (rec_out.is_open())
+      if (rec_out.is_open()) {
         rec_out.flush();
+        if (!rec_out) {
+          pause("recorder disk failure", true);
+          begin_stop(1);
+        }
+      }
       if (sender->ready() && now - last_probe >= 5) {
         // Note the send time only when a probe really goes out: one still in
         // flight keeps its own times, or its late reply would look fast.
@@ -2534,15 +2645,13 @@ struct Runtime::Impl {
     stop_started = mono_s();
     workers_stop = true;
     wake.notify_all();
+    fetch_wake.notify_all();
     for (auto &ws : coinbase)
       ws->stop();
     market->stop();
-    if (rtds)
-      rtds->stop();
     if (sniper)
       sniper->closing = true;
     paper_timer.cancel();
-    fetch_wake.notify_all();
     audit({{"result", "stop"},
            {"reason", code == 143   ? "SIGTERM"
                       : code == 130 ? "SIGINT"
@@ -2568,8 +2677,6 @@ struct Runtime::Impl {
       ws->start();
     if (user)
       user->start();
-    if (rtds)
-      rtds->start();
     workers();
     tick();
     // Last line of defence: an exception escaping any handler stops the bot
@@ -2604,13 +2711,27 @@ struct Runtime::Impl {
       worker.join();
     if (refresher.joinable())
       refresher.join();
+    if (refresher2.joinable())
+      refresher2.join();
     if (settler.joinable())
       settler.join();
     journal.close();
     if (paper_audit)
       paper_audit->close();
-    if (rec_out.is_open())
+    if (rec_out.is_open()) {
+      rec_out.flush();
       rec_out.close();
+      if (!rec_out) {
+        exit_code = 1;
+        ++errors;
+        std::cerr << "native runtime fault: recorder flush failed\n";
+      }
+    }
+    if (journal.failed() || (paper_audit && paper_audit->failed())) {
+      exit_code = 1;
+      ++errors;
+      std::cerr << "native runtime fault: audit flush failed\n";
+    }
     struct rusage resource {};
     getrusage(RUSAGE_SELF, &resource);
     std::cout << Json{{"peak_rss_kib", resource.ru_maxrss},

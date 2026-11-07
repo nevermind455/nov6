@@ -1,0 +1,472 @@
+Start testing: Nov 07 16:42 UTC
+----------------------------------------------------------
+1/4 Testing: native_suite
+1/4 Test: native_suite
+Command: "/src/build-audit-asan/sniper-tests"
+Directory: /src/build-audit-asan
+"native_suite" start time: Nov 07 16:42 UTC
+Output:
+----------------------------------------------------------
+Running main() from ./googletest/src/gtest_main.cc
+[==========] Running 149 tests from 34 test suites.
+[----------] Global test environment set-up.
+[----------] 3 tests from Crypto
+[ RUN      ] Crypto.KeccakKnownAnswers
+[       OK ] Crypto.KeccakKnownAnswers (0 ms)
+[ RUN      ] Crypto.ActualSdkSignaturesAndWireBytes
+[       OK ] Crypto.ActualSdkSignaturesAndWireBytes (8 ms)
+[ RUN      ] Crypto.NativeAuthHmacAndWalletDerivation
+[       OK ] Crypto.NativeAuthHmacAndWalletDerivation (1 ms)
+[----------] 3 tests from Crypto (9 ms total)
+
+[----------] 1 test from Amounts
+[ RUN      ] Amounts.EverySdkGridVector
+[       OK ] Amounts.EverySdkGridVector (898 ms)
+[----------] 1 test from Amounts (898 ms total)
+
+[----------] 2 tests from Money
+[ RUN      ] Money.MinimumsAndExactBoundaries
+[       OK ] Money.MinimumsAndExactBoundaries (0 ms)
+[ RUN      ] Money.FixedSixMatchesPrintfRounding
+[       OK ] Money.FixedSixMatchesPrintfRounding (8 ms)
+[----------] 2 tests from Money (8 ms total)
+
+[----------] 2 tests from Math
+[ RUN      ] Math.IndependentReferenceVectors
+[       OK ] Math.IndependentReferenceVectors (426 ms)
+[ RUN      ] Math.HybridExactDrawdown
+[       OK ] Math.HybridExactDrawdown (0 ms)
+[----------] 2 tests from Math (427 ms total)
+
+[----------] 1 test from Trigger
+[ RUN      ] Trigger.GoldenTicksGapsAndThreshold
+[       OK ] Trigger.GoldenTicksGapsAndThreshold (0 ms)
+[----------] 1 test from Trigger (0 ms total)
+
+[----------] 1 test from Volatility
+[ RUN      ] Volatility.WarmupFloorAndBoundedHistory
+[       OK ] Volatility.WarmupFloorAndBoundedHistory (19 ms)
+[----------] 1 test from Volatility (19 ms total)
+
+[----------] 11 tests from Ledger
+[ RUN      ] Ledger.DurableIntentConfirmedFillIdempotenceAndSettlement
+[       OK ] Ledger.DurableIntentConfirmedFillIdempotenceAndSettlement (9 ms)
+[ RUN      ] Ledger.UnauthorizedAndOverCapFillRefused
+[       OK ] Ledger.UnauthorizedAndOverCapFillRefused (2 ms)
+[ RUN      ] Ledger.ProcessCrashAfterIntentNeverLosesAuthorization
+[       OK ] Ledger.ProcessCrashAfterIntentNeverLosesAuthorization (16 ms)
+[ RUN      ] Ledger.TornOrCorruptedJournalRefusesRestart
+[       OK ] Ledger.TornOrCorruptedJournalRefusesRestart (4 ms)
+[ RUN      ] Ledger.PendingPartialFillBlocksSettlementAcrossRestart
+[       OK ] Ledger.PendingPartialFillBlocksSettlementAcrossRestart (7 ms)
+[ RUN      ] Ledger.StaleEmptyOutcomesKeepKnownFillsReservedAcrossRestart
+[       OK ] Ledger.StaleEmptyOutcomesKeepKnownFillsReservedAcrossRestart (8 ms)
+[ RUN      ] Ledger.ConfirmedFillsSurviveLatePendingUpdates
+[       OK ] Ledger.ConfirmedFillsSurviveLatePendingUpdates (5 ms)
+[ RUN      ] Ledger.ConfirmedTradeBeforeReplyIsNotAnEmptyOrder
+[       OK ] Ledger.ConfirmedTradeBeforeReplyIsNotAnEmptyOrder (3 ms)
+[ RUN      ] Ledger.DurableDrawdownPauseDoesNotRebaseCapital
+[       OK ] Ledger.DurableDrawdownPauseDoesNotRebaseCapital (3 ms)
+[ RUN      ] Ledger.EmptyFillSlotReleaseIsIdempotentAndDurable
+[       OK ] Ledger.EmptyFillSlotReleaseIsIdempotentAndDurable (3 ms)
+[ RUN      ] Ledger.DurableSignedProofExcludesApiCredentialEnvelope
+[       OK ] Ledger.DurableSignedProofExcludesApiCredentialEnvelope (2 ms)
+[----------] 11 tests from Ledger (68 ms total)
+
+[----------] 2 tests from Risk
+[ RUN      ] Risk.CanaryHardStopNeverRaisesABudget
+[       OK ] Risk.CanaryHardStopNeverRaisesABudget (0 ms)
+[ RUN      ] Risk.CanaryPausesThenIncrementsOnlyOnce
+[       OK ] Risk.CanaryPausesThenIncrementsOnlyOnce (0 ms)
+[----------] 2 tests from Risk (0 ms total)
+
+[----------] 4 tests from Config
+[ RUN      ] Config.LiveAcceptsOnlyTheBaselineOrTheTighterLimit
+[       OK ] Config.LiveAcceptsOnlyTheBaselineOrTheTighterLimit (0 ms)
+[ RUN      ] Config.DryRunRequiresLive
+[       OK ] Config.DryRunRequiresLive (0 ms)
+[ RUN      ] Config.RejectsAmbiguousModesAndInvalidDuration
+[       OK ] Config.RejectsAmbiguousModesAndInvalidDuration (0 ms)
+[ RUN      ] Config.RuntimeSettingsCountAsUsedAndAreChecked
+[       OK ] Config.RuntimeSettingsCountAsUsedAndAreChecked (2 ms)
+[----------] 4 tests from Config (3 ms total)
+
+[----------] 1 test from Safety
+[ RUN      ] Safety.PaperHasOneNativeSubmissionFirewall
+[       OK ] Safety.PaperHasOneNativeSubmissionFirewall (1 ms)
+[----------] 1 test from Safety (1 ms total)
+
+[----------] 1 test from Clock
+[ RUN      ] Clock.RejectsSlowSamplesAndAdvancesOnMonotonicTime
+[       OK ] Clock.RejectsSlowSamplesAndAdvancesOnMonotonicTime (0 ms)
+[----------] 1 test from Clock (0 ms total)
+
+[----------] 4 tests from Discovery
+[ RUN      ] Discovery.ExchangeTimestampHonorsUtcOffsets
+[       OK ] Discovery.ExchangeTimestampHonorsUtcOffsets (0 ms)
+[ RUN      ] Discovery.ExchangeTimestampRefusesInvalidUtcOffsets
+[       OK ] Discovery.ExchangeTimestampRefusesInvalidUtcOffsets (0 ms)
+[ RUN      ] Discovery.RoundAcceptsEquivalentOffsetTimestamps
+[       OK ] Discovery.RoundAcceptsEquivalentOffsetTimestamps (2 ms)
+[ RUN      ] Discovery.PublicVenueResponsesAcceptMissingNegativeRiskFlag
+[       OK ] Discovery.PublicVenueResponsesAcceptMissingNegativeRiskFlag (3 ms)
+[----------] 4 tests from Discovery (5 ms total)
+
+[----------] 1 test from DurableLog
+[ RUN      ] DurableLog.RefusesMoreRowsAfterAFailedWrite
+[       OK ] DurableLog.RefusesMoreRowsAfterAFailedWrite (0 ms)
+[----------] 1 test from DurableLog (0 ms total)
+
+[----------] 1 test from Journal
+[ RUN      ] Journal.OversizedRecordFailsClosed
+[       OK ] Journal.OversizedRecordFailsClosed (9 ms)
+[----------] 1 test from Journal (9 ms total)
+
+[----------] 1 test from Freshness
+[ RUN      ] Freshness.ReferenceReasonsAndOrder
+[       OK ] Freshness.ReferenceReasonsAndOrder (0 ms)
+[----------] 1 test from Freshness (0 ms total)
+
+[----------] 2 tests from Book
+[ RUN      ] Book.AtomicDeltasLockedBookAndZeroSizeSnapshot
+[       OK ] Book.AtomicDeltasLockedBookAndZeroSizeSnapshot (0 ms)
+[ RUN      ] Book.ArrivalBookIsStrictUnlessQuietIsOptedIn
+[       OK ] Book.ArrivalBookIsStrictUnlessQuietIsOptedIn (0 ms)
+[----------] 2 tests from Book (0 ms total)
+
+[----------] 1 test from Paper
+[ RUN      ] Paper.DecimalFakFokAndShareSizedReference
+[       OK ] Paper.DecimalFakFokAndShareSizedReference (0 ms)
+[----------] 1 test from Paper (0 ms total)
+
+[----------] 2 tests from Live
+[ RUN      ] Live.PresendCheckMatchesReferencePrepare
+[       OK ] Live.PresendCheckMatchesReferencePrepare (1 ms)
+[ RUN      ] Live.RefusedDispatchIsJournalledAsReferenceSkip
+[       OK ] Live.RefusedDispatchIsJournalledAsReferenceSkip (15 ms)
+[----------] 2 tests from Live (17 ms total)
+
+[----------] 1 test from Settings
+[ RUN      ] Settings.ReferenceDefaultsAndRefusals
+[       OK ] Settings.ReferenceDefaultsAndRefusals (0 ms)
+[----------] 1 test from Settings (0 ms total)
+
+[----------] 1 test from Python
+[ RUN      ] Python.NumericsMatchCPython
+[       OK ] Python.NumericsMatchCPython (0 ms)
+[----------] 1 test from Python (0 ms total)
+
+[----------] 4 tests from VenueUnits
+[ RUN      ] VenueUnits.RoundsLongDecimalsAndStillRefusesRubbish
+[       OK ] VenueUnits.RoundsLongDecimalsAndStillRefusesRubbish (0 ms)
+[ RUN      ] VenueUnits.AFillWithLongDecimalsParsesWithinTheReplyTotal
+[       OK ] VenueUnits.AFillWithLongDecimalsParsesWithinTheReplyTotal (0 ms)
+[ RUN      ] VenueUnits.ManyRoundedLegsStayWithinTheReplyTotal
+[       OK ] VenueUnits.ManyRoundedLegsStayWithinTheReplyTotal (0 ms)
+[ RUN      ] VenueUnits.ARealOverchargeIsNotHiddenAsRounding
+[       OK ] VenueUnits.ARealOverchargeIsNotHiddenAsRounding (0 ms)
+[----------] 4 tests from VenueUnits (0 ms total)
+
+[----------] 1 test from CanarySpend
+[ RUN      ] CanarySpend.AConfirmedMissGivesItsSpendBackAndNeverGoesNegative
+[       OK ] CanarySpend.AConfirmedMissGivesItsSpendBackAndNeverGoesNegative (0 ms)
+[----------] 1 test from CanarySpend (0 ms total)
+
+[----------] 7 tests from NativeHttp2
+[ RUN      ] NativeHttp2.LocalTlsMatchedReply
+[       OK ] NativeHttp2.LocalTlsMatchedReply (15 ms)
+[ RUN      ] NativeHttp2.LocalTlsHttp400Reply
+[       OK ] NativeHttp2.LocalTlsHttp400Reply (13 ms)
+[ RUN      ] NativeHttp2.UncertainWriteIsNeverRetried
+[       OK ] NativeHttp2.UncertainWriteIsNeverRetried (13 ms)
+[ RUN      ] NativeHttp2.GoawayAfterPossibleProcessingClosesConnection
+[       OK ] NativeHttp2.GoawayAfterPossibleProcessingClosesConnection (13 ms)
+[ RUN      ] NativeHttp2.GoawayBeforeProcessingClosesConnection
+[       OK ] NativeHttp2.GoawayBeforeProcessingClosesConnection (13 ms)
+[ RUN      ] NativeHttp2.WrittenWaitsForFlowControlledUploadEndStream
+[       OK ] NativeHttp2.WrittenWaitsForFlowControlledUploadEndStream (175 ms)
+[ RUN      ] NativeHttp2.EarlyResponseKeepsFlowControlledUploadProviderAlive
+[       OK ] NativeHttp2.EarlyResponseKeepsFlowControlledUploadProviderAlive (127 ms)
+[----------] 7 tests from NativeHttp2 (371 ms total)
+
+[----------] 18 tests from Dashboard
+[ RUN      ] Dashboard.EveryFrameIsExactlyTheTerminalSize
+[       OK ] Dashboard.EveryFrameIsExactlyTheTerminalSize (5065 ms)
+[ RUN      ] Dashboard.DrawsThePanelsAtACommonSize
+[       OK ] Dashboard.DrawsThePanelsAtACommonSize (2 ms)
+[ RUN      ] Dashboard.MissingValuesAreNotInvented
+[       OK ] Dashboard.MissingValuesAreNotInvented (0 ms)
+[ RUN      ] Dashboard.WrongTypesAreDrawnNotThrown
+[       OK ] Dashboard.WrongTypesAreDrawnNotThrown (4 ms)
+[ RUN      ] Dashboard.TextFromOutsideCannotControlTheTerminal
+[       OK ] Dashboard.TextFromOutsideCannotControlTheTerminal (2 ms)
+[ RUN      ] Dashboard.SecretsAreHidden
+[       OK ] Dashboard.SecretsAreHidden (7 ms)
+[ RUN      ] Dashboard.HttpAuthorizationAndJsonCredentialsAreHidden
+[       OK ] Dashboard.HttpAuthorizationAndJsonCredentialsAreHidden (0 ms)
+[ RUN      ] Dashboard.TruncationDoesNotExposePrivateKeyPrefixes
+[       OK ] Dashboard.TruncationDoesNotExposePrivateKeyPrefixes (0 ms)
+[ RUN      ] Dashboard.FitCountsCharactersNotBytes
+[       OK ] Dashboard.FitCountsCharactersNotBytes (0 ms)
+[ RUN      ] Dashboard.HsplitUsesTheWholeWidth
+[       OK ] Dashboard.HsplitUsesTheWholeWidth (0 ms)
+[ RUN      ] Dashboard.ClockFollowsUsEasternTime
+[       OK ] Dashboard.ClockFollowsUsEasternTime (0 ms)
+[ RUN      ] Dashboard.PlainLineForLogFiles
+[       OK ] Dashboard.PlainLineForLogFiles (0 ms)
+[ RUN      ] Dashboard.LiveMetricsRequireConfirmedBookingsAndExplicitHttpAcknowledgements
+[       OK ] Dashboard.LiveMetricsRequireConfirmedBookingsAndExplicitHttpAcknowledgements (0 ms)
+[ RUN      ] Dashboard.LiveMetricsSurviveOrderTableEvictionAndExcludePreviousRuns
+[       OK ] Dashboard.LiveMetricsSurviveOrderTableEvictionAndExcludePreviousRuns (0 ms)
+[ RUN      ] Dashboard.LiveAbortedRejectedAndUncertainOrdersHaveDistinctMetrics
+[       OK ] Dashboard.LiveAbortedRejectedAndUncertainOrdersHaveDistinctMetrics (0 ms)
+[ RUN      ] Dashboard.LiveLatencyUsesCompleteWireWriteAndActualAcknowledgement
+[       OK ] Dashboard.LiveLatencyUsesCompleteWireWriteAndActualAcknowledgement (0 ms)
+[ RUN      ] Dashboard.PositionMarksIncludeFeesAndRequireFreshLiveBids
+[       OK ] Dashboard.PositionMarksIncludeFeesAndRequireFreshLiveBids (0 ms)
+[ RUN      ] Dashboard.StaleLiveCollateralIsUnavailableInsteadOfCurrentEquity
+[       OK ] Dashboard.StaleLiveCollateralIsUnavailableInsteadOfCurrentEquity (0 ms)
+[----------] 18 tests from Dashboard (5086 ms total)
+
+[----------] 9 tests from AuditStrategy
+[ RUN      ] AuditStrategy.RejectsImpossibleExchangeDatesAndOffsets
+[       OK ] AuditStrategy.RejectsImpossibleExchangeDatesAndOffsets (0 ms)
+[ RUN      ] AuditStrategy.DecimalIntegerConversionIsExactOrRefusesOverflow
+[       OK ] AuditStrategy.DecimalIntegerConversionIsExactOrRefusesOverflow (0 ms)
+[ RUN      ] AuditStrategy.FloatRoundingUsesExactBinaryValue
+[       OK ] AuditStrategy.FloatRoundingUsesExactBinaryValue (0 ms)
+[ RUN      ] AuditStrategy.LargeFloatFormattingDoesNotTruncateOrOverrun
+[       OK ] AuditStrategy.LargeFloatFormattingDoesNotTruncateOrOverrun (24 ms)
+[ RUN      ] AuditStrategy.IntegerSettingsRefuseUnrepresentableValues
+[       OK ] AuditStrategy.IntegerSettingsRefuseUnrepresentableValues (2 ms)
+[ RUN      ] AuditStrategy.CentSizingDoesNotSaturateLargeIntegerRatios
+[       OK ] AuditStrategy.CentSizingDoesNotSaturateLargeIntegerRatios (0 ms)
+[ RUN      ] AuditStrategy.UnrepresentableFairLimitTickCannotHangTheEngine
+[       OK ] AuditStrategy.UnrepresentableFairLimitTickCannotHangTheEngine (24 ms)
+[ RUN      ] AuditStrategy.DepletedOwnLiquidityIsRejectedWithoutInvalidAccess
+[       OK ] AuditStrategy.DepletedOwnLiquidityIsRejectedWithoutInvalidAccess (27 ms)
+[ RUN      ] AuditStrategy.MissingVenueTickIsRejectedWithoutInvalidAccess
+[       OK ] AuditStrategy.MissingVenueTickIsRejectedWithoutInvalidAccess (25 ms)
+[----------] 9 tests from AuditStrategy (105 ms total)
+
+[----------] 1 test from AuditStorageHandles
+[ RUN      ] AuditStorageHandles.FileDescriptorOwnersCannotBeCopied
+[       OK ] AuditStorageHandles.FileDescriptorOwnersCannotBeCopied (0 ms)
+[----------] 1 test from AuditStorageHandles (0 ms total)
+
+[----------] 1 test from AuditDurableLog
+[ RUN      ] AuditDurableLog.ReplayRefusesAnUnavailableJournal
+[       OK ] AuditDurableLog.ReplayRefusesAnUnavailableJournal (1 ms)
+[----------] 1 test from AuditDurableLog (1 ms total)
+
+[----------] 17 tests from AuditLedger
+[ RUN      ] AuditLedger.InitialCashSurvivesRestartBeforeTheFirstPeriodicSnapshot
+[       OK ] AuditLedger.InitialCashSurvivesRestartBeforeTheFirstPeriodicSnapshot (5 ms)
+[ RUN      ] AuditLedger.MissingSnapshotWithExistingHistoryRefusesAmbiguousRecovery
+[       OK ] AuditLedger.MissingSnapshotWithExistingHistoryRefusesAmbiguousRecovery (3 ms)
+[ RUN      ] AuditLedger.ValidJsonSnapshotCorruptionCannotChangeTheRecoveredBankroll
+[       OK ] AuditLedger.ValidJsonSnapshotCorruptionCannotChangeTheRecoveredBankroll (4 ms)
+[ RUN      ] AuditLedger.SettlementRejectsAnotherConditionsPositionBeforeWriting
+[       OK ] AuditLedger.SettlementRejectsAnotherConditionsPositionBeforeWriting (5 ms)
+[ RUN      ] AuditLedger.InvalidPayoutDoesNotPoisonTheDurableHistory
+[       OK ] AuditLedger.InvalidPayoutDoesNotPoisonTheDurableHistory (4 ms)
+[ RUN      ] AuditLedger.LatePositiveEvidenceRestoresOneCanarySlotAcrossRestart
+[       OK ] AuditLedger.LatePositiveEvidenceRestoresOneCanarySlotAcrossRestart (7 ms)
+[ RUN      ] AuditLedger.RecoveryRepairsACrashBetweenMatchEvidenceAndSlotRestoration
+[       OK ] AuditLedger.RecoveryRepairsACrashBetweenMatchEvidenceAndSlotRestoration (7 ms)
+[ RUN      ] AuditLedger.PreviousSessionOrdersCannotSpendTheNewSessionsFillBudget
+[       OK ] AuditLedger.PreviousSessionOrdersCannotSpendTheNewSessionsFillBudget (4 ms)
+[ RUN      ] AuditLedger.OverflowCannotCommitAnUnrecoverableFill
+[       OK ] AuditLedger.OverflowCannotCommitAnUnrecoverableFill (2 ms)
+[ RUN      ] AuditLedger.LegacyOverflowingHistoryRefusesRecovery
+[       OK ] AuditLedger.LegacyOverflowingHistoryRefusesRecovery (3 ms)
+[ RUN      ] AuditLedger.ConfirmedMissRefundIsDurableAndIdempotent
+[       OK ] AuditLedger.ConfirmedMissRefundIsDurableAndIdempotent (5 ms)
+[ RUN      ] AuditLedger.LatePositiveEvidenceRestoresTheRefundedStakeOnce
+[       OK ] AuditLedger.LatePositiveEvidenceRestoresTheRefundedStakeOnce (5 ms)
+[ RUN      ] AuditLedger.RefundsAndLateFillsCannotChangeAnotherSessionsSpendBudget
+[       OK ] AuditLedger.RefundsAndLateFillsCannotChangeAnotherSessionsSpendBudget (5 ms)
+[ RUN      ] AuditLedger.RecoveryRestoresSpendAfterACrashFollowingPositiveEvidence
+[       OK ] AuditLedger.RecoveryRestoresSpendAfterACrashFollowingPositiveEvidence (7 ms)
+[ RUN      ] AuditLedger.LegacySnapshotRefundMigratesWithoutLosingLateSpendRestoration
+[       OK ] AuditLedger.LegacySnapshotRefundMigratesWithoutLosingLateSpendRestoration (8 ms)
+[ RUN      ] AuditLedger.LegacyPositiveEvidenceAlreadyInSnapshotRestoresSpendOnlyOnce
+[       OK ] AuditLedger.LegacyPositiveEvidenceAlreadyInSnapshotRestoresSpendOnlyOnce (11 ms)
+[ RUN      ] AuditLedger.LegacyRefundOfAnotherSessionsBudgetRefusesCurrentRecovery
+[       OK ] AuditLedger.LegacyRefundOfAnotherSessionsBudgetRefusesCurrentRecovery (7 ms)
+[----------] 17 tests from AuditLedger (103 ms total)
+
+[----------] 3 tests from AuditMoney
+[ RUN      ] AuditMoney.ArithmeticRejectsOverflowAndWidensBeforeAddingTheFeeRate
+[       OK ] AuditMoney.ArithmeticRejectsOverflowAndWidensBeforeAddingTheFeeRate (0 ms)
+[ RUN      ] AuditMoney.NumericStringsRejectTrailingNonNumericData
+[       OK ] AuditMoney.NumericStringsRejectTrailingNonNumericData (0 ms)
+[ RUN      ] AuditMoney.RoundedVenueQuantitiesRejectMicroUnitOverflow
+[       OK ] AuditMoney.RoundedVenueQuantitiesRejectMicroUnitOverflow (0 ms)
+[----------] 3 tests from AuditMoney (0 ms total)
+
+[----------] 2 tests from AuditCrypto
+[ RUN      ] AuditCrypto.DecimalTokenIdsHaveTheSameDigestWithLeadingZeros
+[       OK ] AuditCrypto.DecimalTokenIdsHaveTheSameDigestWithLeadingZeros (1 ms)
+[ RUN      ] AuditCrypto.InvalidPrivateKeysReleaseTheirNativeSigningContexts
+[       OK ] AuditCrypto.InvalidPrivateKeysReleaseTheirNativeSigningContexts (0 ms)
+[----------] 2 tests from AuditCrypto (1 ms total)
+
+[----------] 8 tests from AuditMarket
+[ RUN      ] AuditMarket.RejectsUnsupportedOrUnspecifiedProtocolVersions
+[       OK ] AuditMarket.RejectsUnsupportedOrUnspecifiedProtocolVersions (1 ms)
+[ RUN      ] AuditMarket.RulesMustDescribeTheRequestedBookAndCondition
+[       OK ] AuditMarket.RulesMustDescribeTheRequestedBookAndCondition (2 ms)
+[ RUN      ] AuditMarket.FeeExponentIsValidatedBeforeNativeNarrowing
+[       OK ] AuditMarket.FeeExponentIsValidatedBeforeNativeNarrowing (2 ms)
+[ RUN      ] AuditMarket.ClockRejectsInvalidSamplesWithoutDamagingTheGoodClock
+[       OK ] AuditMarket.ClockRejectsInvalidSamplesWithoutDamagingTheGoodClock (0 ms)
+[ RUN      ] AuditMarket.PythonIntegerBoundaryParsingIsExact
+[       OK ] AuditMarket.PythonIntegerBoundaryParsingIsExact (0 ms)
+[ RUN      ] AuditMarket.UnsupportedTinyTicksCannotEnterALiveBook
+[       OK ] AuditMarket.UnsupportedTinyTicksCannotEnterALiveBook (0 ms)
+[ RUN      ] AuditMarket.PrivateTradeIdentityAndLegInputsCannotBeEmptyOrMalformed
+[       OK ] AuditMarket.PrivateTradeIdentityAndLegInputsCannotBeEmptyOrMalformed (0 ms)
+[ RUN      ] AuditMarket.RoundedTradeDustCannotBecomeNegativeOrOverflow
+[       OK ] AuditMarket.RoundedTradeDustCannotBecomeNegativeOrOverflow (0 ms)
+[----------] 8 tests from AuditMarket (7 ms total)
+
+[----------] 8 tests from AuditRuntime
+[ RUN      ] AuditRuntime.ConfirmedDebitsCannotReuseAStaleCollateralSample
+[       OK ] AuditRuntime.ConfirmedDebitsCannotReuseAStaleCollateralSample (0 ms)
+[ RUN      ] AuditRuntime.AccountSubscriptionsDropSettledHistoryButRetainUncertainOrders
+[       OK ] AuditRuntime.AccountSubscriptionsDropSettledHistoryButRetainUncertainOrders (3 ms)
+[ RUN      ] AuditRuntime.OfficialIntermediateTradeStatusRemainsPending
+[       OK ] AuditRuntime.OfficialIntermediateTradeStatusRemainsPending (0 ms)
+[ RUN      ] AuditRuntime.DiscoveryRefreshesTheActiveLiveFeeAndMinimumSnapshot
+[       OK ] AuditRuntime.DiscoveryRefreshesTheActiveLiveFeeAndMinimumSnapshot (0 ms)
+[ RUN      ] AuditRuntime.RefreshedDiscoveryReplacesTheSharedDecisionAndPresendRules
+[       OK ] AuditRuntime.RefreshedDiscoveryReplacesTheSharedDecisionAndPresendRules (0 ms)
+[ RUN      ] AuditRuntime.ConfigRefusesNativeIntegerOverflowBeforeNarrowing
+[       OK ] AuditRuntime.ConfigRefusesNativeIntegerOverflowBeforeNarrowing (2 ms)
+[ RUN      ] AuditRuntime.PublicCheckReportsEffectiveRiskAndAuditPaths
+[       OK ] AuditRuntime.PublicCheckReportsEffectiveRiskAndAuditPaths (1 ms)
+[ RUN      ] AuditRuntime.IncompatibleStateAndAuditFilesCannotOverwriteEachOther
+[       OK ] AuditRuntime.IncompatibleStateAndAuditFilesCannotOverwriteEachOther (2 ms)
+[----------] 8 tests from AuditRuntime (10 ms total)
+
+[----------] 7 tests from AuditNetwork
+[ RUN      ] AuditNetwork.QueryAndNormalizedOrderPathsAreBlockedBeforeTransport
+[       OK ] AuditNetwork.QueryAndNormalizedOrderPathsAreBlockedBeforeTransport (1 ms)
+[ RUN      ] AuditNetwork.ReadOnlyAndUnrelatedPathsDoNotTripOrderFirewall
+[       OK ] AuditNetwork.ReadOnlyAndUnrelatedPathsDoNotTripOrderFirewall (0 ms)
+[ RUN      ] AuditNetwork.UrlSeparatesQueryFragmentsPortsAndIpv6Authority
+[       OK ] AuditNetwork.UrlSeparatesQueryFragmentsPortsAndIpv6Authority (0 ms)
+[ RUN      ] AuditNetwork.UrlRefusesAmbiguousAuthorityAndControlBytes
+[       OK ] AuditNetwork.UrlRefusesAmbiguousAuthorityAndControlBytes (0 ms)
+[ RUN      ] AuditNetwork.ConnectProxyRequiresPlainHttpAndPreservesLoopbackBypass
+[       OK ] AuditNetwork.ConnectProxyRequiresPlainHttpAndPreservesLoopbackBypass (0 ms)
+[ RUN      ] AuditNetwork.WebsocketRequiresTlsAndFinitePositiveSilence
+[       OK ] AuditNetwork.WebsocketRequiresTlsAndFinitePositiveSilence (0 ms)
+[ RUN      ] AuditNetwork.Http2SetupDeadlineAndRepeatedStartHaveOneRetry
+[       OK ] AuditNetwork.Http2SetupDeadlineAndRepeatedStartHaveOneRetry (1651 ms)
+[----------] 7 tests from AuditNetwork (1654 ms total)
+
+[----------] 20 tests from EdgeReport
+[ RUN      ] EdgeReport.PaperWinAndLossCountFeesOnce
+[       OK ] EdgeReport.PaperWinAndLossCountFeesOnce (7 ms)
+[ RUN      ] EdgeReport.LiveAmountAddsTheFeeAndRepeatedTradesCountOnce
+[       OK ] EdgeReport.LiveAmountAddsTheFeeAndRepeatedTradesCountOnce (0 ms)
+[ RUN      ] EdgeReport.SentButUnfilledLiveOrderIsNotATrade
+[       OK ] EdgeReport.SentButUnfilledLiveOrderIsNotATrade (0 ms)
+[ RUN      ] EdgeReport.UnsettledAndUnmatchedAreCountedNotGuessed
+[       OK ] EdgeReport.UnsettledAndUnmatchedAreCountedNotGuessed (0 ms)
+[ RUN      ] EdgeReport.SplitResolutionPaysHalfAndIsNotScored
+[       OK ] EdgeReport.SplitResolutionPaysHalfAndIsNotScored (0 ms)
+[ RUN      ] EdgeReport.Verdicts
+[       OK ] EdgeReport.Verdicts (6157 ms)
+[ RUN      ] EdgeReport.FillsInOneRoundAreNotIndependent
+[       OK ] EdgeReport.FillsInOneRoundAreNotIndependent (346 ms)
+[ RUN      ] EdgeReport.WilsonInterval
+[       OK ] EdgeReport.WilsonInterval (0 ms)
+[ RUN      ] EdgeReport.TopBinIncludesCertaintyAndRenders
+[       OK ] EdgeReport.TopBinIncludesCertaintyAndRenders (0 ms)
+[ RUN      ] EdgeReport.CalibrationBinsResampleRoundsInsteadOfIndependentFills
+[       OK ] EdgeReport.CalibrationBinsResampleRoundsInsteadOfIndependentFills (177 ms)
+[ RUN      ] EdgeReport.ProfitWithoutScoredRoundsDoesNotClaimModelCalibration
+[       OK ] EdgeReport.ProfitWithoutScoredRoundsDoesNotClaimModelCalibration (5 ms)
+[ RUN      ] EdgeReport.InvalidSettlementAndConflictingTokenEvidenceCannotProduceProfit
+[       OK ] EdgeReport.InvalidSettlementAndConflictingTokenEvidenceCannotProduceProfit (0 ms)
+[ RUN      ] EdgeReport.InvalidNumericEvidenceIsExcludedBeforeSortingAndScoring
+[       OK ] EdgeReport.InvalidNumericEvidenceIsExcludedBeforeSortingAndScoring (0 ms)
+[ RUN      ] EdgeReport.OrphanAndConflictingConfirmedTradesRemainVisibleAsIncompleteEvidence
+[       OK ] EdgeReport.OrphanAndConflictingConfirmedTradesRemainVisibleAsIncompleteEvidence (0 ms)
+[ RUN      ] EdgeReport.RoundSettlementDoesNotCreateArtificialIntraroundDrawdown
+[       OK ] EdgeReport.RoundSettlementDoesNotCreateArtificialIntraroundDrawdown (0 ms)
+[ RUN      ] EdgeReport.MalformedCompanionRowsAndInputReadErrorsCannotGiveCleanEvidence
+[       OK ] EdgeReport.MalformedCompanionRowsAndInputReadErrorsCannotGiveCleanEvidence (0 ms)
+[ RUN      ] EdgeReport.MinimumRoundArgumentRequiresACompletePositiveInteger
+[       OK ] EdgeReport.MinimumRoundArgumentRequiresACompletePositiveInteger (0 ms)
+[ RUN      ] EdgeReport.MetadataConditionMustMatchTheJournalDecision
+[       OK ] EdgeReport.MetadataConditionMustMatchTheJournalDecision (0 ms)
+[ RUN      ] EdgeReport.AnOutcomeTokenCannotSettleInTwoConditions
+[       OK ] EdgeReport.AnOutcomeTokenCannotSettleInTwoConditions (0 ms)
+[ RUN      ] EdgeReport.StatusOnlyPendingAcknowledgementsPreserveTheOriginalDecision
+[       OK ] EdgeReport.StatusOnlyPendingAcknowledgementsPreserveTheOriginalDecision (0 ms)
+[----------] 20 tests from EdgeReport (6699 ms total)
+
+[----------] Global test environment tear-down
+[==========] 149 tests from 34 test suites ran. (15516 ms total)
+[  PASSED  ] 149 tests.
+<end of output>
+Test time =  15.78 sec
+----------------------------------------------------------
+Test Passed.
+"native_suite" end time: Nov 07 16:42 UTC
+"native_suite" time elapsed: 00:00:15
+----------------------------------------------------------
+
+2/4 Testing: comparison_cli
+2/4 Test: comparison_cli
+Command: "/usr/bin/bash" "/src/tests/compare_cli_tests.sh" "/src/build-audit-asan/sniper-cpp" "/src/build-audit-asan/sniper-replay"
+Directory: /src/build-audit-asan
+"comparison_cli" start time: Nov 07 16:42 UTC
+Output:
+----------------------------------------------------------
+Native comparison and replay I/O checks passed.
+<end of output>
+Test time =   0.44 sec
+----------------------------------------------------------
+Test Passed.
+"comparison_cli" end time: Nov 07 16:42 UTC
+"comparison_cli" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/4 Testing: runtime_io
+3/4 Test: runtime_io
+Command: "/usr/bin/bash" "/src/tests/runtime_io_tests.sh" "/src/build-audit-asan/sniper-cpp"
+Directory: /src/build-audit-asan
+"runtime_io" start time: Nov 07 16:42 UTC
+Output:
+----------------------------------------------------------
+Runtime audit failure stopped without orders.
+<end of output>
+Test time =   0.23 sec
+----------------------------------------------------------
+Test Passed.
+"runtime_io" end time: Nov 07 16:42 UTC
+"runtime_io" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/4 Testing: edge_report_cli
+4/4 Test: edge_report_cli
+Command: "/usr/bin/bash" "/src/tests/edge_report_cli_tests.sh" "/src/build-audit-asan/sniper-edge-report"
+Directory: /src/build-audit-asan
+"edge_report_cli" start time: Nov 07 16:42 UTC
+Output:
+----------------------------------------------------------
+Edge report input and argument checks passed.
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"edge_report_cli" end time: Nov 07 16:42 UTC
+"edge_report_cli" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 07 16:42 UTC

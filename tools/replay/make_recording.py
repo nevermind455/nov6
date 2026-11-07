@@ -8,6 +8,7 @@ Each JSONL line is one input both bots consume, in receive order:
   {"k":"mkt","t":..,"w":..,"raw":"..."}                one market-socket frame
   {"k":"round","t":..,"w":..,"up":..,"down":..,"cond":..,"start":..,"end":..,
    "current":true|false,"rules":{...}}                 round discovery / promotion
+  {"k":"rules","t":..,"w":..,"cond":..,"rules":{...}} refreshed cached market rules
   {"k":"rest_req","t":..,"w":..,"token":..}            REST /book request sent
   {"k":"rest_resp","t":..,"w":..,"token":..,"bids":[..],"asks":[..],
    "timestamp":"..","tick":0.01,"hash":".."}           its response, applied now

@@ -149,6 +149,11 @@ class Pool(concurrent.futures.Executor):
 
 
 async def replay(repo, rec_path, out_path, cfg):
+    with tempfile.TemporaryDirectory(prefix="pyreplay_") as journal_dir:
+        return await _replay(repo, rec_path, out_path, cfg, journal_dir)
+
+
+async def _replay(repo, rec_path, out_path, cfg, journal_dir):
     sys.path.insert(0, repo)
     env = dict(BASE_ENV, **cfg)
     clock = Clock()
@@ -161,7 +166,7 @@ async def replay(repo, rec_path, out_path, cfg):
     events = [json.loads(x) for x in pathlib.Path(rec_path).read_text().splitlines() if x.strip()]
     clock.mono, clock.wall = events[0]["t"], events[0]["w"]
     offset = events[0]["w"] - events[0]["t"]
-    journal = pathlib.Path(tempfile.mkdtemp(prefix="pyreplay_")) / "j.jsonl"
+    journal = pathlib.Path(journal_dir) / "j.jsonl"
     ledger = Ledger()
     broker = Broker(ledger)
     with patch.object(S, "time", clock), patch.object(FB, "time", clock), patch.object(TM, "time", clock):
@@ -203,8 +208,8 @@ async def replay(repo, rec_path, out_path, cfg):
                     out += [r["up"], r["down"]]
             return out
 
-        def cache_rules(r, wall):
-            if r["cond"] in fetched:
+        def cache_rules(r, wall, refresh=False):
+            if not refresh and r["cond"] in fetched:
                 return
             fetched.add(r["cond"])
             x = r["rules"]
@@ -250,6 +255,7 @@ async def replay(repo, rec_path, out_path, cfg):
 
         for e in events:
             await settle_orders(e["t"])
+            offset = e["w"] - e["t"]
             set_clock(e["t"])
             k = e["k"]
             if k == "cb":
@@ -292,6 +298,8 @@ async def replay(repo, rec_path, out_path, cfg):
                     prepared = r
                 book.set_active(tokens())
                 cache_rules(r, clock.wall)
+            elif k == "rules":
+                cache_rules(e, clock.wall, refresh=True)
             elif k == "rest_req":
                 v = book.view(e["token"])
                 age = v.book_age_ms()

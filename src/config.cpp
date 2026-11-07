@@ -5,6 +5,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 namespace sniper {
+static int runtime_int(double value, const char *name) {
+  value = std::trunc(value);
+  if (!std::isfinite(value) ||
+      value < std::numeric_limits<int>::min() ||
+      value > std::numeric_limits<int>::max())
+    throw std::invalid_argument(std::string(name) + " exceeds the native integer range");
+  return static_cast<int>(value);
+}
 static std::string trim(std::string s) {
   auto a = s.find_first_not_of(" \t\r\n"), b = s.find_last_not_of(" \t\r\n");
   return a == s.npos ? "" : s.substr(a, b - a + 1);
@@ -96,6 +104,8 @@ Config Config::load(int argc, char **argv) {
     if (!S_ISREG(st.st_mode) || (st.st_mode & 077))
       throw std::invalid_argument(".env must be a regular file with mode 600");
     std::ifstream f(env_path);
+    if (!f)
+      throw std::invalid_argument("could not read --config file: " + env_path.string());
     std::string line;
     while (std::getline(f, line)) {
       line = trim(line);
@@ -114,6 +124,8 @@ Config Config::load(int argc, char **argv) {
         value = value.substr(1, value.size() - 2);
       c.values[key] = value;
     }
+    if (f.bad())
+      throw std::invalid_argument("error reading --config file: " + env_path.string());
   } else if (explicit_config)
     throw std::invalid_argument("--config file not found: " + env_path.string());
   for (auto key : {"PRIVATE_KEY", "POLY_PRIVATE_KEY", "POLY_API_KEY",
@@ -150,13 +162,35 @@ Config Config::load(int argc, char **argv) {
   c.state = c.root / "state" / (c.live ? "live" : "paper");
   c.ledger = c.text(c.live ? "LEDGER_PATH" : "PAPER_LEDGER_PATH",
                     (c.state / "ledger.json").string());
-  c.journal = c.text(c.live ? "LIVE_SNIPER_JOURNAL" : "PAPER_AUDIT_PATH",
-                     (c.state / "sniper.jsonl").string());
+  c.paper_journal = c.text("PAPER_AUDIT_PATH",
+                          (c.root / "state" / "paper" / "sniper.jsonl").string());
+  c.journal = c.live ? c.text("LIVE_SNIPER_JOURNAL", (c.state / "sniper.jsonl").string())
+                    : c.paper_journal.string();
   c.stop_file =
       c.text("SNIPER_CANARY_STOP_FILE", (c.root / "STOP_LIVE").string());
-  for (auto p : {&c.ledger, &c.journal, &c.stop_file, &c.record})
+  for (auto p : {&c.ledger, &c.journal, &c.paper_journal, &c.stop_file, &c.record})
     if (!p->empty() && p->is_relative())
       *p = c.root / *p;
+  if (c.ledger.empty() || c.journal.empty() || c.stop_file.empty())
+    throw std::invalid_argument("ledger, audit and stop-file paths must not be empty");
+  std::vector<std::pair<std::string, std::filesystem::path>> destinations{
+      {"settings", env_path}, {"ledger snapshot", c.ledger},
+      {"durable journal", c.ledger.string() + ".journal"},
+      {"ledger lock", c.ledger.string() + ".lock"},
+      {"audit journal", c.journal}, {"stop file", c.stop_file}};
+  if (!c.live)
+    destinations.emplace_back("paper execution audit", c.journal.parent_path() / "paper_audit.jsonl");
+  else
+    destinations.emplace_back("canary session", c.state / "live_canary_state.json");
+  if (!c.record.empty())
+    destinations.emplace_back("recording", c.record);
+  std::map<std::filesystem::path, std::string> unique_paths;
+  for (const auto &[kind, path] : destinations) {
+    auto canonical = std::filesystem::weakly_canonical(path);
+    auto [found, inserted] = unique_paths.emplace(canonical, kind);
+    if (!inserted)
+      throw std::invalid_argument(kind + " path collides with " + found->second);
+  }
   auto secret = [](const char *key) {
     auto p = std::getenv(key);
     return p ? std::string(p) : std::string{};
@@ -193,7 +227,7 @@ Config Config::load(int argc, char **argv) {
   c.flat = c.s.flat_live;
   c.order_type = c.s.order_type;
   c.conns = c.s.coinbase_conns;
-  c.shares = static_cast<int>(c.s.shares);
+  c.shares = runtime_int(c.s.shares, "SNIPER_SHARES");
   c.baseline_bp = c.s.hybrid_policy.vol_baseline_bp;
   c.dd_stop = c.s.hybrid_policy.drawdown_stop;
   c.dd_pause = c.s.hybrid_dd_pause_s;
@@ -206,9 +240,9 @@ Config Config::load(int argc, char **argv) {
   c.coinbase_unknown = c.s.coinbase_unknown_ms;
   c.backlog_max = c.s.coinbase_backlog_max;
   c.silent = c.s.coinbase_silent_s;
-  c.hold_ms = static_cast<int>(c.s.hold_ms);
-  c.extra_ms = static_cast<int>(c.s.paper_extra_ms);
-  c.book_wait_ms = static_cast<int>(c.s.book_wait_ms);
+  c.hold_ms = runtime_int(c.s.hold_ms, "SNIPER_HOLD_MS");
+  c.extra_ms = runtime_int(c.s.paper_extra_ms, "SNIPER_PAPER_EXTRA_MS");
+  c.book_wait_ms = runtime_int(c.s.book_wait_ms, "SNIPER_BOOK_WAIT_MS");
   c.ptb_skip = c.s.ptb_skip_close;
   c.ptb_margin = c.s.ptb_margin_bp;
   // The runtime reads these later. They count as used here, and --check refuses
@@ -284,6 +318,11 @@ Json Config::public_view() const {
           {"fair_margin", margin},
           {"runtime_dependencies", "C++ libraries; no Python"},
           {"independent_paper_model", !live},
+          {"live_canary", {{"max_loss_usd", dollars(canary_loss)},
+                            {"hard_stop", canary_hard_stop}}},
+          {"paths", {{"state_dir", state.string()},
+                     {"stop_file", stop_file.string()},
+                     {"paper_journal", paper_journal.string()}}},
           {"notices", notices}};
 }
 } // namespace sniper

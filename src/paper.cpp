@@ -546,6 +546,8 @@ void PaperBroker::begin(const std::shared_ptr<Plan> &plan,
     if (decision.asks.empty())
       throw PaperRejected("public order book unavailable: no asks");
     decision = net_of_own_fills(decision);
+    if (decision.asks.empty())
+      throw PaperRejected("public order book unavailable: no asks");
     if (decision.tick_size && o.rules.tick_size &&
         *decision.tick_size != *o.rules.tick_size)
       o.rules.tick_size = decision.tick_size; // refreshed rules (_rules_matching)
@@ -558,6 +560,9 @@ void PaperBroker::begin(const std::shared_ptr<Plan> &plan,
                           " exceeds paper limit " + py::fixed(cfg.max_spread, 6));
     if (plan->shares) {
       Dec size = D(static_cast<long long>(*plan->shares));
+      if (!o.rules.tick_size ||
+          !(ZERO < *o.rules.tick_size && *o.rules.tick_size < ONE))
+        throw PaperRejected("paper market has no valid venue tick size");
       const Dec tick = *o.rules.tick_size;
       Dec limit = tick_cap(D(cap), tick);
       std::vector<Dec> mins;

@@ -1,0 +1,18 @@
+[1/4] Building CXX object CMakeFiles/sniper-edge-report.dir/tools/report/edge_report.cpp.o
+[2/4] Linking CXX executable sniper-edge-report
+[3/4] Building CXX object CMakeFiles/sniper-tests.dir/tests/edge_report_tests.cpp.o
+[4/4] Linking CXX executable sniper-tests
+Internal ctest changing into directory: /src/build-audit-asan
+Test project /src/build-audit-asan
+    Start 1: native_suite
+1/4 Test #1: native_suite .....................   Passed   15.78 sec
+    Start 2: comparison_cli
+2/4 Test #2: comparison_cli ...................   Passed    0.44 sec
+    Start 3: runtime_io
+3/4 Test #3: runtime_io .......................   Passed    0.23 sec
+    Start 4: edge_report_cli
+4/4 Test #4: edge_report_cli ..................   Passed    0.09 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Total Test time (real) =  16.54 sec

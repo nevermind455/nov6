@@ -1,0 +1,3 @@
+{"result": "filled", "order_id": "o", "condition_id": "WIN", "side": "UP", "fair": 0.6, "shares": 10, "cost": 5, "fee": 0, "wall": 100}
+{"result": "settlement", "condition_id": "WIN", "payouts": {"tok": 1000000}}
+{"result": "settlement", "condition_id": "LOSS", "payouts": {"tok": 0}}

@@ -2,6 +2,8 @@
 // (nevermind455/oct10@772f2eb). Pure text and layout: the terminal output and
 // its thread are in dashboard_terminal.cpp.
 #include "sniper/dashboard.hpp"
+#include "sniper/storage.hpp"
+#include "sniper/book.hpp"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -1177,11 +1179,134 @@ std::string compute_terminal_text(std::string_view value, std::size_t max_chars)
 }
 } // namespace
 
+Json live_execution_quality(const std::map<std::string, Intent> &orders,
+                            const std::set<std::string> &acknowledged,
+                            const std::map<std::string, double> &decision_asks,
+                            double started_wall,
+                            const std::string &last_fill_order) {
+  long long attempted = 0, sent = 0, acked = 0, pending = 0, filled = 0,
+            partial = 0, zero = 0, rejected = 0, failed = 0, slip_n = 0;
+  double slip_sum = 0, latest = -INFINITY;
+  Json last;
+  for (const auto &[id, i] : orders) {
+    if (!std::isfinite(i.sent_wall) || i.sent_wall < started_wall)
+      continue;
+    ++attempted;
+    if (i.status == "aborted") {
+      ++failed;
+      continue;
+    }
+    ++sent;
+    if (acknowledged.count(id))
+      ++acked;
+    if (i.unresolved() || i.status == "matched")
+      ++pending;
+    if (i.booked_shares > 0) {
+      const bool is_partial = i.booked_cost < i.stake &&
+                              i.stake - i.booked_cost > 1;
+      ++(is_partial ? partial : filled);
+      const double shares = dollars(i.booked_shares);
+      const double price = dollars(i.booked_cost) / shares;
+      std::optional<double> ask, slip;
+      auto a = decision_asks.find(id);
+      if (a != decision_asks.end() && std::isfinite(a->second) && a->second > 0) {
+        ask = a->second;
+        slip = (price - *ask) * 100;
+        slip_sum += *slip;
+        ++slip_n;
+      }
+      if (last_fill_order.empty() ? i.sent_wall >= latest : id == last_fill_order) {
+        latest = i.sent_wall;
+        last = Json{{"order_id", id}, {"side", i.side},
+                     {"signal_mid", nullptr}, {"ask_seen", opt(ask)},
+                     {"cap", dollars(i.limit)}, {"price", price},
+                     {"shares", shares}, {"slip_c", opt(slip)}};
+      }
+    } else if (i.status == "no_match")
+      ++zero;
+    else if (i.status == "refused")
+      ++rejected;
+  }
+  return Json{{"attempted", attempted}, {"sent", sent}, {"acked", acked},
+               {"pending", pending}, {"filled", filled}, {"partial", partial},
+               {"zero_fill", zero}, {"rejected", rejected}, {"failed", failed},
+               {"fill_rate", sent ? Json(static_cast<double>(filled + partial) / sent) : Json()},
+               {"reject_rate", sent ? Json(static_cast<double>(rejected) / sent) : Json()},
+               {"avg_slip_c", slip_n ? Json(slip_sum / slip_n) : Json()},
+               {"slip_n", slip_n}, {"last", last}};
+}
+
+Json execution_latencies(const Json &row) {
+  auto stamp = [&](const char *name) -> std::optional<std::int64_t> {
+    const auto &v = get(row, name);
+    if (!v.is_number_integer() ||
+        (v.is_number_unsigned() && v.get<std::uint64_t>() >
+                                      std::numeric_limits<std::int64_t>::max()))
+      return {};
+    auto n = v.get<std::int64_t>();
+    return n > 0 ? std::optional(n) : std::nullopt;
+  };
+  Json samples = Json::object();
+  auto interval = [&](const char *key, const char *start, const char *end) {
+    auto a = stamp(start), b = stamp(end);
+    if (a && b && *b >= *a)
+      samples[key] = static_cast<double>(*b - *a) / 1e6;
+  };
+  interval("trigger_to_decision", "T0_ns", "T2_ns");
+  interval("trigger_to_send", "T0_ns", "T5_ns");
+  if (get(row, "acknowledged") == Json(true)) {
+    interval("send_to_ack", "T5_ns", "T6_ns");
+    interval("trigger_to_ack", "T0_ns", "T6_ns");
+    if (auto elapsed = num(get(row, "reply_ms")); elapsed && *elapsed >= 0)
+      samples["enqueue_to_ack"] = *elapsed;
+  }
+  return samples;
+}
+
+Json mark_position(double shares, double notional, double fees,
+                    const BookView &view, double now_mono, double max_age_ms) {
+  auto bid = view.best_bid();
+  const double age = view.updated_mono
+                         ? (now_mono - *view.updated_mono) * 1000 : INFINITY;
+  if (view.status != LIVE || !std::isfinite(age) || age < 0 || age > max_age_ms ||
+      !bid || !std::isfinite(*bid) || *bid < 0 || *bid > 1)
+    bid.reset();
+  Json result{{"bid", opt(bid)}};
+  if (shares <= 0) {
+    result["value"] = 0.0;
+    result["pnl"] = 0.0;
+  } else if (bid) {
+    const double value = shares * *bid;
+    result["value"] = value;
+    result["pnl"] = value - notional - fees;
+  } else {
+    result["value"] = nullptr;
+    result["pnl"] = nullptr;
+  }
+  return result;
+}
+
+Json live_balance_view(std::optional<double> balance, double age_s,
+                        double max_age_s) {
+  const bool known = balance && std::isfinite(*balance) && *balance >= 0;
+  const bool fresh = known && std::isfinite(age_s) && age_s >= 0 &&
+                      std::isfinite(max_age_s) && max_age_s > 0 && age_s <= max_age_s;
+  return Json{{"balance", fresh ? Json(*balance) : Json()},
+               {"balance_status", !known ? "UNKNOWN" : fresh ? "OK" : "STALE"},
+               {"balance_age_s", std::isfinite(age_s) && age_s >= 0 ? Json(age_s) : Json()}};
+}
+
 // ---------------------------------------------------------------- safety
 std::string redact(std::string_view value, std::size_t max_chars) {
-  std::string t(value);
-  if (max_chars > 0 && t.size() > max_chars)
-    t = t.substr(0, max_chars) + "...<truncated>";
+  // Inspect beyond the display boundary before truncating. Otherwise cutting a
+  // 32-byte key in half prevents hide_hex_32 from recognizing it and displays
+  // the key's prefix. Keep regex work bounded even for a huge venue error.
+  const auto lookahead = std::min<std::size_t>(128, value.size());
+  const auto inspected = max_chars > 0 && max_chars < value.size()
+                             ? max_chars + std::min(lookahead, value.size() - max_chars)
+                             : value.size();
+  std::string t(value.substr(0, inspected));
+  const bool input_truncated = inspected < value.size();
   // The patterns below only match text holding one of these words.
   auto low = lower(t);
   bool suspect = false;
@@ -1190,19 +1315,29 @@ std::string redact(std::string_view value, std::size_t max_chars) {
       suspect = true;
   if (suspect) {
     static const std::regex url(R"re((https?://)([^/@\s:]+):([^/@\s]+)@)re", std::regex::ECMAScript | std::regex::icase);
+    static const std::regex incomplete_url(R"re((https?://)([^/@\s:]+):([^/@\s]+)$)re", std::regex::ECMAScript | std::regex::icase);
     static const std::regex query(
         R"re(([?&](?:access[_-]?token|api[_-]?key|key|secret|signature)=)[^&#\s]+)re",
         std::regex::ECMAScript | std::regex::icase);
+    static const std::regex authorization(
+        R"re(\b(authorization)\b(["']?\s*[:=]\s*)(["']?)(?:(?:bearer|basic)\s+)?[^\s,;'"}\]]+)re",
+        std::regex::ECMAScript | std::regex::icase);
     static const std::regex named(
-        R"re(\b(authorization|bearer|api[_-]?key|secret|passphrase|password|private[_-]?key|poly[_-]?private[_-]?key|signature)\b(\s*[:=]\s*|\s+)(['"]?)([^\s,;'"}\]]+)(\3))re",
+        R"re(\b(authorization|bearer|(?:poly[_-]?)?(?:api[_-]?key|api[_-]?secret|api[_-]?passphrase|private[_-]?key)|secret|passphrase|password|signature)\b(["']?\s*[:=]\s*|\s+)(['"]?)[^\s,;'"}\]]+)re",
         std::regex::ECMAScript | std::regex::icase);
     static const std::regex jwt(R"re(eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})re");
     t = std::regex_replace(t, url, "$1<redacted>:<redacted>@");
+    if (input_truncated)
+      t = std::regex_replace(t, incomplete_url, "$1<redacted>:<redacted>@");
     t = std::regex_replace(t, query, "$1<redacted>");
-    t = std::regex_replace(t, named, "$1$2$3<redacted>$5");
+    t = std::regex_replace(t, authorization, "$1$2$3<redacted>");
+    t = std::regex_replace(t, named, "$1$2$3<redacted>");
     t = std::regex_replace(t, jwt, "<redacted-jwt>");
   }
-  return hide_hex_32(t);
+  t = hide_hex_32(t);
+  if (max_chars > 0 && (t.size() > max_chars || input_truncated))
+    t = t.substr(0, max_chars) + "...<truncated>";
+  return t;
 }
 
 std::string terminal_text(std::string_view value, std::size_t max_chars) {

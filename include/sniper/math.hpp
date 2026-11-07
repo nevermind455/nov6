@@ -32,9 +32,15 @@ inline double fair_limit(double fair, double margin, double tick,
       fee_exponent < 0)
     throw std::domain_error("invalid fair limit input");
   double p = std::floor((fair - margin) / tick + 1e-9) * tick;
+  if (!std::isfinite(p))
+    throw std::domain_error("fair limit grid is not representable");
   while (p > 0.0 &&
-         p + taker_fee(p, fee_rate, fee_exponent) + margin > fair + 1e-12)
-    p -= tick;
+         p + taker_fee(p, fee_rate, fee_exponent) + margin > fair + 1e-12) {
+    const double next = p - tick;
+    if (!(next < p))
+      throw std::domain_error("venue tick is below floating-point price precision");
+    p = next;
+  }
   return std::nearbyint(std::max(p, 0.0) * 1e4) / 1e4;
 }
 inline std::pair<double, double>

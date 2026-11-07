@@ -37,3 +37,4 @@ for tick in ("0.1", "0.01", "0.001", "0.0001"):
 print("cases", total, "different", diff)
 for e in examples:
     print(e)
+sys.exit(1 if diff else 0)

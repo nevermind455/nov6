@@ -32,10 +32,16 @@ set_value SNIPER_SHARES 5
 set_value SNIPER_CANARY_MAX_SHARES 100000
 # The whole session. The loss budget counts settled losses plus everything open
 # or pending, and gives no credit for wins.
-set_value SNIPER_CANARY_MAX_LOSS_USD 100
+# Preflight requires at most $5 until a prior canary state exists. Keep the
+# repository's configured $100 budget for an already initialized installation.
+loss_budget=5
+if [[ -e state/live/live_canary_state.json ]]; then
+  loss_budget=100
+fi
+set_value SNIPER_CANARY_MAX_LOSS_USD "$loss_budget"
 set_value SNIPER_CANARY_MAX_SPEND_USD 100
 set_value SNIPER_CANARY_MAX_ORDERS 10000
 set_value SNIPER_CANARY_MAX_FILLS 10000
 set_value SNIPER_CANARY_MAX_ROUNDS 10000
 set_value SNIPER_CANARY_HARD_STOP 1
-printf '%s\n' 'Wrote .env.live for a live run: quarter-Kelly orders, $100 loss budget.'
+printf 'Wrote .env.live for a live run: quarter-Kelly orders, $%s loss budget.\n' "$loss_budget"

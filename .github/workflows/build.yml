@@ -2,6 +2,7 @@ name: Build and test
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -22,10 +23,13 @@ jobs:
           sudo apt-get install -y build-essential cmake ninja-build ca-certificates \
             libssl-dev libboost1.83-dev libfmt-dev nlohmann-json3-dev \
             libsimdjson-dev libnghttp2-dev libsecp256k1-dev \
-            libgtest-dev libbenchmark-dev tmux
+            libgtest-dev libbenchmark-dev tmux curl jq
 
       - name: Build and run the native tests
         run: bash scripts/build.sh
+
+      - name: Verify development comparison tools
+        run: python3 -m unittest discover -s tools/replay -p 'test_*.py'
 
       - name: Run setup on the shipped settings
         run: bash scripts/setup.sh
@@ -61,7 +65,8 @@ jobs:
         working-directory: tools/fake-venue
         run: |
           bash make-certs.sh
-          npm install --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          node --test oracle.test.js
           node venue.js > "$RUNNER_TEMP/venue.log" 2>&1 &
           venue=$!
           trap 'kill "$venue"' EXIT

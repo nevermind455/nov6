@@ -95,6 +95,10 @@ std::optional<long long> max_opt(std::initializer_list<std::optional<long long>>
       r = x;
   return r;
 }
+bool supported_tick(double tick) {
+  return tick == 0.1 || tick == 0.01 || tick == 0.005 ||
+         tick == 0.0025 || tick == 0.001 || tick == 0.0001;
+}
 } // namespace
 
 std::optional<long long> py_int(const Json &v) {
@@ -134,6 +138,7 @@ std::optional<long long> py_int(const Json &v) {
   if (i >= s.size())
     return std::nullopt;
   unsigned long long acc = 0;
+  const auto limit = static_cast<unsigned long long>(LLONG_MAX) + (neg ? 1 : 0);
   for (; i < s.size(); ++i) {
     char ch = s[i];
     if (ch == '_' && i > 0 && std::isdigit(static_cast<unsigned char>(s[i - 1])) &&
@@ -141,12 +146,13 @@ std::optional<long long> py_int(const Json &v) {
       continue;
     if (!std::isdigit(static_cast<unsigned char>(ch)))
       return std::nullopt;
-    if (acc > (ULLONG_MAX - 9) / 10)
+    unsigned digit = static_cast<unsigned>(ch - '0');
+    if (acc > (limit - digit) / 10)
       return std::nullopt;
-    acc = acc * 10 + static_cast<unsigned>(ch - '0');
+    acc = acc * 10 + digit;
   }
-  if (acc > static_cast<unsigned long long>(LLONG_MAX))
-    return std::nullopt;
+  if (neg && acc == static_cast<unsigned long long>(LLONG_MAX) + 1)
+    return LLONG_MIN;
   return neg ? -static_cast<long long>(acc) : static_cast<long long>(acc);
 }
 
@@ -446,6 +452,10 @@ bool BookState::apply_snapshot(const std::string &token, const Json &bids,
     desync({token}, "snapshot timestamp refused");
     return false;
   }
+  if (o.tick && !supported_tick(*o.tick)) {
+    desync({token}, "invalid snapshot tick size");
+    return false;
+  }
   auto previous = m.ts;
   if (m.seen_ts && (!previous || *m.seen_ts > *previous))
     previous = m.seen_ts;
@@ -601,8 +611,10 @@ bool BookState::set_tick_size(const std::string &token, const Json &tick,
   if (tick.is_boolean())
     return false;
   auto parsed = py_float(tick);
-  if (!parsed || !std::isfinite(*parsed) || *parsed <= 0 || *parsed >= 1)
+  if (!parsed || !supported_tick(*parsed)) {
+    desync({token}, "unsupported venue tick size");
     return false;
+  }
   observe({token});
   meta.tick = parsed;
   if (timestamp) {
@@ -690,6 +702,9 @@ bool dispatch_market_event(BookState &book, const Json &m) {
   if (et == "book") {
     SnapshotOptions o;
     o.ts_ms = get(m, "timestamp");
+    if (m.contains("tick_size")) {
+      o.tick = py_float(get(m, "tick_size")).value_or(NAN);
+    }
     const Json &h = get(m, "hash");
     if (!h.is_null())
       o.hash = h.is_string() ? h.get<std::string>() : h.dump();
@@ -878,6 +893,10 @@ std::optional<Round> parse_round(const Json &e, std::int64_t start) {
           !m.value("acceptingOrders", false) ||
           !m.value("enableOrderBook", false))
         continue;
+      // Both ID fields can be populated. This native signer and settlement
+      // path support CTF v1 only; never select legacy IDs from a v2 market.
+      if (m.value("version", "") != "v1")
+        continue;
       auto cfg = m.at("cryptoMarketConfig");
       if (cfg.value("asset", "") != "btc" ||
           cfg.value("duration", "") != "5m" ||
@@ -930,12 +949,25 @@ Rules parse_rules(const Json &m, const Json &b, std::string_view t) {
   Rules r;
   if (!m.is_object() || !m.contains("fd") || !m.at("fd").is_object())
     throw std::runtime_error("market fee rules not loaded");
+  if (m.value("v", "") != "v1")
+    throw std::runtime_error("unsupported market protocol version");
+  auto condition = m.at("c").get<std::string>();
+  if (!valid_hex(condition, 32) || !valid_token(t) || !b.is_object() ||
+      b.value("asset_id", "") != t || b.value("market", "") != condition)
+    throw std::runtime_error("market rules and book identity disagree");
   r.tick = as_units(m.at("mts"));
   r.rate = as_units(m.at("fd").at("r"));
-  r.exponent = static_cast<int>(number(m.at("fd").at("e")));
+  double exponent = number(m.at("fd").at("e"));
+  if (exponent < 1 || exponent > 8 || exponent != std::floor(exponent))
+    throw std::runtime_error("unsupported market fee exponent");
+  r.exponent = static_cast<int>(exponent);
   // The CLOB omits nr for standard markets; the official SDK uses false.
   r.neg = m.value("nr", false);
   r.min_shares = as_units(b.at("min_order_size"));
+  if (r.tick != as_units(b.at("tick_size")) ||
+      r.min_shares != as_units(m.at("mos")) ||
+      (b.contains("neg_risk") && b.at("neg_risk").get<bool>() != r.neg))
+    throw std::runtime_error("market rules and book parameters disagree");
   bool exists = false;
   for (auto &v : m.at("t"))
     if (v.at("t") == t)

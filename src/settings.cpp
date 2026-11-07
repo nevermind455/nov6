@@ -6,6 +6,7 @@
 #include "sniper/sniper.hpp"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace sniper {
 namespace {
@@ -66,6 +67,14 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
       return false;
     throw std::invalid_argument("invalid " + name + "=" + pyrepr(raw) +
                                 ": 1 or 0");
+  };
+  auto env_int = [&](const std::string &name, int def) {
+    double v = std::trunc(env_float(name, def));
+    if (v < std::numeric_limits<int>::min() ||
+        v > std::numeric_limits<int>::max())
+      throw std::invalid_argument("invalid " + name + "=" + g(v) +
+                                  ": outside native integer range");
+    return static_cast<int>(v);
   };
   auto text = [&](const std::string &name, const std::string &def) {
     auto raw = raw_of(name);
@@ -134,8 +143,7 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
   s.min_left_s = env_float("SNIPER_MIN_LEFT_S", 10);
   refuse_on("SNIPER_FRESH_MARKET_SOCKET",
             env_bool("SNIPER_FRESH_MARKET_SOCKET", false));
-  s.max_fills_round =
-      static_cast<int>(std::trunc(env_float("SNIPER_MAX_FILLS_ROUND", 20)));
+  s.max_fills_round = env_int("SNIPER_MAX_FILLS_ROUND", 20);
   s.max_side_shares = env_float("SNIPER_MAX_SIDE_SHARES", 200);
   s.fair = env_bool("SNIPER_FAIR", true);
   s.fair_margin = env_float("SNIPER_FAIR_MARGIN", 0.01);
@@ -247,12 +255,10 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
   }
   s.coinbase_stale_ms = env_float("SNIPER_COINBASE_STALE_MS", 1000);
   s.coinbase_unknown_ms = env_float("SNIPER_COINBASE_UNKNOWN_MS", 5000);
-  s.coinbase_backlog_max = static_cast<int>(
-      std::trunc(env_float("SNIPER_COINBASE_BACKLOG_MAX", 20)));
+  s.coinbase_backlog_max = env_int("SNIPER_COINBASE_BACKLOG_MAX", 20);
   double cb_silent = env_float("SNIPER_COINBASE_SILENT_S", 5);
   s.coinbase_silent_s = cb_silent;
-  s.coinbase_conns =
-      static_cast<int>(std::trunc(env_float("SNIPER_COINBASE_CONNS", 2)));
+  s.coinbase_conns = env_int("SNIPER_COINBASE_CONNS", 2);
   refuse_on("SNIPER_EXTRA_FEEDS", !strip(text("SNIPER_EXTRA_FEEDS", "")).empty());
   refuse_on("SNIPER_WIDE_CAP_C", wide_cap_c > 0);
   refuse_on("SNIPER_WIDE_CAP_LIVE", wide_cap_live);

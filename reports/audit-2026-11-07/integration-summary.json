@@ -1,0 +1,25 @@
+{
+  "paper_final": {
+    "peak_rss_kib": 50904,
+    "native_cpp": true,
+    "stopped": true,
+    "exit_code": 0,
+    "paper_order_calls": 0,
+    "signals": 1397,
+    "orders": 5,
+    "paper_fills": 1,
+    "dry_run_orders": 0,
+    "errors": 0
+  },
+  "distinct_round_ends": [
+    1794067500,
+    1794067800
+  ],
+  "paper_seconds": 360,
+  "dashboard_seconds": 270,
+  "dashboard_sizes": [
+    "170x50",
+    "100x30"
+  ],
+  "assertions": "passed"
+}

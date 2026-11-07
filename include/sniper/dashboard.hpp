@@ -44,7 +44,10 @@
 // POLYMARKET BTC, LATENCY BUDGET and P/L BY SOURCE panels, markouts, and the
 // Binance round trip on the NET line.
 #include <memory>
+#include <map>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -53,9 +56,24 @@
 
 namespace sniper {
 using Json = nlohmann::ordered_json;
+struct Intent;
+struct BookView;
 }
 
 namespace sniper::dash {
+// Pure evidence adapters. Confirmed ledger bookings drive live fills; HTTP
+// acknowledgements and decision asks are independent of the bounded order table.
+Json live_execution_quality(const std::map<std::string, Intent> &orders,
+                            const std::set<std::string> &acknowledged,
+                            const std::map<std::string, double> &decision_asks,
+                            double started_wall,
+                            const std::string &last_fill_order = {});
+Json execution_latencies(const Json &row);
+Json mark_position(double shares, double notional, double fees,
+                    const BookView &, double now_mono, double max_age_ms);
+Json live_balance_view(std::optional<double> balance, double age_s,
+                        double max_age_s = 120);
+
 enum class Color : unsigned char {
   cream, paper2, ink, dim, faint, rule, green, green2, red, red2, amber, blue,
   purple, cyan, white, count_

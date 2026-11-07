@@ -5,11 +5,14 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/write.hpp>
 #include <cstring>
+#include <condition_variable>
 #include <gtest/gtest.h>
+#include <mutex>
 #include <nghttp2/nghttp2.h>
 #include <openssl/evp.h>
 #include <openssl/x509v3.h>
 #include <thread>
+#include <unistd.h>
 using namespace sniper;
 namespace net = boost::asio;
 using tcp = net::ip::tcp;
@@ -20,8 +23,15 @@ struct FakeClob {
   tcp::acceptor acceptor{io, {net::ip::make_address("127.0.0.1"), 0}};
   std::thread thread;
   bool drop = false, goaway = false, goaway_accepts_request = false;
+  bool flow_controlled = false, early_response = false;
   int http_status = 200;
   std::atomic<int> requests{0};
+  std::atomic<std::size_t> received_bytes{0};
+  std::atomic<bool> settings_acknowledged{false}, window_exhausted{false};
+  std::atomic<bool> upload_released{false};
+  std::atomic<bool> fixture_finished{false};
+  std::mutex upload_mutex;
+  std::condition_variable upload_wake;
   std::string received,
       response =
           R"({"success":true,"makingAmount":"1","takingAmount":"2","orderID":"offline-order"})";
@@ -71,6 +81,7 @@ struct FakeClob {
     FakeClob *server;
     int32_t stream = 0;
     bool complete = false, close = false;
+    bool responded = false, window_released = false;
     std::size_t offset = 0;
   };
   static ssize_t response_data(nghttp2_session *, int32_t, uint8_t *out,
@@ -89,11 +100,37 @@ struct FakeClob {
                   size_t len, void *user) {
     auto *state = static_cast<Session *>(user);
     state->server->received.append(reinterpret_cast<const char *>(bytes), len);
+    state->server->received_bytes += len;
     return 0;
+  }
+  static void respond(nghttp2_session *session, Session *s, int32_t stream) {
+    s->stream = stream;
+    std::string key = ":status",
+                value = std::to_string(s->server->http_status);
+    nghttp2_nv header{reinterpret_cast<uint8_t *>(key.data()),
+                      reinterpret_cast<uint8_t *>(value.data()), key.size(),
+                      value.size(), NGHTTP2_NV_FLAG_NONE};
+    nghttp2_data_provider provider{};
+    provider.source.ptr = s;
+    provider.read_callback = response_data;
+    nghttp2_submit_response(session, s->stream, &header, 1, &provider);
+    s->responded = true;
   }
   static int frame(nghttp2_session *session, const nghttp2_frame *frame,
                    void *user) {
     auto *s = static_cast<Session *>(user);
+    if (frame->hd.type == NGHTTP2_SETTINGS &&
+        (frame->hd.flags & NGHTTP2_FLAG_ACK))
+      s->server->settings_acknowledged = true;
+    if (frame->hd.type == NGHTTP2_HEADERS) {
+      s->stream = frame->hd.stream_id;
+      if (s->server->early_response && !s->responded)
+        respond(session, s, frame->hd.stream_id);
+    }
+    if (s->server->flow_controlled && frame->hd.type == NGHTTP2_DATA &&
+        !(frame->hd.flags & NGHTTP2_FLAG_END_STREAM) &&
+        s->server->received_bytes >= 1024)
+      s->server->window_exhausted = true;
     if ((frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_DATA) &&
         (frame->hd.flags & NGHTTP2_FLAG_END_STREAM)) {
       ++s->server->requests;
@@ -109,16 +146,8 @@ struct FakeClob {
             NGHTTP2_NO_ERROR, nullptr, 0);
         return 0;
       }
-      s->stream = frame->hd.stream_id;
-      std::string key = ":status",
-                  value = std::to_string(s->server->http_status);
-      nghttp2_nv header{reinterpret_cast<uint8_t *>(key.data()),
-                        reinterpret_cast<uint8_t *>(value.data()), key.size(),
-                        value.size(), NGHTTP2_NV_FLAG_NONE};
-      nghttp2_data_provider provider{};
-      provider.source.ptr = s;
-      provider.read_callback = response_data;
-      nghttp2_submit_response(session, s->stream, &header, 1, &provider);
+      if (!s->responded)
+        respond(session, s, frame->hd.stream_id);
       s->complete = true;
     }
     return 0;
@@ -136,9 +165,17 @@ struct FakeClob {
         nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks,
                                                                   data);
         nghttp2_session *session = nullptr;
-        nghttp2_session_server_new(&session, callbacks, &state);
+        nghttp2_option *options = nullptr;
+        nghttp2_option_new(&options);
+        if (flow_controlled)
+          nghttp2_option_set_no_auto_window_update(options, 1);
+        nghttp2_session_server_new2(&session, callbacks, &state, options);
+        nghttp2_option_del(options);
         nghttp2_session_callbacks_del(callbacks);
-        nghttp2_submit_settings(session, NGHTTP2_FLAG_NONE, nullptr, 0);
+        nghttp2_settings_entry window{NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, 1024};
+        nghttp2_submit_settings(session, NGHTTP2_FLAG_NONE,
+                               flow_controlled ? &window : nullptr,
+                               flow_controlled ? 1 : 0);
         auto flush = [&] {
           const uint8_t *bytes;
           ssize_t n;
@@ -157,8 +194,24 @@ struct FakeClob {
           if (state.close)
             break;
           flush();
-          if (state.complete)
+          if (flow_controlled && window_exhausted && !state.window_released) {
+            std::unique_lock lock(upload_mutex);
+            if (!upload_wake.wait_for(lock, std::chrono::seconds(5),
+                                      [this] { return upload_released.load(); }))
+              break;
+            state.window_released = true;
+            nghttp2_submit_window_update(session, NGHTTP2_FLAG_NONE,
+                                         state.stream, 65535);
+            flush();
+          }
+          if (state.complete) {
+            if (flow_controlled) {
+              std::unique_lock lock(upload_mutex);
+              upload_wake.wait_for(lock, std::chrono::seconds(5),
+                                   [this] { return fixture_finished.load(); });
+            }
             break;
+          }
         }
         nghttp2_session_del(session);
         boost::system::error_code ec;
@@ -169,8 +222,14 @@ struct FakeClob {
     });
   }
   void join() {
+    fixture_finished = true;
+    release_upload();
     if (thread.joinable())
       thread.join();
+  }
+  void release_upload() {
+    upload_released = true;
+    upload_wake.notify_all();
   }
   ~FakeClob() { join(); }
 };
@@ -242,6 +301,82 @@ void exercise(bool drop, int status, bool goaway = false,
     EXPECT_EQ(response.body, fake.response);
   }
 }
+void exercise_flow_control(bool early_response) {
+  net::io_context io;
+  net::ssl::context tls(net::ssl::context::tls_client);
+  FakeClob fake(tls, false, early_response ? 400 : 200);
+  fake.flow_controlled = true;
+  fake.early_response = early_response;
+  fake.start();
+  std::string body(32768, 'x');
+  std::atomic<std::uint64_t> blocked{0};
+  int written = 0, replies = 0, unknown = 0;
+  bool submitted = false, saw_blocked_upload = false, saw_early_reply = false;
+  double blocked_since = 0;
+  H2Callbacks callbacks;
+  callbacks.written = [&](auto id, auto stamp) {
+    EXPECT_EQ(id, "flow-controlled-order");
+    EXPECT_GT(stamp, 0);
+    EXPECT_TRUE(fake.upload_released);
+    ++written;
+  };
+  callbacks.reply = [&](auto id, const HttpResult &response) {
+    EXPECT_EQ(id, "flow-controlled-order");
+    EXPECT_EQ(response.status, early_response ? 400 : 200);
+    EXPECT_EQ(response.body, fake.response);
+    saw_early_reply = !fake.upload_released;
+    ++replies;
+  };
+  callbacks.unknown = [&](auto id, auto reason) {
+    if (id == "flow-controlled-order") {
+      ADD_FAILURE() << reason;
+      ++unknown;
+    }
+  };
+  H2Client client(io, tls, true, blocked, std::move(callbacks), 3, "127.0.0.1",
+                  std::to_string(fake.acceptor.local_endpoint().port()));
+  net::steady_timer poll(io);
+  std::function<void()> step = [&] {
+    poll.expires_after(std::chrono::milliseconds(10));
+    poll.async_wait([&](auto ec) {
+      if (ec)
+        return;
+      if (!submitted && client.ready() && fake.settings_acknowledged)
+        submitted = client.post("flow-controlled-order", body, {});
+      if (fake.window_exhausted && !fake.upload_released) {
+        if (blocked_since == 0)
+          blocked_since = mono_s();
+        if ((early_response && replies == 1) ||
+            (!early_response && mono_s() - blocked_since > .1)) {
+          EXPECT_EQ(written, 0);
+          EXPECT_LT(fake.received_bytes, body.size());
+          saw_blocked_upload = true;
+          fake.release_upload();
+        }
+      }
+      if (written == 1 && replies == 1 && fake.requests == 1)
+        io.stop();
+      else
+        step();
+    });
+  };
+  client.start();
+  step();
+  io.run_for(std::chrono::seconds(5));
+  client.stop();
+  io.restart();
+  io.poll();
+  fake.join();
+  EXPECT_TRUE(submitted);
+  EXPECT_TRUE(saw_blocked_upload);
+  EXPECT_EQ(saw_early_reply, early_response);
+  EXPECT_EQ(written, 1);
+  EXPECT_EQ(replies, 1);
+  EXPECT_EQ(unknown, 0);
+  EXPECT_EQ(fake.requests, 1);
+  EXPECT_EQ(fake.received, body);
+  EXPECT_EQ(blocked, 0);
+}
 } // namespace
 TEST(NativeHttp2, LocalTlsMatchedReply) { exercise(false, 200); }
 TEST(NativeHttp2, LocalTlsHttp400Reply) { exercise(false, 400); }
@@ -251,4 +386,15 @@ TEST(NativeHttp2, GoawayAfterPossibleProcessingClosesConnection) {
 }
 TEST(NativeHttp2, GoawayBeforeProcessingClosesConnection) {
   exercise(false, 200, true, false);
+}
+TEST(NativeHttp2, WrittenWaitsForFlowControlledUploadEndStream) {
+  exercise_flow_control(false);
+}
+TEST(NativeHttp2, EarlyResponseKeepsFlowControlledUploadProviderAlive) {
+  ASSERT_EXIT(
+      {
+        exercise_flow_control(true);
+        _exit(::testing::Test::HasFailure() ? 1 : 0);
+      },
+      ::testing::ExitedWithCode(0), "");
 }

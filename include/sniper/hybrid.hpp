@@ -4,6 +4,7 @@
 // floats are converted with Decimal(str(x)), exactly as _decimal() does.
 #include "pyrt.hpp"
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -148,8 +149,11 @@ inline long long minimum_entry_shares(const Dec &price_cap,
       py::to_integral(py::div(musd, price, c), py::Rounding::Ceiling).to_ll();
   long long minimum = std::max(a, b);
   auto ratio = py::as_integer_ratio(py::mul(price, D(100), c));
-  long long multiple = ratio.second.convert_to<long long>();
-  return ((minimum + multiple - 1) / multiple) * multiple;
+  const py::BigInt rounded =
+      ((py::BigInt(minimum) + ratio.second - 1) / ratio.second) * ratio.second;
+  if (rounded > std::numeric_limits<long long>::max())
+    throw py::ValueError("minimum entry shares are outside native integer range");
+  return rounded.convert_to<long long>();
 }
 
 inline long long cent_compatible_shares(const Dec &target0,
@@ -159,8 +163,8 @@ inline long long cent_compatible_shares(const Dec &target0,
   if (price >= D(1))
     throw py::ValueError("price_cap must be below 1");
   auto ratio = py::as_integer_ratio(py::mul(price, D(100)));
-  long long multiple = ratio.second.convert_to<long long>();
   long long shares = py::to_integral(target, py::Rounding::Floor).to_ll();
-  return shares / multiple * multiple;
+  const py::BigInt rounded = py::BigInt(shares) / ratio.second * ratio.second;
+  return rounded.convert_to<long long>();
 }
 } // namespace sniper::hybrid

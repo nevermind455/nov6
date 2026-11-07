@@ -35,8 +35,10 @@ int compare_decisions(const std::filesystem::path &a,
     std::string line;
     while (std::getline(file, line)) {
       auto j = Json::parse(line);
-      if (!j.contains("side") || (j.value("result", "") != "pending" &&
-                                  j.value("result", "") != "skipped"))
+      auto result = j.value("result", "");
+      if (!j.contains("side") ||
+          (result != "pending" && result != "skipped" && result != "filled" &&
+           result != "refused" && result != "error"))
         continue;
       Json row;
       for (auto key :

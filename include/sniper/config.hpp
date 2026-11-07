@@ -5,7 +5,7 @@
 #include <set>
 namespace sniper {
 struct Config {
-  std::filesystem::path root, state, journal, ledger, stop_file, record;
+  std::filesystem::path root, state, journal, paper_journal, ledger, stop_file, record;
   bool live = false, health = false, new_session = false, check = false,
        dash = false, dry_run = false, canary_hard_stop = true;
   double dash_fps = 2;

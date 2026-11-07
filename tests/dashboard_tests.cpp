@@ -1,6 +1,8 @@
 // The terminal dashboard's layout: exact geometry at every size, missing values
 // drawn as "--", and text from outside never reaching the screen raw.
 #include "sniper/dashboard.hpp"
+#include "sniper/book.hpp"
+#include "sniper/storage.hpp"
 #include <gtest/gtest.h>
 #include <string>
 using namespace sniper;
@@ -145,6 +147,34 @@ TEST(Dashboard, SecretsAreHidden) {
   // ordinary text is left alone
   EXPECT_EQ(terminal_text("ask not below fair value"), "ask not below fair value");
   EXPECT_EQ(terminal_text("btc-updown-5m-1793963400"), "btc-updown-5m-1793963400");
+  EXPECT_EQ(terminal_text("https://localhost:443"), "https://localhost:443");
+}
+
+TEST(Dashboard, HttpAuthorizationAndJsonCredentialsAreHidden) {
+  for (const auto &sample : {
+           std::string("Authorization: Bearer audit-token-123"),
+           std::string("Authorization: Basic audit-token-123"),
+           std::string(R"({"authorization":"Bearer audit-token-123"})"),
+           std::string(R"({"apiKey":"audit-token-123"})"),
+           std::string(R"({"secret":"audit-token-123"})"),
+           std::string("POLY_API_SECRET=audit-token-123"),
+           std::string("POLY_API_PASSPHRASE=audit-token-123")}) {
+    SCOPED_TRACE(sample);
+    EXPECT_EQ(terminal_text(sample).find("audit-token-123"), std::string::npos);
+    EXPECT_NE(terminal_text(sample).find("<redacted>"), std::string::npos);
+  }
+}
+
+TEST(Dashboard, TruncationDoesNotExposePrivateKeyPrefixes) {
+  const auto secret = "0x" + std::string(64, 'f');
+  EXPECT_EQ(terminal_text(secret, 32).find(std::string(16, 'f')),
+            std::string::npos);
+  EXPECT_EQ(terminal_text("prefix " + secret + std::string(300, 'z'), 32)
+                .find(std::string(16, 'f')),
+            std::string::npos);
+  EXPECT_EQ(terminal_text("Authorization: Bearer " + std::string(1000, 's'), 32)
+                .find(std::string(8, 's')),
+            std::string::npos);
 }
 
 TEST(Dashboard, FitCountsCharactersNotBytes) {
@@ -178,4 +208,167 @@ TEST(Dashboard, PlainLineForLogFiles) {
   EXPECT_NE(line.find("[DASH] PAPER btc-updown-5m-1793963400 T-153s"), std::string::npos);
   EXPECT_NE(line.find("orders=21"), std::string::npos);
   EXPECT_EQ(line.find('\x1b'), std::string::npos);
+}
+
+TEST(Dashboard, LiveMetricsRequireConfirmedBookingsAndExplicitHttpAcknowledgements) {
+  Intent order;
+  order.id = "pending-order";
+  order.side = "UP";
+  order.sent_wall = 101;
+  order.stake = 5 * U;
+  order.limit = 500000;
+  order.status = "matched";
+  order.matched_shares = 6 * U;
+  order.matched_cost = 3 * U;
+  std::map<std::string, Intent> orders{{order.id, order}};
+  std::set<std::string> acknowledged;
+  const std::map<std::string, double> asks{{order.id, .49}};
+  auto q = live_execution_quality(orders, acknowledged, asks, 100);
+  EXPECT_EQ(q["sent"], 1);
+  EXPECT_EQ(q["acked"], 0);
+  EXPECT_EQ(q["filled"], 0);
+  EXPECT_EQ(q["partial"], 0);
+  EXPECT_EQ(q["pending"], 1);
+  acknowledged.insert(order.id); // HTTP match acknowledgement is not a fill.
+  q = live_execution_quality(orders, acknowledged, asks, 100);
+  EXPECT_EQ(q["acked"], 1);
+  EXPECT_EQ(q["partial"], 0);
+  orders.at(order.id).booked_shares = 2 * U;
+  orders.at(order.id).booked_cost = 900000;
+  q = live_execution_quality(orders, acknowledged, asks, 100);
+  EXPECT_EQ(q["partial"], 1);
+  EXPECT_EQ(q["pending"], 1);
+  EXPECT_DOUBLE_EQ(q["last"]["price"].get<double>(), .45);
+  // A later confirmed trade updates the same order's cumulative VWAP/count.
+  orders.at(order.id).booked_shares = 6 * U;
+  orders.at(order.id).booked_cost = 3 * U;
+  orders.at(order.id).status = "confirmed";
+  q = live_execution_quality(orders, acknowledged, asks, 100);
+  EXPECT_EQ(q["filled"], 0);
+  EXPECT_EQ(q["partial"], 1);
+  EXPECT_EQ(q["pending"], 0);
+  EXPECT_DOUBLE_EQ(q["last"]["price"].get<double>(), .5);
+  EXPECT_DOUBLE_EQ(q["last"]["shares"].get<double>(), 6);
+  EXPECT_EQ(q["slip_n"], 1);
+  EXPECT_NEAR(q["avg_slip_c"].get<double>(), 1.0, 1e-10);
+  EXPECT_DOUBLE_EQ(q["fill_rate"].get<double>(), 1);
+  EXPECT_EQ(q, live_execution_quality(orders, acknowledged, asks, 100));
+}
+
+TEST(Dashboard, LiveMetricsSurviveOrderTableEvictionAndExcludePreviousRuns) {
+  std::map<std::string, Intent> orders;
+  std::set<std::string> acknowledged;
+  for (int n = 0; n < 60; ++n) {
+    Intent i;
+    i.id = std::to_string(n);
+    i.sent_wall = 101 + n;
+    i.status = n == 0 ? "unknown" : "no_match";
+    i.stake = 5 * U;
+    orders.emplace(i.id, i);
+    if (n != 0)
+      acknowledged.insert(i.id);
+  }
+  Intent previous;
+  previous.id = "previous-run";
+  previous.sent_wall = 99;
+  previous.status = "confirmed";
+  previous.booked_shares = 10 * U;
+  previous.booked_cost = previous.stake = 5 * U;
+  orders.emplace(previous.id, previous);
+  auto q = live_execution_quality(orders, acknowledged, {}, 100);
+  EXPECT_EQ(q["attempted"], 60);
+  EXPECT_EQ(q["acked"], 59);
+  EXPECT_EQ(q["pending"], 1);
+  EXPECT_EQ(q["zero_fill"], 59);
+  auto &late = orders.at("0"); // already older than the table's 40 rows
+  late.booked_shares = 10 * U;
+  late.booked_cost = 5 * U;
+  late.status = "confirmed";
+  q = live_execution_quality(orders, acknowledged, {{"0", .49}}, 100);
+  EXPECT_EQ(q["filled"], 1);
+  EXPECT_EQ(q["acked"], 59); // a confirmed private trade is not an HTTP ACK
+  EXPECT_EQ(q["pending"], 0);
+  EXPECT_EQ(q["last"]["order_id"], "0");
+  EXPECT_EQ(q["zero_fill"], 59);
+  auto &newer = orders.at("1");
+  newer.booked_shares = 4 * U;
+  newer.booked_cost = 2 * U;
+  newer.status = "confirmed";
+  // The latest confirmed event can belong to an older submitted order.
+  q = live_execution_quality(orders, acknowledged, {{"0", .49}}, 100, "0");
+  EXPECT_EQ(q["last"]["order_id"], "0");
+  EXPECT_EQ(q["filled"], 1);
+  EXPECT_EQ(q["partial"], 1);
+}
+
+TEST(Dashboard, LiveAbortedRejectedAndUncertainOrdersHaveDistinctMetrics) {
+  std::map<std::string, Intent> orders;
+  for (const auto *status : {"aborted", "refused", "no_match", "unknown"}) {
+    Intent i;
+    i.id = i.status = status;
+    i.sent_wall = 101;
+    orders.emplace(i.id, i);
+  }
+  const auto q = live_execution_quality(orders, {"refused", "no_match"}, {}, 100);
+  EXPECT_EQ(q["attempted"], 4);
+  EXPECT_EQ(q["sent"], 3);
+  EXPECT_EQ(q["acked"], 2);
+  EXPECT_EQ(q["failed"], 1);
+  EXPECT_EQ(q["rejected"], 1);
+  EXPECT_EQ(q["zero_fill"], 1);
+  EXPECT_EQ(q["pending"], 1);
+}
+
+TEST(Dashboard, LiveLatencyUsesCompleteWireWriteAndActualAcknowledgement) {
+  Json row{{"T0_ns", 1000000000LL}, {"T2_ns", 1002000000LL},
+            {"T5_ns", 1020000000LL}, {"T6_ns", 1050000000LL},
+            {"acknowledged", true}, {"reply_ms", 999.0}};
+  auto samples = execution_latencies(row);
+  EXPECT_EQ(samples["trigger_to_decision"], 2);
+  EXPECT_EQ(samples["trigger_to_send"], 20);
+  EXPECT_EQ(samples["send_to_ack"], 30);
+  EXPECT_EQ(samples["trigger_to_ack"], 50);
+  EXPECT_EQ(samples["enqueue_to_ack"], 999);
+  row.erase("T5_ns");
+  samples = execution_latencies(row);
+  EXPECT_FALSE(samples.contains("trigger_to_send"));
+  EXPECT_FALSE(samples.contains("send_to_ack")); // T2 never substitutes T5
+  row["T5_ns"] = 1020000000LL;
+  row["acknowledged"] = false;
+  samples = execution_latencies(row);
+  EXPECT_FALSE(samples.contains("send_to_ack"));
+  EXPECT_FALSE(samples.contains("trigger_to_ack"));
+  EXPECT_FALSE(samples.contains("enqueue_to_ack"));
+  row["acknowledged"] = true;
+  row["T5_ns"] = 1060000000LL; // early reply before the upload ended
+  EXPECT_FALSE(execution_latencies(row).contains("send_to_ack"));
+}
+
+TEST(Dashboard, PositionMarksIncludeFeesAndRequireFreshLiveBids) {
+  BookView book;
+  book.status = LIVE;
+  book.updated_mono = 100;
+  book.bids = {{.6, 20}};
+  auto position = mark_position(10, 5, .1, book, 100.5, 2000);
+  EXPECT_DOUBLE_EQ(position["value"].get<double>(), 6);
+  EXPECT_NEAR(position["pnl"].get<double>(), .9, 1e-12);
+  book.status = STALE;
+  EXPECT_TRUE(mark_position(10, 5, .1, book, 100.5, 2000)["value"].is_null());
+  book.status = LIVE;
+  EXPECT_TRUE(mark_position(10, 5, .1, book, 103, 2000)["pnl"].is_null());
+  EXPECT_TRUE(mark_position(10, 5, .1, book, 99, 2000)["value"].is_null());
+  book.updated_mono.reset();
+  EXPECT_TRUE(mark_position(10, 5, .1, book, 100, 2000)["value"].is_null());
+  EXPECT_EQ(mark_position(0, 0, 0, book, 100, 2000)["value"], 0);
+}
+
+TEST(Dashboard, StaleLiveCollateralIsUnavailableInsteadOfCurrentEquity) {
+  auto current = live_balance_view(123.45, 5);
+  EXPECT_EQ(current["balance_status"], "OK");
+  EXPECT_DOUBLE_EQ(current["balance"].get<double>(), 123.45);
+  auto stale = live_balance_view(123.45, 121);
+  EXPECT_EQ(stale["balance_status"], "STALE");
+  EXPECT_TRUE(stale["balance"].is_null());
+  EXPECT_EQ(live_balance_view({}, 5)["balance_status"], "UNKNOWN");
+  EXPECT_TRUE(live_balance_view(123.45, -1)["balance"].is_null());
 }

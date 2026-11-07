@@ -145,7 +145,10 @@ std::optional<double> iso_ms(const Json &v) {
   }
   if (i != s.size())
     return std::nullopt;
-  if (M < 1 || M > 12 || Dd < 1 || Dd > 31 || h > 23 || mi > 59 || se > 59)
+  const std::chrono::year_month_day date{
+      std::chrono::year{Y}, std::chrono::month{static_cast<unsigned>(M)},
+      std::chrono::day{static_cast<unsigned>(Dd)}};
+  if (Y < 1 || !date.ok() || h > 23 || mi > 59 || se > 59 || oh > 23 || om > 59)
     return std::nullopt;
   // days from civil (Howard Hinnant)
   int y = Y - (M <= 2);

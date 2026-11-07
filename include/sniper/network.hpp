@@ -8,7 +8,9 @@ namespace sniper {
 struct Url {
   std::string scheme, host, port, target;
   static Url parse(std::string_view);
+  std::string authority(bool include_default_port = false) const;
 };
+std::optional<Url> connect_proxy_for(const Url &);
 struct HttpResult {
   int status = 0;
   std::string body;
@@ -33,6 +35,8 @@ class WebSocket {
   std::shared_ptr<Impl> p_;
 
 public:
+  // All methods and callbacks run on the supplied io_context's single thread.
+  // WSS is required; the TLS context must outlive the client and its handlers.
   using Message = std::function<void(std::string_view, int)>;
   using State = std::function<void(bool)>;
   WebSocket(boost::asio::io_context &, boost::asio::ssl::context &,
@@ -54,6 +58,8 @@ class H2Client {
   std::shared_ptr<Impl> p_;
 
 public:
+  // As with WebSocket, use the supplied io_context's single thread. An uncertain
+  // request is reported through unknown and is never retried by this client.
   H2Client(boost::asio::io_context &, boost::asio::ssl::context &, bool live,
            std::atomic<std::uint64_t> &blocked, H2Callbacks, int timeout_s = 10,
            std::string host = "clob.polymarket.com", std::string port = "443");
