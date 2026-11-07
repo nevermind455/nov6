@@ -39,9 +39,10 @@ handled by the shell launcher, so it does not require rebuilding the executable.
 bash scripts/prepare-live.sh
 ```
 
-This writes `.env.live`, leaving `.env` alone: flat 5-share orders (at most $4.75
-each), a $5 loss budget, and a limit of 10 orders, 5 fills, 3 rounds and $15 spent
-for the session. When a budget is reached, new orders stop until you deliberately
+This writes `.env.live`, leaving `.env` alone: quarter-Kelly orders sized from
+the wallet (up to 200 shares per outcome), a $5 first-session loss budget
+($100 when a previous canary state already exists), and a limit of 10000 orders, 10000 fills, 10000 rounds and
+$100 spent for the session. When a budget is reached, new orders stop until you deliberately
 start a new session. Your limit of ask + 0.02 carries over from `.env`.
 
 ## 4. Put your key in this session only

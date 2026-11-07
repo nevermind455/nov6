@@ -971,3 +971,72 @@ TEST(Python, NumericsMatchCPython) {
   EXPECT_EQ(hybrid::minimum_entry_shares(py::D(.501)), 10);
   EXPECT_EQ(hybrid::cent_compatible_shares(py::D(13.0), py::D(.15)), 13);
 }
+
+TEST(VenueUnits, RoundsLongDecimalsAndStillRefusesRubbish) {
+  EXPECT_EQ(venue_units(Json("0.43")), 430000);
+  EXPECT_EQ(venue_units(Json("0.4308331")), 430833);
+  EXPECT_EQ(venue_units(Json("0.4308335")), 430834);
+  EXPECT_EQ(venue_units(Json("19.636363636363")), 19636364);
+  EXPECT_EQ(venue_units(Json("0.9999999")), 1000000);
+  EXPECT_THROW(venue_units(Json("0.43083x1")), std::exception);
+  EXPECT_THROW(venue_units(Json("abc")), std::exception);
+  // settings stay strict
+  EXPECT_THROW(units("0.4308331"), std::exception);
+}
+
+namespace {
+std::map<std::string, Intent> long_decimal_intent() {
+  Intent i;
+  i.id = "o";
+  i.condition = "c";
+  i.token = "t";
+  i.up = "t";
+  i.down = "x";
+  i.limit = 450000;
+  i.stake = 8460000;
+  i.matched_shares = 19636364;
+  i.matched_cost = 8460000;
+  return {{"o", i}};
+}
+Json long_decimal_trade() {
+  return {{"id", "tr"}, {"taker_order_id", "o"}, {"asset_id", "t"}, {"market", "c"},
+          {"status", "CONFIRMED"}, {"side", "BUY"}, {"size", "19.636363636"},
+          {"price", "0.430833333333"}};
+}
+} // namespace
+
+TEST(VenueUnits, AFillWithLongDecimalsParsesWithinTheReplyTotal) {
+  auto t = parse_trade(long_decimal_trade(), long_decimal_intent());
+  EXPECT_EQ(t.shares, 19636364);
+  EXPECT_LE(t.cost, 8460000);
+  EXPECT_GT(t.cost, 8459900);
+}
+
+TEST(VenueUnits, ManyRoundedLegsStayWithinTheReplyTotal) {
+  Json trade = long_decimal_trade();
+  trade["size"] = "3.000000";
+  trade["price"] = "0.43";
+  trade["maker_orders"] = Json::array();
+  for (int n = 0; n < 3; ++n)
+    trade["maker_orders"].push_back(
+        {{"asset_id", "t"}, {"price", "0.43"}, {"matched_amount", "1.0000004"}});
+  auto intents = long_decimal_intent();
+  intents["o"].matched_cost = 1290000 - 1;
+  auto t = parse_trade(trade, intents);
+  EXPECT_EQ(t.cost, 1290000 - 1);
+}
+
+TEST(VenueUnits, ARealOverchargeIsNotHiddenAsRounding) {
+  auto intents = long_decimal_intent();
+  intents["o"].matched_cost = 8000000;
+  EXPECT_GT(parse_trade(long_decimal_trade(), intents).cost, 8000000);
+}
+
+TEST(CanarySpend, AConfirmedMissGivesItsSpendBackAndNeverGoesNegative) {
+  CanaryState state;
+  state.spend = 25040000;
+  refund_missed_spend(state, 7400000);
+  EXPECT_EQ(state.spend, 17640000);
+  refund_missed_spend(state, 99000000);
+  EXPECT_EQ(state.spend, 0);
+}

@@ -117,6 +117,33 @@ inline std::string fixed6(double x) {
     throw std::overflow_error("decimal overflow");
   return std::string(buf, r.ptr);
 }
+// A quantity the venue reports about a trade that already happened. The venue
+// can send more than six places (an average price, say), and refusing it would
+// leave a real fill unbooked, so this rounds to the nearest micro-unit. Settings
+// and signed amounts keep the strict units().
+inline Units venue_units(const Json &j) {
+  if (!j.is_string())
+    return units(fixed6(j.get<double>()));
+  std::string s = j.get<std::string>();
+  auto dot = s.find('.');
+  if (dot == std::string::npos || s.size() - dot - 1 <= 6)
+    return units(s);
+  for (std::size_t i = dot + 7; i < s.size(); ++i)
+    if (s[i] < '0' || s[i] > '9')
+      throw std::invalid_argument("invalid decimal");
+  bool up = s[dot + 7] >= '5';
+  Units kept = units(s.substr(0, dot + 7));
+  if (!up)
+    return kept;
+  if (s[0] == '-') {
+    if (kept == std::numeric_limits<Units>::min())
+      throw std::overflow_error("rounded venue quantity overflow");
+    return kept - 1;
+  }
+  if (kept == std::numeric_limits<Units>::max())
+    throw std::overflow_error("rounded venue quantity overflow");
+  return kept + 1;
+}
 inline Units as_units(const Json &j) {
   if (j.is_string())
     return units(j.get<std::string>());

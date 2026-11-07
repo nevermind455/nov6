@@ -233,8 +233,8 @@ ParsedTrade parse_trade(const Json &j,
   auto &i = it->second;
   if (i.token != t.token || i.condition != t.condition || j.at("side") != "BUY")
     throw std::runtime_error("fill identity disagrees with authorized order");
-  t.shares = as_units(j.at("size"));
-  auto price = as_units(j.at("price"));
+  t.shares = venue_units(j.at("size"));
+  auto price = venue_units(j.at("price"));
   if (t.shares <= 0 || price <= 0 || price >= U)
     throw std::runtime_error("invalid private fill");
   if (i.fee_rate < 0 || i.fee_rate > U || i.fee_exponent < 1 ||
@@ -249,8 +249,8 @@ ParsedTrade parse_trade(const Json &j,
       !j.at("maker_orders").empty()) {
     Units size = 0, cost = 0, fees = 0;
     for (auto &leg : j.at("maker_orders")) {
-      auto p = as_units(leg.at("price")),
-           sh = as_units(leg.at("matched_amount"));
+      auto p = venue_units(leg.at("price")),
+           sh = venue_units(leg.at("matched_amount"));
       if (sh <= 0 || p <= 0 || p >= U)
         throw std::runtime_error("invalid maker leg");
       if (leg.at("asset_id") != t.token) {
@@ -269,10 +269,27 @@ ParsedTrade parse_trade(const Json &j,
       add(cost, multiply(sh, p));
       add(fees, fee_total(sh, p, i.fee_rate, i.fee_exponent));
     }
-    if (std::abs(size - t.shares) > 1)
+    // each rounded leg can be off by one micro-unit
+    const Units dust = static_cast<Units>(j.at("maker_orders").size());
+    if (std::abs(size - t.shares) > dust)
       throw std::runtime_error("maker legs do not match trade size");
     t.cost = cost;
     t.fee = fees;
+  }
+  // Rounding must not trip the ledger's limits, so take that dust off: half a
+  // micro-unit of price per share, and a micro-unit per leg. A larger excess is
+  // left alone for the ledger to refuse.
+  Units legs = j.contains("maker_orders") && j.at("maker_orders").is_array()
+                   ? static_cast<Units>(j.at("maker_orders").size())
+                   : 0;
+  const Units allowed = legs + t.shares / U + 1;
+  for (Units cap : {i.matched_cost, i.stake}) {
+    if (cap <= 0)
+      continue;
+    const auto room = static_cast<__int128>(cap) - i.booked_cost;
+    if (room >= 0 && t.cost > room &&
+        static_cast<__int128>(t.cost) - room <= allowed)
+      t.cost = static_cast<Units>(room);
   }
   return t;
 }

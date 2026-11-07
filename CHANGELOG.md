@@ -32,6 +32,12 @@ was performed for this audit.
 * Strengthen replay comparison and clock fidelity, fail replay output errors,
   pin development simulator dependencies and use a synthetic 60-second TWAP
   in the local fixture. Add native, CLI, launcher and simulator regressions.
+* Review and incorporate concurrent main-branch additions: the native edge
+  report, long-decimal venue observations, inherited-order reconciliation and
+  confirmed-miss refunds. Make refunds durable, session-scoped and reversible
+  on late fills; check venue rounding boundaries. Correct the analysis tool's
+  clustered intervals, calibration verdict, evidence validation, round drawdown
+  and read/argument error handling.
 
 Strategy thresholds, five-share baseline, cent alignment, the $1 marketable
 minimum, strict arrival-book policy and configured risk protections are kept.

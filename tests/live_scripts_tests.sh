@@ -153,4 +153,19 @@ grep -qF 'finish the 24-hour paper run first' "$fixture/output"
 awk 'BEGIN { for (i = 0; i <= 1440; ++i) printf "{\"result\":\"summary\",\"wall\":%d}\n", 1700000000 + i * 60 }' > "$fixture/state/paper/sniper.jsonl"
 run 0 --dash
 expect_arguments --dash
+
+# The real preparation script must satisfy the first-session protection and
+# retain the repository's higher budget once the installation has prior state.
+cp "$sniper_root/scripts/prepare-live.sh" "$fixture/scripts/"
+printf 'SNIPER_SLIP=0.02\n' > "$fixture/.env"
+rm "$fixture/.env.live"
+bash "$fixture/scripts/prepare-live.sh" > /dev/null
+grep -qx 'SNIPER_CANARY_MAX_LOSS_USD=5' "$fixture/.env.live"
+grep -qx 'SNIPER_KELLY=1' "$fixture/.env.live"
+run 0
+mkdir -p "$fixture/state/live"
+printf '{}\n' > "$fixture/state/live/live_canary_state.json"
+bash "$fixture/scripts/prepare-live.sh" > /dev/null
+grep -qx 'SNIPER_CANARY_MAX_LOSS_USD=100' "$fixture/.env.live"
+run 0
 printf 'Live launcher checks passed (no real network or orders).\n'

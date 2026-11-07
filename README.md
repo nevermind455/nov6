@@ -24,6 +24,11 @@ transport, recovery, balance, market-validation and reporting fixes, their
 regressions, and the limits of the available trading evidence. The native
 strategy thresholds and risk protections remain in place. Only legacy CTF v1
 markets are supported; newer market protocols refuse trading.
+It also covers the native read-only `sniper-edge-report` received during the
+audit. Run `./bin/sniper-edge-report state/paper/sniper.jsonl` to analyze
+settled fills with round-clustered intervals. Incomplete/untraceable evidence
+returns a nonzero status; a profitable simulated sample does not establish
+future live returns.
 
 ## What changed in 1.1.0
 

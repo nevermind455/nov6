@@ -1,0 +1,36 @@
+[0/1] Re-running CMake...
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /src/build-audit
+[1/8] Building CXX object CMakeFiles/sniper_core.dir/src/storage.cpp.o
+[2/8] Linking CXX static library libsniper_core.a
+[3/8] Linking CXX executable sniper-cpp
+[4/8] Linking CXX executable sniper-replay
+[5/8] Linking CXX executable sniper-diff
+[6/8] Building CXX object CMakeFiles/sniper-tests.dir/tests/audit_ledger_crypto_tests.cpp.o
+[7/8] Linking CXX executable sniper-bench
+[8/8] Linking CXX executable sniper-tests
+Internal ctest changing into directory: /src/build-audit
+Test project /src/build-audit
+    Start 1: native_suite
+1/4 Test #1: native_suite .....................   Passed    3.78 sec
+    Start 2: comparison_cli
+2/4 Test #2: comparison_cli ...................   Passed    0.02 sec
+    Start 3: runtime_io
+3/4 Test #3: runtime_io .......................   Passed    0.20 sec
+    Start 4: edge_report_cli
+4/4 Test #4: edge_report_cli ..................   Passed    0.02 sec
+
+100% tests passed, 0 tests failed out of 4
+
+Total Test time (real) =   4.02 sec
+-- Install configuration: ""
+-- Installing: /src/bin/./sniper-edge-report
+-- Installing: /src/bin/./sniper-diff
+-- Set non-toolchain portion of runtime path of "/src/bin/./sniper-diff" to "$ORIGIN/lib:$ORIGIN/../lib"
+-- Installing: /src/bin/./sniper-replay
+-- Set non-toolchain portion of runtime path of "/src/bin/./sniper-replay" to "$ORIGIN/lib:$ORIGIN/../lib"
+-- Installing: /src/bin/./sniper-cpp
+-- Set non-toolchain portion of runtime path of "/src/bin/./sniper-cpp" to "$ORIGIN/lib:$ORIGIN/../lib"
+-- Installing: /src/bin/./sniper-tests
+-- Set non-toolchain portion of runtime path of "/src/bin/./sniper-tests" to "$ORIGIN/lib:$ORIGIN/../lib"

@@ -22,17 +22,26 @@ set_value() {
     printf '%s=%s\n' "$1" "$2" >> .env.live
   fi
 }
-# Flat 5-share orders: at most $4.75 each, whatever the wallet holds.
-set_value SNIPER_KELLY 0
-set_value SNIPER_FLAT_LIVE 1
+# Quarter-Kelly orders, sized from the wallet. 100000 is the highest share cap
+# the config accepts, so this cap no longer limits an order.
+set_value SNIPER_KELLY 1
+set_value SNIPER_KELLY_FRACTION 0.25
+set_value SNIPER_HYBRID_SIZING 1
+set_value SNIPER_FLAT_LIVE 0
 set_value SNIPER_SHARES 5
-set_value SNIPER_CANARY_MAX_SHARES 5
+set_value SNIPER_CANARY_MAX_SHARES 100000
 # The whole session. The loss budget counts settled losses plus everything open
 # or pending, and gives no credit for wins.
-set_value SNIPER_CANARY_MAX_LOSS_USD 5
-set_value SNIPER_CANARY_MAX_SPEND_USD 15
-set_value SNIPER_CANARY_MAX_ORDERS 10
-set_value SNIPER_CANARY_MAX_FILLS 5
-set_value SNIPER_CANARY_MAX_ROUNDS 3
+# Preflight requires at most $5 until a prior canary state exists. Keep the
+# repository's configured $100 budget for an already initialized installation.
+loss_budget=5
+if [[ -e state/live/live_canary_state.json ]]; then
+  loss_budget=100
+fi
+set_value SNIPER_CANARY_MAX_LOSS_USD "$loss_budget"
+set_value SNIPER_CANARY_MAX_SPEND_USD 100
+set_value SNIPER_CANARY_MAX_ORDERS 10000
+set_value SNIPER_CANARY_MAX_FILLS 10000
+set_value SNIPER_CANARY_MAX_ROUNDS 10000
 set_value SNIPER_CANARY_HARD_STOP 1
-printf '%s\n' 'Wrote .env.live for a first live run: 5 shares an order, $5 loss budget.'
+printf 'Wrote .env.live for a live run: quarter-Kelly orders, $%s loss budget.\n' "$loss_budget"

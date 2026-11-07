@@ -1,0 +1,12 @@
+EDGE REPORT  reports/public_paper_audit.jsonl
+
+VERDICT: NO DATA
+  no settled fills to judge
+
+SAMPLE
+  settled fills 0 in 0 rounds
+  left out: 0 not settled yet, 0 with no token match
+  50/50 resolutions 0, refused 0, skipped rows 19, error rows 0
+
+Paper fills are simulated. Intervals describe the supplied settled sample,
+not a guarantee of future or live profitability.

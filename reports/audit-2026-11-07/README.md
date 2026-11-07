@@ -4,7 +4,7 @@ These artifacts belong to the 7 November 2026 audit, rather than the historical
 release measurements in the parent directory. They contain synthetic test
 evidence and public, unauthenticated market data. No funded order was sent.
 
-* `native-tests.log`: complete normal CTest output (115 GoogleTests plus CLI
+* `native-tests.log`: complete normal CTest output (146 GoogleTests plus CLI
   and process I/O regressions).
 * `sanitizer-tests.log`: the same suite with ASan, UBSan, float-cast-overflow,
   `detect_leaks=1`, `abort_on_error=1` and `halt_on_error=1`.
@@ -21,6 +21,10 @@ evidence and public, unauthenticated market data. No funded order was sent.
   boundary, and a 270-second dashboard run at two terminal sizes. There were
   1,397 signals, five paper orders, one synthetic fill, no runtime errors and
   zero real submission calls. These are fixture results, not live performance.
+  The accompanying `paper-ledger.json` and `paper-execution-audit.jsonl` allow
+  the native edge report to trace the synthetic fill; `synthetic-edge-report.txt`
+  correctly refuses an edge conclusion for one round. `public-edge-report.txt`
+  reports NO DATA for the checked-in public-feed journal with zero fills.
 * `public-event.json`, `public-market.json`, `public-book.json`: read-only
   responses observed on 7 November around 10:36–10:37 UTC, from:
   `https://gamma-api.polymarket.com/events/slug/btc-updown-5m-1794047700`,

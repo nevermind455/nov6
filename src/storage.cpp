@@ -230,6 +230,7 @@ Json intent_json(const Intent &i) {
           {"trades", i.trades},
           {"fill_slot", i.fill_slot},
           {"canary_slot_owned", i.canary_slot_owned},
+          {"canary_spend_released", i.canary_spend_released},
           {"canary_session", i.canary_session},
           {"min_entry", i.min_entry},
           {"sent_wall", i.sent_wall}};
@@ -260,6 +261,7 @@ Intent intent_from_json(const Json &j) {
   i.trades = j.at("trades").get<std::vector<std::string>>();
   i.fill_slot = j.at("fill_slot");
   i.canary_slot_owned = j.value("canary_slot_owned", false);
+  i.canary_spend_released = j.value("canary_spend_released", false);
   i.canary_session = j.value("canary_session", 0.0);
   i.min_entry = j.at("min_entry");
   i.sent_wall = j.at("sent_wall");
@@ -316,10 +318,20 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
   }
   for (auto &[id, i] : orders)
     reindex(id);
+  // The earlier refund implementation persisted a zero-match status followed
+  // immediately by a reduced canary state, without identifying its order in
+  // that second event. Recover that attribution from the retained WAL, even
+  // when a snapshot has already absorbed both events.
+  std::optional<Units> historical_spend;
+  double historical_session = 0;
+  std::optional<std::string> legacy_miss;
+  std::map<std::string, bool> historical_released;
+  std::set<double> unsafe_refund_sessions;
   wal_.replay([&](std::uint64_t seq, const Json &e) {
+    const auto type = e.at("type").get<std::string>();
     // The retained authorization event identifies the original session even
     // for snapshots written before slot ownership fields were introduced.
-    if (e.at("type") == "intent") {
+    if (type == "intent") {
       auto id = e.at("intent").at("id").get<std::string>();
       auto it = orders.find(id);
       if (it != orders.end() && e.at("intent").value("fill_slot", false)) {
@@ -327,9 +339,50 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
         it->second.canary_session = e.at("canary").value("started", 0.0);
       }
     }
+    if (type == "canary" && legacy_miss && historical_spend) {
+      auto it = orders.find(*legacy_miss);
+      const auto &state = e.at("state");
+      if (it != orders.end() && it->second.canary_slot_owned &&
+          it->second.stake >= 0 && state.value("started", 0.0) == historical_session) {
+        const auto expected = std::max<__int128>(0, static_cast<__int128>(*historical_spend) - it->second.stake);
+        if (state.at("spend").get<Units>() == expected && expected < *historical_spend) {
+          if (historical_released[it->first] || it->second.canary_session != historical_session)
+            unsafe_refund_sessions.insert(historical_session);
+          historical_released[it->first] = true;
+          it->second.canary_spend_released = true;
+        }
+      }
+    }
+    legacy_miss.reset();
+    if (type == "intent" || type == "canary") {
+      const auto &state = e.at(type == "intent" ? "canary" : "state");
+      historical_spend = state.at("spend").get<Units>();
+      historical_session = state.value("started", 0.0);
+      if (type == "intent")
+        historical_released[e.at("intent").at("id").get<std::string>()] =
+            e.at("intent").value("canary_spend_released", false);
+    } else if (type == "release_spend" || type == "restore_spend") {
+      auto id = e.at("id").get<std::string>();
+      const bool released = type == "release_spend";
+      const auto &intent = orders.at(id);
+      if (historical_spend && historical_released[id] != released &&
+          intent.canary_session == historical_session) {
+        historical_spend = released
+            ? checked_money(std::max<__int128>(0, static_cast<__int128>(*historical_spend) - intent.stake))
+            : checked_money(static_cast<__int128>(*historical_spend) + intent.stake);
+      }
+      historical_released[id] = released;
+      if (seq <= snapshot_seq)
+        orders.at(id).canary_spend_released = released;
+    } else if (type == "status" && e.at("status") == "no_match" &&
+               e.at("shares").get<Units>() == 0 && e.at("cost").get<Units>() == 0) {
+      legacy_miss = e.at("id").get<std::string>();
+    }
     if (seq > snapshot_seq)
       apply(e);
   });
+  if (unsafe_refund_sessions.count(canary.started))
+    throw std::runtime_error("legacy canary refund history disagrees with the current session; reconcile its budget before restart");
   if (!has_snapshot && wal_.sequence() != 0)
     throw std::runtime_error("ledger snapshot missing for existing history; initial cash is ambiguous");
   if (snapshot_seq > wal_.sequence())
@@ -434,6 +487,26 @@ void Ledger::apply(const Json &e) {
           throw std::overflow_error("canary fill count overflow");
         ++canary.fills;
       }
+    }
+  } else if (type == "release_spend") {
+    auto &i = orders.at(e.at("id").get<std::string>());
+    if (i.canary_slot_owned && !i.canary_spend_released &&
+        i.status == "no_match" && i.matched_shares == 0 && i.booked_shares == 0) {
+      if (i.stake < 0)
+        throw std::runtime_error("negative authorized canary spend");
+      i.canary_spend_released = true;
+      if (i.canary_session == canary.started)
+        canary.spend = checked_money(std::max<__int128>(0, static_cast<__int128>(canary.spend) - i.stake));
+    }
+  } else if (type == "restore_spend") {
+    auto &i = orders.at(e.at("id").get<std::string>());
+    if (i.canary_slot_owned && i.canary_spend_released &&
+        (i.matched_shares > 0 || i.booked_shares > 0)) {
+      if (i.stake < 0)
+        throw std::runtime_error("negative authorized canary spend");
+      if (i.canary_session == canary.started)
+        canary.spend = checked_money(static_cast<__int128>(canary.spend) + i.stake);
+      i.canary_spend_released = false;
     }
   } else if (type == "canary")
     canary.load(e.at("state"));
@@ -575,6 +648,15 @@ void Ledger::release_fill_slot(std::string_view id) {
     return;
   commit({{"type", "release_slot"}, {"id", id}});
 }
+void Ledger::release_missed_spend(std::string_view id) {
+  const auto &i = orders.at(std::string(id));
+  if (!i.canary_slot_owned || i.canary_spend_released ||
+      i.status != "no_match" || i.matched_shares > 0 || i.booked_shares > 0)
+    return;
+  if (i.stake < 0)
+    throw std::invalid_argument("negative authorized canary spend");
+  commit({{"type", "release_spend"}, {"id", id}});
+}
 void Ledger::restore_fill_slot(std::string_view id) {
   const auto &i = orders.at(std::string(id));
   if (i.canary_slot_owned && !i.fill_slot &&
@@ -582,6 +664,14 @@ void Ledger::restore_fill_slot(std::string_view id) {
     if (i.canary_session == canary.started && canary.fills == std::numeric_limits<Units>::max())
       throw std::overflow_error("canary fill count overflow");
     commit({{"type", "restore_slot"}, {"id", id}});
+  }
+  if (i.canary_slot_owned && i.canary_spend_released &&
+      (i.matched_shares > 0 || i.booked_shares > 0)) {
+    if (i.stake < 0)
+      throw std::invalid_argument("negative authorized canary spend");
+    if (i.canary_session == canary.started)
+      checked_money(static_cast<__int128>(canary.spend) + i.stake);
+    commit({{"type", "restore_spend"}, {"id", id}});
   }
 }
 Units Ledger::holding(std::string_view token_id) const {

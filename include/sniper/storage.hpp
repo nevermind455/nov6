@@ -79,6 +79,7 @@ struct Intent {
   std::vector<std::string> trades;
   bool fill_slot = false, min_entry = false;
   bool canary_slot_owned = false;
+  bool canary_spend_released = false;
   double canary_session = 0;
   double sent_wall = 0;
   bool unresolved() const {
@@ -129,6 +130,7 @@ public:
   void drawdown_pause(double deadline);
   void set_canary(const CanaryState &);
   void release_fill_slot(std::string_view id);
+  void release_missed_spend(std::string_view id);
   Units holding(std::string_view token) const;
   Units risk_shares(std::string_view token) const;
   Units reserved() const;

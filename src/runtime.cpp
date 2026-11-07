@@ -127,6 +127,9 @@ struct Runtime::Impl {
   simdjson::dom::parser parser;
   std::map<std::int64_t, Round> rounds;
   std::set<std::string> subscribed, user_markets;
+  // Orders still open when this run started. New orders wait until the
+  // reconciliation has resolved them; a timed pause would outlast startup.
+  std::set<std::string> inherited_orders;
   std::vector<bool> cb_open, cb_ack;
   std::vector<double> cb_last_tick;
   std::optional<std::uint64_t> sequence;
@@ -290,7 +293,7 @@ struct Runtime::Impl {
         rounds[r.start] = r;
         if (i.unresolved() || i.status == "matched") {
           if (c.live)
-            pause("unresolved native order from previous run", true);
+            inherited_orders.insert(id);
           else
             ledger.status(id, "cancelled");
         }
@@ -1912,6 +1915,13 @@ struct Runtime::Impl {
       return "STOP_LIVE present";
     if (wall_s() < pause_until)
       return pause_reason;
+    for (auto o = inherited_orders.begin(); o != inherited_orders.end();) {
+      auto &i = ledger.orders.at(*o);
+      if (i.unresolved() || i.status == "matched")
+        return "unresolved native order from previous run: " + *o + " (" +
+               i.status + ")";
+      o = inherited_orders.erase(o);
+    }
     if (!sender->ready())
       return "native order connection not ready";
     try {
@@ -1993,13 +2003,16 @@ struct Runtime::Impl {
       bool success = j.value("success", false);
       auto making =
           j.contains("makingAmount") && !j.at("makingAmount").is_null()
-              ? as_units(j.at("makingAmount"))
+              ? venue_units(j.at("makingAmount"))
               : 0;
       auto taking =
           j.contains("takingAmount") && !j.at("takingAmount").is_null()
-              ? as_units(j.at("takingAmount"))
+              ? venue_units(j.at("takingAmount"))
               : 0;
       std::string error = j.value("errorMsg", "");
+      // an HTTP 400 carries its text in "error" instead
+      if (error.empty() && j.contains("error") && j.at("error").is_string())
+        error = j.at("error").get<std::string>();
       if (taking > 0 && making > 0) {
         if (making > intent.stake + 1 ||
             making > multiply(taking, intent.limit) + 1)
@@ -2020,12 +2033,17 @@ struct Runtime::Impl {
         bool miss = lower.find("no orders") != std::string::npos ||
                     lower.find("not fully filled") != std::string::npos;
         ledger.status(id, miss ? "no_match" : "refused");
+        // The venue confirmed nothing traded, so no money was spent. A refusal
+        // for any other reason keeps its spend.
+        if (miss)
+          ledger.release_missed_spend(id);
         ledger.release_fill_slot(id);
         release(id);
         record_reply({{"result", "refused"},
                {"order_id", id},
                {"reason", miss ? "FAK no match" : "venue refused native order"},
-               {"http_status", reply.status}});
+               {"http_status", reply.status},
+               {"venue_reply", j.dump(-1, ' ', true).substr(0, 300)}});
       } else if (success) {
         ledger.status(id, "pending");
         release(id);
@@ -2125,7 +2143,7 @@ struct Runtime::Impl {
             continue;
           }
           if (v.value("type", "") == "CANCELLATION") {
-            auto size = as_units(v.at("size_matched"));
+            auto size = venue_units(v.at("size_matched"));
             ledger.status(id, size ? "matched" : "no_match", size);
             if (!size)
               ledger.release_fill_slot(id);
@@ -2202,6 +2220,10 @@ struct Runtime::Impl {
         out->unresolved.push_back(id);
     out->since =
         ledger.canary.started > 0 ? ledger.canary.started - 5 : wall_s() - 5;
+    // An order from an earlier session still needs its own trades read back.
+    for (auto &[id, i] : ledger.orders)
+      if ((i.unresolved() || i.status == "matched") && i.sent_wall > 0)
+        out->since = std::min(out->since, i.sent_wall - 5);
     try {
       out->auth_mono = mono_s();
       out->auth_time = clock.now(out->auth_mono);
@@ -2354,7 +2376,7 @@ struct Runtime::Impl {
                   if (!j.is_object())
                     throw std::runtime_error("order status is not an object");
                   auto size = j.contains("size_matched")
-                                  ? as_units(j.at("size_matched"))
+                                  ? venue_units(j.at("size_matched"))
                                   : 0;
                   auto status = j.value("status", "");
                   if (status == "MATCHED" || status == "CANCELED" ||

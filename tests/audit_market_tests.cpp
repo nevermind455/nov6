@@ -102,3 +102,22 @@ TEST(AuditMarket, PrivateTradeIdentityAndLegInputsCannotBeEmptyOrMalformed) {
   invalid["maker_orders"] = Json::array({{{"price", "-0.1"}, {"matched_amount", "2"}, {"asset_id", "456"}}});
   EXPECT_THROW(parse_trade(invalid, intents), std::runtime_error);
 }
+TEST(AuditMarket, RoundedTradeDustCannotBecomeNegativeOrOverflow) {
+  Intent intent;
+  intent.id = "order";
+  intent.condition = "condition";
+  intent.token = intent.up = "123";
+  intent.down = "456";
+  intent.stake = 1;
+  intent.matched_cost = 1;
+  intent.booked_cost = 2;
+  std::map<std::string, Intent> intents{{intent.id, intent}};
+  Json trade{{"id", "trade"}, {"taker_order_id", "order"}, {"asset_id", "123"},
+             {"market", "condition"}, {"side", "BUY"}, {"size", "0.000001"},
+             {"price", "0.25"}, {"status", "CONFIRMED"}};
+  EXPECT_EQ(parse_trade(trade, intents).cost, 0);
+  intents.at("order").booked_cost = std::numeric_limits<Units>::max();
+  trade["size"] = "9223372036854.775807";
+  trade["price"] = "0.5";
+  EXPECT_GT(parse_trade(trade, intents).cost, 0);
+}
