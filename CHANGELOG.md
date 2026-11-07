@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — subscription cleanup and paper validation
+
+* Retire book subscriptions when a discovery refresh drops the current or
+  prepared round (identity change) without another round replacing it.
+  `update_hub` used to return early in that case, leaving the old tokens
+  subscribed and active until the next round change. Trading was already
+  blocked there; this fixes the leak. Regression:
+  `AuditRuntime.SubscriptionsFollowOnlyTheCurrentAndPreparedRounds`.
+* Add `docs/PAPER_VALIDATION.md`: VPS paper procedure, where each item is
+  logged and the acceptance checks, with an 11-minute simulated reference run.
+
 ## Unreleased — configurable next-round preparation
 
 * Prepare the next round (subscribe both books, cache its rules) anywhere in

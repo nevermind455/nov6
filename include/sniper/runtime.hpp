@@ -14,6 +14,10 @@ bool refresh_round_rules(Round &current, const Round &fresh);
 // Whether the round after the one containing `now_wall` should be prepared:
 // true anywhere in its last `lead` seconds, so a late tick cannot miss it.
 bool prepare_due(double now_wall, double lead);
+// Book tokens to keep subscribed: both outcomes of the current and the
+// prepared round, and nothing else.
+std::set<std::string> round_tokens(const std::optional<Round> &current,
+                                   const std::optional<Round> &prepared);
 // Start (unix seconds) of the five-minute round containing `now_wall`.
 std::int64_t round_window(double now_wall);
 bool cache_round_rules(std::map<std::string, MarketRules> &, const Round &,
