@@ -6,6 +6,13 @@
   the last `SNIPER_PREPARE_LEAD_S` seconds of the current round (default 60,
   allowed 30-240), instead of only in a fixed 25-30 s slot that a late
   discovery pass could miss. Strategy, sizing and risk are unchanged.
+* Move the preparation timing into `execution::prepare_due` and cover the
+  whole lead window, the old slot, a late tick and the boundary with a
+  regression test.
+* Add p95 to the tick-to-wire benchmark and a websocket book-update latency
+  benchmark (`BookUpdatePercentiles`).
+* Rebuild `bin/` with `scripts/build.sh` on Ubuntu 24.04 / GCC 13 and refresh
+  `reports/SHA256SUMS`.
 
 ## 7 November 2026 — complete-system audit fixes
 
