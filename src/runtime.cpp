@@ -2507,8 +2507,23 @@ struct Runtime::Impl {
                   if (i == ledger.orders.end() ||
                       i->second.status == "confirmed")
                     return;
-                  if (!j.is_object())
-                    throw std::runtime_error("order status is not an object");
+                  if (!j.is_object()) {
+                    // The venue can have no record of a FAK, one still in its
+                    // taker delay or one killed unfilled. Ask again later;
+                    // trade reconciliation still books any fill it made.
+                    if (!missing_fak_is_unfilled(i->second, wall_s()))
+                      return;
+                    ledger.status(id, "no_match", 0);
+                    ledger.release_fill_slot(id);
+                    release(id);
+                    audit({{"result", "order_not_found"},
+                           {"order_id", id},
+                           {"resolved", "no_match"},
+                           {"reason", "the venue has no record of this FAK a "
+                                      "minute after it was sent, and no trade "
+                                      "matched it"}});
+                    return;
+                  }
                   auto size = j.contains("size_matched")
                                   ? venue_units(j.at("size_matched"))
                                   : 0;

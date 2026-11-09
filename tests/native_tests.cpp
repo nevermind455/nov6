@@ -1057,3 +1057,22 @@ TEST(ManualTrades, OnlyTradesWithAnUnknownTakerOrderAreForeign) {
   // a malformed trade is left for parse_trade to refuse
   EXPECT_FALSE(is_foreign_trade({{"id", "t"}}, intents));
 }
+
+TEST(OrderReconciliation, AMissingFakWaitsAMinuteAndNeverHidesAFill) {
+  Intent i;
+  i.sent_wall = 1000.0;
+  // still inside its taker hold or just after: ask again later
+  EXPECT_FALSE(missing_fak_is_unfilled(i, 1010.0));
+  EXPECT_FALSE(missing_fak_is_unfilled(i, 1059.9));
+  // a minute later with nothing matched: it did not fill
+  EXPECT_TRUE(missing_fak_is_unfilled(i, 1060.0));
+  // any matched or booked shares keep it open for trade reconciliation
+  i.matched_shares = 1;
+  EXPECT_FALSE(missing_fak_is_unfilled(i, 2000.0));
+  i.matched_shares = 0;
+  i.booked_shares = 1;
+  EXPECT_FALSE(missing_fak_is_unfilled(i, 2000.0));
+  // an order with no send time is never resolved this way
+  Intent unsent;
+  EXPECT_FALSE(missing_fak_is_unfilled(unsent, 1e12));
+}
