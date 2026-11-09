@@ -233,6 +233,7 @@ features. Never copy the old Python bot's entire configuration without review.
 | `SNIPER_DELAY_SOURCE`, `SNIPER_FILL_ODDS` | `model`, `off` | Independent paper model |
 | `SNIPER_BOOK_QUIET` | `0` | Reference opt-in: accept a quiet book at the order's arrival |
 | `SNIPER_PTB_SKIP_CLOSE` | `0` | Optional price-to-beat gate; unvalidated here |
+| `SNIPER_MISS_RETRY`, `SNIPER_MISS_RETRY_MS` | `0`, `1000` | Opt-in: after a confirmed zero-fill FAK miss, decide once more for the same signal (every gate again, same limit rule) if it is younger than this many ms and the Coinbase move still holds. Test in paper first |
 | `SNIPER_CANARY_MAX_SHARES` | `25` | Live order share cap |
 | `SNIPER_CANARY_MAX_ORDERS` | `40` | Initial canary order budget |
 | `SNIPER_CANARY_MAX_FILLS` | `20` | Initial canary fill-slot budget |

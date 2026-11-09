@@ -791,6 +791,9 @@ std::shared_ptr<Plan> Sniper::fire_now(const std::string &side, double r_bp,
     row["signal_mid"] = *t1_mid_;
   if (cb_fresh.last_excess)
     row["coinbase_excess_ms"] = py::round(*cb_fresh.last_excess, 1);
+  if (retry_fields_)
+    for (auto &[k, v] : retry_fields_->items())
+      row[k] = v; // keeps the signal's own window and reference
   try {
     auto plan = decide(side, row, t_ms);
     if (!plan) {
@@ -800,6 +803,7 @@ std::shared_ptr<Plan> Sniper::fire_now(const std::string &side, double r_bp,
     plan->t_ms = t_ms;
     plan->t_ns = t_ns;
     plan->r_bp = r_bp;
+    plan->retry = retry_next_;
     if (env.live()) {
       // _fire_live: the decision-book fields join the row once the order
       // is on its way; a refusal is journalled as a skip, nothing was sent
@@ -821,6 +825,7 @@ std::shared_ptr<Plan> Sniper::fire_now(const std::string &side, double r_bp,
         release(side);
         return nullptr;
       }
+      last_plan_[idx(side)] = plan;
       return plan;
     }
     std::string sign_err;
@@ -869,6 +874,7 @@ std::shared_ptr<Plan> Sniper::fire_now(const std::string &side, double r_bp,
     decision_book(row, *plan);
     plan->row = row;
     dispatched_.push_back(plan);
+    last_plan_[idx(side)] = plan;
     return plan;
   } catch (const std::exception &e) {
     ++n["errors"];
@@ -1244,6 +1250,7 @@ std::shared_ptr<Plan> Sniper::decide(const std::string &side, Json &row,
 void Sniper::finish_paper(const std::shared_ptr<Plan> &plan,
                           const PaperResult &res) {
   Json &row = plan->row;
+  std::string outcome;
   try {
     bankroll_completed(*plan);
     if (!res.arrival.is_null())
@@ -1252,6 +1259,7 @@ void Sniper::finish_paper(const std::shared_ptr<Plan> &plan,
     std::string reason = plan->sign_error.empty() ? res.error : plan->sign_error;
     row["outcome"] = paper_outcome(filled, filled ? "" : reason, row,
                                    s.book_clock != "wake");
+    outcome = row["outcome"].get<std::string>();
     if (!res.arrival.is_null()) {
       const Json &a = res.arrival;
       if (field(a, "evidence") == Json("quiet")) {
@@ -1301,6 +1309,69 @@ void Sniper::finish_paper(const std::shared_ptr<Plan> &plan,
     write(row);
   }
   release(plan->side);
+  if (retryable_outcome(outcome))
+    retry_after_miss(plan->side, plan.get());
+}
+
+bool Sniper::retryable_outcome(const std::string &outcome) {
+  return outcome == "PRICE_CAP_MISS" || outcome == "LIVE_ODDS_MISS" ||
+         outcome == "INSUFFICIENT_LIQUIDITY" || outcome == "MISS_AT_DECISION" ||
+         outcome == "FOK_MISS_AT_WAKE";
+}
+
+void Sniper::retry_after_miss(const std::string &side, const Plan *missed) {
+  if (s.miss_retry <= 0 || closing)
+    return;
+  const int i = idx(side);
+  auto prev = last_plan_[i];
+  if (!prev || (missed && missed != prev.get()))
+    return;
+  last_plan_[i].reset();
+  if (prev->retry >= s.miss_retry) {
+    ++n["miss retry: already re-tried"];
+    return;
+  }
+  const double now_ms = env.mono() * 1000.0;
+  if (!(now_ms - prev->t_ms <= s.miss_retry_ms)) {
+    ++n["miss retry: signal too old"];
+    return;
+  }
+  if (inflight[i]) {
+    ++n["miss retry: order in flight"];
+    return;
+  }
+  // The move must still be there: the latest Coinbase mid against the
+  // signal's own reference, the same way and at least the trigger size.
+  const Json &ref = field(prev->row, "ref_mid");
+  if (!ref.is_number() || !(ref.get<double>() > 0) || !last_mid) {
+    ++n["miss retry: move unknown"];
+    return;
+  }
+  const double r_now = (*last_mid / ref.get<double>() - 1.0) * 1e4;
+  if ((side == "UP" ? r_now : -r_now) < s.k_bp - 1e-9) {
+    ++n["miss retry: move faded"];
+    return;
+  }
+  Json fields{{"retry_of", field(prev->row, "id")},
+              {"retry", prev->retry + 1},
+              {"retry_after_ms", py::round(now_ms - prev->t_ms, 1)},
+              {"ref_mid", ref}};
+  if (field(prev->row, "window_ms").is_number())
+    fields["window_ms"] = field(prev->row, "window_ms");
+  inflight[i] = InFlight{};
+  retry_fields_ = std::move(fields);
+  retry_next_ = prev->retry + 1;
+  t1_mid_ = last_mid;
+  // The signal's own time: the fair value keeps its pre-move anchor, and the
+  // live send guard still refuses it once the trigger has gone stale.
+  auto plan = fire_now(side, r_now, prev->t_ms, prev->t_ns);
+  t1_mid_.reset();
+  retry_fields_.reset();
+  retry_next_ = 0;
+  if (plan) {
+    last_fire_by_side[i] = now_ms;
+    ++n["miss retries"];
+  }
 }
 } // namespace sniper
 

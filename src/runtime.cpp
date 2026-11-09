@@ -1698,6 +1698,11 @@ struct Runtime::Impl {
                     ++paper_fills;
                   sniper->finish_paper(plan, res);
                 });
+    // a re-try decided while an order finished (SNIPER_MISS_RETRY)
+    for (auto &plan : sniper->take_dispatched()) {
+      ++orders_sent;
+      paper->begin(plan, c.s, book);
+    }
     arm_paper_timer();
   }
   void arm_paper_timer() {
@@ -2146,6 +2151,15 @@ struct Runtime::Impl {
                {"reason", miss ? "FAK no match" : "venue refused native order"},
                {"http_status", reply.status},
                {"venue_reply", j.dump(-1, ' ', true).substr(0, 300)}});
+        // SNIPER_MISS_RETRY: one more FAK for the same signal, after this
+        // reply has been handled and through every normal gate again.
+        if (miss && c.s.miss_retry > 0 && !stopping) {
+          const std::string side = intent.side;
+          post("miss retry", [this, side] {
+            if (!stopping && sniper)
+              sniper->retry_after_miss(side);
+          });
+        }
       } else if (success) {
         ledger.status(id, "pending");
         release(id);

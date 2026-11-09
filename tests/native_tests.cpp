@@ -807,7 +807,9 @@ struct LiveStubEnv : SniperEnv {
   std::vector<Json> rows;
   std::string refusal;
   bool halted = false;
+  bool is_live = true;
   int dispatched = 0;
+  std::vector<std::shared_ptr<Plan>> plans;
   LiveStubEnv() {
     rules.condition_id = "0xcond";
     rules.fee_rate = py::D("0.07");
@@ -826,7 +828,7 @@ struct LiveStubEnv : SniperEnv {
   std::string condition_id() override { return "0xcond"; }
   std::optional<double> window_end() override { return wall() + 120.0; }
   BookState &book() override { return books; }
-  bool live() override { return true; }
+  bool live() override { return is_live; }
   std::optional<double> read_bankroll() override { return 1000.0; }
   const MarketRules *cached_rules(const std::string &, bool) override {
     return &rules;
@@ -851,6 +853,7 @@ struct LiveStubEnv : SniperEnv {
   void journal(Json row) override { rows.push_back(std::move(row)); }
   bool dispatch_live(const std::shared_ptr<Plan> &p) override {
     ++dispatched;
+    plans.push_back(p);
     if (refusal.empty())
       return true;
     p->live_refusal = refusal;
@@ -1075,4 +1078,160 @@ TEST(OrderReconciliation, AMissingFakWaitsAMinuteAndNeverHidesAFill) {
   // an order with no send time is never resolved this way
   Intent unsent;
   EXPECT_FALSE(missing_fak_is_unfilled(unsent, 1e12));
+}
+
+namespace {
+// The LiveStubEnv warm-up and +1.2 bp trigger, shared by the re-try tests.
+struct RetryRig {
+  LiveStubEnv env;
+  SniperSettings s;
+  std::unique_ptr<Sniper> sn;
+  long long seq = 1;
+  double mid = 60000;
+  explicit RetryRig(int retry, bool live = true) {
+    env.is_live = live;
+    s.cooldown_ms = 0;
+    s.coinbase_conns = 1;
+    s.miss_retry = retry;
+    sn = std::make_unique<Sniper>(s, env);
+    sn->cb_fresh.enabled = false;
+    for (int i = 0; i < 70; ++i) {
+      env.now += 1;
+      mid *= (i % 2 ? 1.00004 : 0.99996);
+      quote();
+      sn->on_coinbase(live_ticker(seq++, mid), env.now * 1000);
+    }
+    sn->refresh_bankroll(env.now);
+    sn->refresh_hybrid_risk();
+  }
+  void quote() {
+    env.quote("111", ".48", ".50");
+    env.quote("222", ".49", ".51");
+  }
+  void tick() { sn->on_coinbase(live_ticker(seq++, mid), env.now * 1000); }
+  void fire_up() {
+    for (int k = 0; k < 4; ++k) {
+      env.now += 1.0;
+      quote();
+      tick();
+    }
+    env.now += 0.3;
+    quote();
+    tick();
+    sn->refresh_bankroll(env.now);
+    sn->refresh_hybrid_risk();
+    env.now += 0.01;
+    mid *= 1.00012;
+    tick();
+  }
+  // the venue answers `ms` later with no match; the runtime releases the side
+  void miss_after(double ms) {
+    env.now += ms / 1000.0;
+    quote();
+    sn->release("UP");
+    sn->retry_after_miss("UP");
+  }
+  int ups() const {
+    int k = 0;
+    for (auto &p : env.plans)
+      k += p->side == "UP";
+    return k;
+  }
+};
+} // namespace
+
+TEST(MissRetry, OneReTryForTheSameSignalThroughEveryGate) {
+  RetryRig rig(1);
+  rig.fire_up();
+  ASSERT_EQ(rig.ups(), 1);
+  rig.miss_after(300);
+  ASSERT_EQ(rig.ups(), 2);
+  auto &first = *rig.env.plans[0], &again = *rig.env.plans[1];
+  EXPECT_EQ(again.row.value("retry_of", ""), first.row.value("id", ""));
+  EXPECT_EQ(again.row.value("retry", 0), 1);
+  EXPECT_EQ(again.retry, 1);
+  EXPECT_DOUBLE_EQ(again.row.value("ref_mid", 0.0), first.row.value("ref_mid", 0.0));
+  // the signal's own time, so the live send guard still sees its true age
+  EXPECT_DOUBLE_EQ(again.t_ms, first.t_ms);
+  EXPECT_EQ(rig.sn->n["miss retries"], 1u);
+  // the re-try missed as well: never a second one for the same signal
+  rig.miss_after(300);
+  EXPECT_EQ(rig.ups(), 2);
+  EXPECT_EQ(rig.sn->n["miss retry: already re-tried"], 1u);
+}
+
+TEST(MissRetry, NotForAnOldSignalAFadedMoveOrWhenOff) {
+  RetryRig rig(1);
+  rig.fire_up();
+  rig.miss_after(1500); // later than SNIPER_MISS_RETRY_MS
+  EXPECT_EQ(rig.ups(), 1);
+  EXPECT_EQ(rig.sn->n["miss retry: signal too old"], 1u);
+
+  rig.env.now += 2.0;
+  rig.fire_up();
+  ASSERT_EQ(rig.ups(), 2);
+  rig.env.now += 0.05;
+  rig.mid /= 1.00010; // BTC gave most of the move back
+  rig.tick();
+  rig.miss_after(200);
+  EXPECT_EQ(rig.ups(), 2);
+  EXPECT_EQ(rig.sn->n["miss retry: move faded"], 1u);
+
+  RetryRig off(0);
+  off.fire_up();
+  off.miss_after(300);
+  EXPECT_EQ(off.ups(), 1);
+  EXPECT_EQ(off.sn->n["miss retries"], 0u);
+}
+
+TEST(MissRetry, PaperRetriesOnlyAZeroFillMiss) {
+  RetryRig rig(1, /*live=*/false);
+  rig.fire_up();
+  auto sent = rig.sn->take_dispatched();
+  ASSERT_EQ(sent.size(), 1u);
+  rig.env.now += 0.3;
+  rig.quote();
+  PaperResult miss;
+  miss.error = "FAK no-fill at the arrival book";
+  rig.sn->finish_paper(sent[0], miss);
+  auto again = rig.sn->take_dispatched();
+  ASSERT_EQ(again.size(), 1u);
+  EXPECT_EQ(again[0]->retry, 1);
+  EXPECT_EQ(again[0]->row.value("retry_of", ""), sent[0]->row.value("id", ""));
+  // its own miss gets no further re-try
+  rig.env.now += 0.3;
+  rig.sn->finish_paper(again[0], miss);
+  EXPECT_TRUE(rig.sn->take_dispatched().empty());
+
+  // a refusal that is not a price miss is never re-tried
+  rig.env.now += 2.0;
+  rig.fire_up();
+  auto next = rig.sn->take_dispatched();
+  ASSERT_EQ(next.size(), 1u);
+  PaperResult rejected;
+  rejected.error = "order size 3 shares is below venue minimum 5";
+  rig.sn->finish_paper(next[0], rejected);
+  EXPECT_TRUE(rig.sn->take_dispatched().empty());
+}
+
+TEST(MissRetry, OutcomesAndSettings) {
+  for (auto o : {"PRICE_CAP_MISS", "LIVE_ODDS_MISS", "INSUFFICIENT_LIQUIDITY",
+                 "MISS_AT_DECISION", "FOK_MISS_AT_WAKE"})
+    EXPECT_TRUE(Sniper::retryable_outcome(o)) << o;
+  for (auto o : {"FILLED", "TECHNICAL_ERROR", "BELOW_VENUE_MINIMUM", "STALE_BOOK",
+                 "SPREAD_TOO_WIDE", "UNKNOWN_BOOK_STATE"})
+    EXPECT_FALSE(Sniper::retryable_outcome(o)) << o;
+  auto s = sniper_settings(std::map<std::string, std::string>{});
+  EXPECT_EQ(s.miss_retry, 0); // off unless asked for
+  EXPECT_DOUBLE_EQ(s.miss_retry_ms, 1000);
+  s = sniper_settings(std::map<std::string, std::string>{
+      {"SNIPER_MISS_RETRY", "1"}, {"SNIPER_MISS_RETRY_MS", "800"}});
+  EXPECT_EQ(s.miss_retry, 1);
+  EXPECT_DOUBLE_EQ(s.miss_retry_ms, 800);
+  EXPECT_THROW(sniper_settings(std::map<std::string, std::string>{
+                   {"SNIPER_MISS_RETRY", "2"}}),
+               std::invalid_argument);
+  EXPECT_THROW(sniper_settings(std::map<std::string, std::string>{
+                   {"SNIPER_MISS_RETRY_MS", "0"}}),
+               std::invalid_argument);
 }

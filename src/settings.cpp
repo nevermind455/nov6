@@ -167,6 +167,8 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
   s.ptb_min_checks = ptb_min_checks;
   s.ptb_skip_close = env_bool("SNIPER_PTB_SKIP_CLOSE", false);
   s.venue_min_shares = env_float("SNIPER_VENUE_MIN_SHARES", 0);
+  s.miss_retry = env_int("SNIPER_MISS_RETRY", 0);
+  s.miss_retry_ms = env_float("SNIPER_MISS_RETRY_MS", 1000);
   {
     std::string raw = strip(text("SNIPER_PAPER_CASH_FROM", ""));
     std::string l = lower(raw);
@@ -327,6 +329,14 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
            " (whole shares, 0 to 5; 0 = the venue's own)"},
       {s.venue_min_shares == 0 || s.order_sizing == "shares",
        "SNIPER_VENUE_MIN_SHARES needs SNIPER_ORDER_SIZING=shares"},
+      {s.miss_retry == 0 || s.miss_retry == 1,
+       "SNIPER_MISS_RETRY=" + std::to_string(s.miss_retry) +
+           " (0 = off, 1 = one re-try after a confirmed miss)"},
+      {s.miss_retry_ms > 0 && s.miss_retry_ms <= 5000,
+       "SNIPER_MISS_RETRY_MS=" + g(s.miss_retry_ms) +
+           " (must be > 0 and at most 5000)"},
+      {s.miss_retry == 0 || s.order_type == "FAK",
+       "SNIPER_MISS_RETRY needs SNIPER_ORDER_TYPE=FAK"},
       {paper_cash_max_age_s > 0, "SNIPER_PAPER_CASH_MAX_AGE_S=" +
                                      g(paper_cash_max_age_s) +
                                      " (must be > 0)"},

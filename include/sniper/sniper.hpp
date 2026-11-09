@@ -62,6 +62,10 @@ struct SniperSettings {
   std::string backlog_gate = "count";
   double backlog_fresh_ms = 100;
   double venue_min_shares = 0;
+  // One more FAK after a confirmed zero-fill miss, while the signal is fresh
+  // and its move still holds. 0 = off (the reference behaviour).
+  int miss_retry = 0;
+  double miss_retry_ms = 1000;
   bool ptb_skip_close = false;
   double ptb_margin_bp = 1.0;
   std::string primary_feed = "coinbase";
@@ -192,6 +196,7 @@ struct Plan {
   Json row;      // the decision row, journalled when the outcome is known
   BookView view; // the book the decision saw
   double r_bp = 0;
+  int retry = 0; // 0 for a signal's order, 1 for its re-try after a miss
   std::int64_t t_ns = 0, decided_ns = 0, built_ns = 0, signed_ns = 0,
                sent_ns = 0;
 };
@@ -252,6 +257,14 @@ public:
   void finish_paper(const std::shared_ptr<Plan> &, const PaperResult &);
   // Release a side without an outcome row (live path does its own rows).
   void release(const std::string &side) { inflight[idx(side)].reset(); }
+  // After a confirmed zero-fill miss on this side (released already): with
+  // SNIPER_MISS_RETRY=1, decide once more for the same signal, through every
+  // normal gate, if it is younger than SNIPER_MISS_RETRY_MS and the latest
+  // Coinbase mid still holds the trigger move. `missed`, when given, must be
+  // the side's last order.
+  void retry_after_miss(const std::string &side, const Plan *missed = nullptr);
+  // The paper outcomes that are a zero-fill miss of the order's own price.
+  static bool retryable_outcome(const std::string &outcome);
   // _set_bankroll(_read_bankroll(), read_at)
   void refresh_bankroll(double read_at);
   // _refresh_hybrid_risk: worker-only accounting refresh
@@ -287,6 +300,9 @@ private:
   std::vector<std::shared_ptr<Plan>> dispatched_;
   std::int64_t t1_ns_ = 0;
   std::optional<double> t1_mid_;
+  std::shared_ptr<Plan> last_plan_[2]; // each side's last order sent
+  std::optional<Json> retry_fields_;   // joined to a re-try's decision row
+  int retry_next_ = 0;
 
   void signal(double mid, double t_ms, std::int64_t t_ns);
   std::shared_ptr<Plan> fire_now(const std::string &side, double r_bp,
