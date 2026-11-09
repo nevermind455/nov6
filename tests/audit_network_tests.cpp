@@ -135,6 +135,21 @@ TEST(AuditNetwork, WebsocketRequiresTlsAndFinitePositiveSilence) {
                  std::invalid_argument);
 }
 
+TEST(AuditNetwork, TcpLatencyOptionsAreVerifiedBeforeProtocolSetup) {
+  net::io_context io;
+  tcp::socket socket(io);
+  // An unavailable socket must not be advertised as configured/ready.
+  EXPECT_TRUE(transport::configure_tcp_socket(socket));
+  socket.open(tcp::v4());
+  ASSERT_FALSE(transport::configure_tcp_socket(socket));
+  tcp::no_delay no_delay;
+  net::socket_base::keep_alive keep_alive;
+  socket.get_option(no_delay);
+  socket.get_option(keep_alive);
+  EXPECT_TRUE(no_delay.value());
+  EXPECT_TRUE(keep_alive.value());
+}
+
 TEST(AuditNetwork, Http2SetupDeadlineAndRepeatedStartHaveOneRetry) {
   net::io_context io;
   net::ssl::context tls(net::ssl::context::tls_client);

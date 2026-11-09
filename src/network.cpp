@@ -17,6 +17,26 @@ namespace beast = boost::beast;
 namespace http = beast::http;
 namespace ws = beast::websocket;
 using tcp = net::ip::tcp;
+boost::system::error_code transport::configure_tcp_socket(tcp::socket &socket) {
+  beast::error_code ec;
+  socket.set_option(tcp::no_delay(true), ec);
+  if (ec)
+    return ec;
+  socket.set_option(net::socket_base::keep_alive(true), ec);
+  if (ec)
+    return ec;
+  tcp::no_delay no_delay;
+  net::socket_base::keep_alive keep_alive;
+  socket.get_option(no_delay, ec);
+  if (ec)
+    return ec;
+  socket.get_option(keep_alive, ec);
+  if (ec)
+    return ec;
+  if (!no_delay.value() || !keep_alive.value())
+    return net::error::operation_not_supported;
+  return {};
+}
 Url Url::parse(std::string_view value) {
   Url u;
   auto p = value.find("://");
@@ -236,6 +256,9 @@ HttpResult RestClient::request(std::string_view method,
             addresses, [&](beast::error_code ec, const auto &) {
               if (ec)
                 return finish(ec);
+              if (auto options = transport::configure_tcp_socket(
+                      beast::get_lowest_layer(stream).socket()))
+                return finish(options);
               if (!proxy) {
                 tls();
                 return;
@@ -379,6 +402,9 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
                 if (!self->current(p))
                   return;
                 if (ec)
+                  return self->fail(p);
+                if (transport::configure_tcp_socket(
+                        beast::get_lowest_layer(p->socket).socket()))
                   return self->fail(p);
                 if (!proxy)
                   return self->tls(p);

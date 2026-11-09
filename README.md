@@ -35,6 +35,26 @@ control, missed opportunity, unfilled, venue rejection, software failure or
 unknown outcome), and live orders are followed from send to acknowledgement
 to fill with per-stage latency. See `docs/MISSED_ORDERS.md`.
 
+## Execution latency and VPS measurements
+
+The order sender reuses its HTTP/2 TLS connection, and WebSocket feeds drive
+decisions directly. Discovery and recovery REST requests stay in background
+work. Timing evidence separates the receive/decision path, pre-send checks,
+signing, durable authorization, complete socket write, acknowledgement and
+confirmed-trade receipt. Strategy rules and risk checks remain in place.
+
+On the AMS3 VPS, run the native read-only probe:
+
+```bash
+./bin/sniper-net-probe --label ams3 --samples 100 --interval-ms 200 > ams3-latency.json
+```
+
+It requests public GET `/time` and needs no wallet credentials. Compare results
+from actual candidate hosts with equivalent proxy routes. Request RTT includes
+network and server response time; it does not isolate an exchange-imposed hold.
+See [execution latency and VPS measurements](docs/EXECUTION_LATENCY.md) for
+stage definitions, signing constraints and interpretation.
+
 ## What changed in 1.1.0
 
 * **Decisions now follow the reference exactly**: gate order, skip texts,

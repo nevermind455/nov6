@@ -1,6 +1,7 @@
 #pragma once
 #include "crypto.hpp"
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/context.hpp>
 #include <functional>
 #include <memory>
@@ -11,6 +12,12 @@ struct Url {
   std::string authority(bool include_default_port = false) const;
 };
 std::optional<Url> connect_proxy_for(const Url &);
+namespace transport {
+// Apply and verify once after TCP connect, before CONNECT/TLS. Application
+// watchdogs and heartbeats still decide readiness; kernel keepalive is extra.
+boost::system::error_code
+configure_tcp_socket(boost::asio::ip::tcp::socket &);
+} // namespace transport
 struct HttpResult {
   int status = 0;
   std::string body;
@@ -53,6 +60,11 @@ struct H2Callbacks {
   std::function<void(std::string_view, const HttpResult &)> reply;
   std::function<void(std::string_view, std::string_view)> unknown;
 };
+struct H2ConnectionInfo {
+  std::uint64_t generation = 0;
+  std::int64_t ready_ns = 0;
+  bool tcp_no_delay = false, tcp_keep_alive = false;
+};
 class H2Client {
   struct Impl;
   std::shared_ptr<Impl> p_;
@@ -66,6 +78,9 @@ public:
   void start();
   void stop();
   bool ready() const;
+  // A snapshot of the currently negotiated session, not a new socket query.
+  // Absence means no ready connection; generations change after reconnects.
+  std::optional<H2ConnectionInfo> connection_info() const;
   bool post(std::string id, std::string body, const Headers &headers);
   bool get_time();
 };

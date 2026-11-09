@@ -9,6 +9,7 @@ extern "C" {
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
+#include <type_traits>
 namespace sniper {
 Bytes unhex(std::string_view s) {
   if (s.substr(0, 2) == "0x" || s.substr(0, 2) == "0X")
@@ -82,21 +83,40 @@ std::string checksum_address(std::string_view address) {
   auto b = unhex(address);
   if (b.size() != 20)
     throw std::invalid_argument("invalid address");
-  auto lower = hex(b, false), h = hex(keccak(lower), false);
-  for (std::size_t i = 0; i < lower.size(); ++i)
+  auto lower = hex(b, false);
+  const auto h = keccak(lower);
+  for (std::size_t i = 0; i < lower.size(); ++i) {
+    const auto nibble = i % 2 == 0 ? h[i / 2] >> 4 : h[i / 2] & 15;
     if (lower[i] >= 'a' && lower[i] <= 'f' &&
-        std::stoi(h.substr(i, 1), nullptr, 16) >= 8)
+        nibble >= 8)
       lower[i] = std::toupper(lower[i]);
+  }
   return "0x" + lower;
 }
 static Hash hash_words(std::initializer_list<Hash> words) {
-  Bytes bytes;
-  bytes.reserve(words.size() * 32);
-  for (auto &w : words)
-    bytes.insert(bytes.end(), w.begin(), w.end());
-  return keccak(bytes);
+  // initializer_list owns contiguous, fixed-size word values for this call.
+  // Hash their object bytes directly rather than copying them to a heap vector.
+  static_assert(sizeof(Hash) == 32);
+  const auto bytes = std::as_bytes(std::span(words.begin(), words.size()));
+  return keccak(std::span(
+      reinterpret_cast<const unsigned char *>(bytes.data()), bytes.size()));
+}
+template <class Integer> static Hash native_word(Integer value) {
+  static_assert(std::is_integral_v<Integer> && sizeof(Integer) <= 8);
+  if constexpr (std::is_signed_v<Integer>)
+    if (value < 0)
+      throw std::invalid_argument("uint256 overflow");
+  auto n = static_cast<std::uint64_t>(value);
+  Hash out{};
+  for (int i = 31; i >= 24; --i) {
+    out[i] = static_cast<unsigned char>(n & 255);
+    n >>= 8;
+  }
+  return out;
 }
 static Hash raw32(std::string_view s) {
+  if (s == ZERO32)
+    return {};
   auto b = unhex(s);
   if (b.size() != 32)
     throw std::invalid_argument("bytes32 length");
@@ -105,49 +125,79 @@ static Hash raw32(std::string_view s) {
   return h;
 }
 static Big decimal_token(std::string_view token) {
-  if (!valid_token(token))
+  if (token.empty() || token.size() > 78)
     throw std::invalid_argument("invalid decimal token id");
   Big value = 0;
-  for (char digit : token)
+  for (char digit : token) {
+    if (digit < '0' || digit > '9')
+      throw std::invalid_argument("invalid decimal token id");
     value = value * 10 + (digit - '0');
+  }
+  if (value <= 0 || value >= (Big(1) << 256))
+    throw std::invalid_argument("invalid decimal token id");
   return value;
 }
-Hash order_digest(const UnsignedOrder &o) {
-  if (o.signature_type < 0 || o.signature_type > 2)
-    throw std::invalid_argument("signature type 3 is unsupported");
-  static auto type = keccak(
+static const Hash &order_type_hash() {
+  static const auto type = keccak(
       "Order(uint256 salt,address maker,address signer,uint256 tokenId,uint256 "
       "makerAmount,uint256 takerAmount,uint8 side,uint8 signatureType,uint256 "
       "timestamp,bytes32 metadata,bytes32 builder)");
-  static auto dt = keccak("EIP712Domain(string name,string version,uint256 "
-                          "chainId,address verifyingContract)");
-  auto domain =
-      hash_words({dt, keccak("Polymarket CTF Exchange"), keccak(o.version),
-                  word(137), address_word(o.exchange)});
-  auto structure = hash_words(
-      {type, word(o.salt), address_word(o.maker), address_word(o.signer),
-       word(decimal_token(o.token)), word(o.maker_amount), word(o.taker_amount),
-       word(o.side), word(o.signature_type), word(o.timestamp),
-       raw32(o.metadata), raw32(o.builder)});
-  Bytes message{0x19, 0x01};
-  message.insert(message.end(), domain.begin(), domain.end());
-  message.insert(message.end(), structure.begin(), structure.end());
+  return type;
+}
+static Hash order_domain(std::string_view version, std::string_view exchange) {
+  static const auto type = keccak("EIP712Domain(string name,string version,uint256 "
+                                 "chainId,address verifyingContract)");
+  static const auto name = keccak("Polymarket CTF Exchange");
+  static const auto chain = native_word(137);
+  return hash_words({type, name, keccak(version), chain, address_word(exchange)});
+}
+static const std::array<Hash, 2> &common_order_domains() {
+  static const std::array<Hash, 2> domains{
+      order_domain("2", STANDARD_EXCHANGE), order_domain("2", NEG_EXCHANGE)};
+  return domains;
+}
+static Hash typed_digest(const Hash &domain, const Hash &structure) {
+  std::array<unsigned char, 66> message{};
+  message[0] = 0x19;
+  message[1] = 0x01;
+  std::copy(domain.begin(), domain.end(), message.begin() + 2);
+  std::copy(structure.begin(), structure.end(), message.begin() + 34);
   return keccak(message);
+}
+static Hash order_digest_impl(const UnsignedOrder &o, const Big *parsed_token) {
+  if (o.signature_type < 0 || o.signature_type > 2)
+    throw std::invalid_argument("signature type 3 is unsupported");
+  // Only immutable known domains are cached. Arbitrary public API domains
+  // retain their normal validated encoding and cannot reuse a wrong separator.
+  const auto domain =
+      o.version == "2" && o.exchange == STANDARD_EXCHANGE
+          ? common_order_domains()[0]
+      : o.version == "2" && o.exchange == NEG_EXCHANGE
+          ? common_order_domains()[1]
+          : order_domain(o.version, o.exchange);
+  auto structure = hash_words(
+      {order_type_hash(), native_word(o.salt), address_word(o.maker), address_word(o.signer),
+       parsed_token ? word(*parsed_token) : word(decimal_token(o.token)),
+       native_word(o.maker_amount), native_word(o.taker_amount),
+       native_word(o.side), native_word(o.signature_type), native_word(o.timestamp),
+       raw32(o.metadata), raw32(o.builder)});
+  return typed_digest(domain, structure);
+}
+Hash order_digest(const UnsignedOrder &o) {
+  return order_digest_impl(o, nullptr);
 }
 Hash auth_digest(std::string_view address, std::int64_t timestamp,
                  std::uint64_t nonce) {
-  auto domain = hash_words(
+  static const auto domain = hash_words(
       {keccak("EIP712Domain(string name,string version,uint256 chainId)"),
-       keccak("ClobAuthDomain"), keccak("1"), word(137)});
+       keccak("ClobAuthDomain"), keccak("1"), native_word(137)});
+  static const auto type = keccak("ClobAuth(address address,string timestamp,uint256 nonce,string "
+                                  "message)");
+  static const auto attestation = keccak("This message attests that I control the given wallet");
   auto content = hash_words(
-      {keccak("ClobAuth(address address,string timestamp,uint256 nonce,string "
-              "message)"),
-       address_word(address), keccak(std::to_string(timestamp)), word(nonce),
-       keccak("This message attests that I control the given wallet")});
-  Bytes message{0x19, 0x01};
-  message.insert(message.end(), domain.begin(), domain.end());
-  message.insert(message.end(), content.begin(), content.end());
-  return keccak(message);
+      {type, address_word(address), keccak(std::to_string(timestamp)), native_word(nonce),
+       attestation});
+  return typed_digest(domain, content);
 }
 Signer::Signer(std::string_view key) {
   std::array<unsigned char, 32> seed{};
@@ -173,6 +223,9 @@ Signer::Signer(std::string_view key) {
                                 SECP256K1_EC_UNCOMPRESSED);
   auto h = keccak(std::span(encoded + 1, 64));
   address_ = checksum_address(hex(std::span(h.data() + 12, 20)));
+  // Warm immutable typed-data constants before any signal can request a sign.
+  (void)common_order_domains();
+  (void)order_type_hash();
   } catch (...) {
     OPENSSL_cleanse(seed.data(), seed.size());
     OPENSSL_cleanse(key_.data(), key_.size());
@@ -325,9 +378,14 @@ SignedOrder build_order(const Signer &signer, std::string_view maker,
                         int signature_type, std::string_view token_id,
                         Units stake, Units cap, const Rules &rules,
                         const Credentials &creds, std::string_view type) {
-  if (!rules.loaded || !valid_token(token_id))
+  if (!rules.loaded)
     throw std::invalid_argument("order rules or token unavailable");
-  Big token = decimal_token(token_id);
+  Big token;
+  try {
+    token = decimal_token(token_id);
+  } catch (const std::invalid_argument &) {
+    throw std::invalid_argument("order rules or token unavailable");
+  }
   if ((token & (((Big(1) << 64) - 1) << 40)) == 0)
     throw std::invalid_argument(
         "protocol-v2 position IDs require exchange-v3; native baseline trades "
@@ -352,7 +410,7 @@ SignedOrder build_order(const Signer &signer, std::string_view maker,
   o.taker_amount = a.taker;
   o.signature_type = signature_type;
   o.timestamp = static_cast<std::int64_t>(wall_s() * 1000);
-  s.digest = order_digest(o);
+  s.digest = order_digest_impl(o, &token);
   s.signature = signer.sign(s.digest);
   s.id = hex(s.digest);
   s.body = serialize_order(o, s.signature, creds.key, type);

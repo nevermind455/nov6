@@ -39,6 +39,10 @@ endif()
 add_executable(sniper-cpp src/main.cpp)
 add_executable(sniper-replay tools/replay/sniper_replay.cpp)
 add_executable(sniper-diff tools/replay/diff_tool.cpp)
+add_executable(sniper-net-probe src/net_probe.cpp)
+target_link_libraries(sniper-net-probe PRIVATE sniper_core)
+set_target_properties(sniper-net-probe PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")
+install(TARGETS sniper-net-probe RUNTIME DESTINATION .)
 add_executable(sniper-edge-report tools/report/edge_report.cpp)
 target_compile_options(sniper-edge-report PRIVATE -O2 -Wall -Wextra)
 target_link_libraries(sniper-edge-report PRIVATE nlohmann_json::nlohmann_json fmt::fmt-header-only)
@@ -72,7 +76,7 @@ if(SNIPER_TESTS)
     tests/audit_strategy_tests.cpp tests/audit_ledger_crypto_tests.cpp
     tests/audit_market_tests.cpp tests/audit_runtime_tests.cpp
     tests/audit_network_tests.cpp tests/edge_report_tests.cpp
-    tests/miss_report_tests.cpp)
+    tests/miss_report_tests.cpp tests/latency_crypto_tests.cpp)
   target_include_directories(sniper-tests PRIVATE tools/report)
   target_link_libraries(sniper-tests PRIVATE sniper_core GTest::gtest_main)
   set_target_properties(sniper-tests PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")
@@ -87,6 +91,8 @@ if(SNIPER_TESTS)
     $<TARGET_FILE:sniper-cpp>)
   add_test(NAME edge_report_cli COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/edge_report_cli_tests.sh
     $<TARGET_FILE:sniper-edge-report>)
+  add_test(NAME net_probe_cli COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/net_probe_cli_tests.sh
+    $<TARGET_FILE:sniper-net-probe>)
   add_executable(sniper-bench tests/benchmark.cpp)
   target_link_libraries(sniper-bench PRIVATE sniper_core benchmark::benchmark_main)
 endif()

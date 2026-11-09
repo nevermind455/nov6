@@ -1,0 +1,22 @@
+{
+  "native_cpp": true,
+  "mode": "PAPER",
+  "trigger_bp": 0.5,
+  "window_ms": 250.0,
+  "order_type": "FAK",
+  "kelly_fraction": 0.25,
+  "fair_margin": 0.01,
+  "prepare_lead_s": 60.0,
+  "runtime_dependencies": "C++ libraries; no Python",
+  "independent_paper_model": true,
+  "live_canary": {
+    "max_loss_usd": 20.0,
+    "hard_stop": true
+  },
+  "paths": {
+    "state_dir": "/workspace/nov6/state/paper",
+    "stop_file": "/workspace/nov6/STOP_LIVE",
+    "paper_journal": "/workspace/nov6/state/paper/sniper.jsonl"
+  },
+  "notices": []
+}

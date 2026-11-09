@@ -39,6 +39,37 @@ static void Signing(benchmark::State &state) {
   }
 }
 
+// Isolate typed-data preparation from ECDSA and durable I/O. Keep these
+// identical before/after a crypto change; they do not contact a venue.
+static void OrderDigest(benchmark::State &state) {
+  UnsignedOrder order;
+  order.salt = 123456789;
+  order.maker = order.signer = "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf";
+  order.token = "71321045679252212594626385532706912750332728571942532289631379312455583992563";
+  order.exchange = STANDARD_EXCHANGE;
+  order.maker_amount = 5 * U;
+  order.taker_amount = 10 * U;
+  order.timestamp = 1900000000000;
+  for (auto _ : state) {
+    auto digest = order_digest(order);
+    benchmark::DoNotOptimize(digest);
+  }
+}
+
+static void BuildOrder(benchmark::State &state) {
+  Signer signer(
+      "0x0000000000000000000000000000000000000000000000000000000000000001");
+  Credentials credentials{"offline-key", "c2VjcmV0", "offline-passphrase"};
+  Rules rules{10000, 5 * U, 70000, 1, false, true, 1};
+  for (auto _ : state) {
+    auto order = build_order(
+        signer, signer.address(), 0,
+        "71321045679252212594626385532706912750332728571942532289631379312455583992563",
+        5 * U, U / 2, rules, credentials);
+    benchmark::DoNotOptimize(order);
+  }
+}
+
 namespace {
 struct BenchEnv : SniperEnv {
   double now = 1000, offset = 1793966400.0 + 100 - 1000;
@@ -377,5 +408,7 @@ BENCHMARK(BookUpdatePercentiles)->Iterations(1)->Unit(benchmark::kMillisecond);
 BENCHMARK(TickToWirePercentiles)->Arg(0)->Arg(1)->Iterations(1)->Unit(benchmark::kMillisecond);
 BENCHMARK(Maths);
 BENCHMARK(Signing);
+BENCHMARK(OrderDigest);
+BENCHMARK(BuildOrder);
 BENCHMARK(TickToDecision)->Repetitions(1);
 BENCHMARK(TickToIntent)->Arg(0)->Arg(1);

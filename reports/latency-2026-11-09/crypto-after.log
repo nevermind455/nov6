@@ -1,0 +1,25 @@
+2026-11-09T08:46:35+00:00
+Running build-audit/sniper-bench
+Run on (3 X 2596.14 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x1)
+  L1 Instruction 32 KiB (x1)
+  L2 Unified 1024 KiB (x1)
+  L3 Unified 32768 KiB (x1)
+Load Average: 0.06, 0.40, 0.31
+***WARNING*** Library was built as DEBUG. Timings may be affected.
+-------------------------------------------------------------
+Benchmark                   Time             CPU   Iterations
+-------------------------------------------------------------
+Signing_mean            29700 ns        29682 ns            7
+Signing_median          29144 ns        29139 ns            7
+Signing_stddev           1176 ns         1149 ns            7
+Signing_cv               3.96 %          3.87 %             7
+OrderDigest_mean         9867 ns         9866 ns            7
+OrderDigest_median       9873 ns         9873 ns            7
+OrderDigest_stddev        208 ns          208 ns            7
+OrderDigest_cv           2.11 %          2.11 %             7
+BuildOrder_mean         47469 ns        47465 ns            7
+BuildOrder_median       46777 ns        46773 ns            7
+BuildOrder_stddev        2364 ns         2363 ns            7
+BuildOrder_cv            4.98 %          4.98 %             7

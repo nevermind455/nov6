@@ -33,10 +33,25 @@ decision (`dec_ask`, `dec_bid`, `dec_quote_age_ms`, `dec_venue_age_ms`,
 `dec_depth_sh`), fair value (`fair`, `fair_limit`, `cap`), sizing
 (`order_shares`, `target_shares`, `kelly_shares`), the round (`condition_id`,
 `round_end`, `left_s`) and price-to-beat (`ptb`, `ptb_why`). Live reply rows
-carry monotonic stamps: `T0_ns` trigger receipt, `T2_ns` dispatch start,
-`T3_ns` signed, `T4_ns` durable intent, `T5_ns` request written, `T6_ns`
-reply received. Credentials never appear in the journal; reply text is
-truncated to 300 characters.
+carry local steady-clock nanoseconds: `T0_ns` trigger receipt, `T1_ns` entry
+to `Runtime::dispatch_live`, `T2_ns` immediately before order construction and
+signing, `T3_ns` signed, `T4_ns` durable intent, `T5_ns` complete TLS/socket-write
+completion, and `T6_ns` response-callback entry. T5 is an application observation,
+not a physical NIC or peer-receipt timestamp. Credentials never appear in the
+journal; reply text is truncated to 300 characters.
+
+Private trade rows carry `evidence_received_ns` and `evidence_source`:
+`websocket` records local message-handler receipt; `rest_reconciliation` records
+when the background REST result was observed. Selected venue timestamps are
+preserved separately in `venue_event_times_raw`, with their original units and
+clock uninterpreted. They cannot be subtracted from the local monotonic stamps.
+
+When available, `connection_generation`, `connection_ready_ns`, `tcp_no_delay`
+and `tcp_keep_alive` identify the existing sender connection. The optional
+`recent_time_probe_median_rtt_ms` and `time_probe_age_ms` describe recent
+GET `/time` observations, which include network and endpoint response time.
+See [execution latency and VPS measurements](EXECUTION_LATENCY.md) for the
+read-only probe and the limits of these measurements.
 
 Skip rows are rate-limited to one per second per reason, round and side. The
 exact totals are the `skip: <reason>` counters in each `summary` row, so the
@@ -84,15 +99,28 @@ separately and never as live orders.
 
 | Stage | From | Measured |
 | --- | --- | --- |
-| `trigger_to_dispatch` | T0 to T2 | locally |
-| `signing` | T2 to T3 | locally |
-| `durable_intent` | T3 to T4 (fsync) | locally |
-| `request_write` | T4 to T5 | locally |
-| `network_and_ack` | T5 to T6 | network and exchange |
+| `trigger_to_dispatch` | T0 to T1 | local receive/decision path |
+| `pre_send_checks` | T1 to T2 | local checks and preparation |
+| `signing` | T2 to T3 | local order construction, signing and serialization |
+| `durable_intent` | T3 to T4 | local authorization and durable write, including fsync |
+| `request_write` | T4 to T5 | final guards, headers, enqueueing and complete socket write |
+| `network_and_ack` | T5 to T6 | transport and venue response; not an isolated exchange delay |
 | `trigger_to_ack` | T0 to T6 | both |
-| `send_to_first_fill_ms` | dispatch row to first confirmed fill | network, exchange and private channel |
+| `send_to_websocket_confirmation_evidence_ms` | T5 to first positive CONFIRMED receipt, when its source is WebSocket | transport, venue confirmation and private channel |
+| `send_to_reconciliation_confirmation_evidence_ms` | T5 to first positive CONFIRMED receipt, when its source is REST | includes reconciliation polling/observation delay |
+| `send_to_first_fill_ms` | dispatch/fill row wall times | legacy wall-clock metric, not full-write monotonic timing |
 | `book_age_at_decision` | `dec_quote_age_ms` | market data freshness |
 | `paper_modelled_latency` | paper `latency_ms` | **modelled, not measured** |
+
+Missing or reversed stage pairs are omitted. Older rows without T1 retain the
+T0-to-T2 fallback for `trigger_to_dispatch`, including checks; the
+`latency_evidence.legacy_trigger_to_dispatch_includes_checks` count identifies
+that case, and `pre_send_checks_missing_boundary` counts unavailable check
+boundaries. The source-separated confirmation metrics join only the first
+recorded positive CONFIRMED receipt per order within its dispatch run. A client
+receipt timestamp does not establish when matching or execution occurred at
+the venue. Neither ACK RTT nor subtraction of a recent probe RTT can establish
+an exact exchange-imposed hold.
 
 ## Confirmed and suspected causes
 

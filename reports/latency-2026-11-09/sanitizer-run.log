@@ -1,0 +1,16 @@
+Internal ctest changing into directory: /src/build-latency-asan
+Test project /src/build-latency-asan
+    Start 1: native_suite
+1/5 Test #1: native_suite .....................   Passed   18.26 sec
+    Start 2: comparison_cli
+2/5 Test #2: comparison_cli ...................   Passed    0.40 sec
+    Start 3: runtime_io
+3/5 Test #3: runtime_io .......................   Passed    0.26 sec
+    Start 4: edge_report_cli
+4/5 Test #4: edge_report_cli ..................   Passed    0.09 sec
+    Start 5: net_probe_cli
+5/5 Test #5: net_probe_cli ....................   Passed    2.47 sec
+
+100% tests passed, 0 tests failed out of 5
+
+Total Test time (real) =  21.49 sec
