@@ -22,6 +22,32 @@
 namespace sniper {
 namespace net = boost::asio;
 namespace execution {
+Json order_timing_fields(const std::array<std::int64_t, 8> &stamps) {
+  Json fields = Json::object();
+  for (int index = 0; index <= 6; ++index)
+    if (stamps[index] > 0)
+      fields["T" + std::to_string(index) + "_ns"] = stamps[index];
+  return fields;
+}
+Json trade_evidence_fields(const Json &trade, std::string_view source,
+                           std::int64_t received_ns) {
+  Json fields{{"evidence_source", source}};
+  if (received_ns > 0)
+    fields["evidence_received_ns"] = received_ns;
+  Json venue = Json::object();
+  for (const char *key : {"match_time", "last_update", "timestamp", "created_at"}) {
+    auto it = trade.find(key);
+    if (it == trade.end())
+      continue;
+    if (it->is_string())
+      venue[key] = it->get_ref<const std::string &>().substr(0, 128);
+    else if (it->is_number() && std::isfinite(it->get<double>()))
+      venue[key] = *it;
+  }
+  if (!venue.empty())
+    fields["venue_event_times_raw"] = std::move(venue);
+  return fields;
+}
 Units spendable_collateral(Units sampled_balance, Units sampled_outflow,
                            Units current_outflow) {
   if (sampled_balance < 0 || sampled_outflow < 0 || current_outflow < sampled_outflow)
@@ -179,7 +205,13 @@ struct Runtime::Impl {
   execution::PauseLatch pause_latches;
   std::deque<double> slow_replies;
   std::map<std::string, double> sent_at, skip_last;
-  std::map<std::string, std::array<std::int64_t, 8>> stamps;
+  struct ExecutionStamp {
+    std::array<std::int64_t, 8> stages{};
+    std::optional<H2ConnectionInfo> connection;
+    std::optional<double> probe_rtt_ms;
+    double probe_age_ms = 0;
+  };
+  std::map<std::string, ExecutionStamp> stamps;
   std::map<std::string, Units> provisional;
   std::map<std::string, std::map<std::string, Units>> private_sizes;
   std::uint64_t signals_seen = 0, orders_sent = 0, paper_fills = 0, errors = 0,
@@ -332,7 +364,7 @@ struct Runtime::Impl {
     H2Callbacks cb;
     cb.written = [this](auto id, auto t) {
       if (auto it = stamps.find(std::string(id)); it != stamps.end()) {
-        it->second[5] = t;
+        it->second.stages[5] = t;
         if (dashboard)
           dash_live_timings(std::string(id), timing_fields(id));
       }
@@ -1720,6 +1752,7 @@ struct Runtime::Impl {
   // send (no retry). A refusal sends nothing; the engine journals it as
   // "live refused" ("live halted" while new orders are paused).
   bool dispatch_live(const std::shared_ptr<Plan> &p) {
+    const auto dispatch_started_ns = mono_ns();
     auto refuse = [&](const std::string &why, bool halted = false) {
       p->live_refusal = why;
       p->live_halted = halted;
@@ -1823,7 +1856,7 @@ struct Runtime::Impl {
     intent.min_entry = p->minimum_entry;
     std::array<std::int64_t, 8> ts{};
     ts[0] = p->t_ns;
-    ts[1] = p->t_ns;
+    ts[1] = dispatch_started_ns;
     ts[2] = mono_ns();
     auto signed_order = build_order(*signer, c.funder, c.signature_type,
                                     p->token, stake, cap, rule, creds,
@@ -1901,7 +1934,14 @@ struct Runtime::Impl {
       ledger.set_canary(unsent_state);
       return refuse(gate + " before dispatch");
     }
-    stamps[intent.id] = ts;
+    ExecutionStamp trace;
+    trace.stages = ts;
+    trace.connection = sender->connection_info();
+    if (!clock.rtts.empty() && clock.at >= 0 && now >= clock.at) {
+      trace.probe_rtt_ms = clock.median_rtt();
+      trace.probe_age_ms = (now - clock.at) * 1000.0;
+    }
+    stamps[intent.id] = std::move(trace);
     sent_at[intent.id] = now;
     auto headers = l2_headers(*signer, creds, "POST", "/order",
                               signed_order.body, clock.now(now));
@@ -1916,8 +1956,7 @@ struct Runtime::Impl {
     row["order_id"] = intent.id;
     row["client_order_id"] = intent.id;
     row["result"] = "pending";
-    row["T0_ns"] = ts[0];
-    row["T2_ns"] = ts[2];
+    row.update(timing_fields(intent.id));
     audit(row);
     return true;
   }
@@ -1995,13 +2034,24 @@ struct Runtime::Impl {
   Json timing_fields(std::string_view id) const {
     Json fields = Json::object();
     auto it = stamps.find(std::string(id));
-    if (it != stamps.end())
-      for (int index : {0, 2, 3, 4, 5, 6})
-        if (it->second[index] > 0)
-          fields["T" + std::to_string(index) + "_ns"] = it->second[index];
+    if (it != stamps.end()) {
+      const auto &trace = it->second;
+      fields = execution::order_timing_fields(trace.stages);
+      if (trace.connection) {
+        fields["connection_generation"] = trace.connection->generation;
+        fields["connection_ready_ns"] = trace.connection->ready_ns;
+        fields["tcp_no_delay"] = trace.connection->tcp_no_delay;
+        fields["tcp_keep_alive"] = trace.connection->tcp_keep_alive;
+      }
+      if (trace.probe_rtt_ms) {
+        fields["recent_time_probe_median_rtt_ms"] = *trace.probe_rtt_ms;
+        fields["time_probe_age_ms"] = trace.probe_age_ms;
+      }
+    }
     return fields;
   }
   void on_reply(std::string_view id, const HttpResult &reply) {
+    const auto reply_received_ns = mono_ns();
     if (id == "__clock") {
       try {
         if (reply.status == 200) {
@@ -2018,11 +2068,13 @@ struct Runtime::Impl {
       return;
     auto &intent = it->second;
     if (auto s = stamps.find(std::string(id)); s != stamps.end())
-      s->second[6] = mono_ns();
+      s->second.stages[6] = reply_received_ns;
     auto timings = timing_fields(id);
+    Json venue_fields = Json::object();
     auto record_reply = [&](Json row) {
       row["acknowledged"] = true;
       row.update(timings);
+      row.update(venue_fields);
       audit(std::move(row));
     };
     double rtt = sent_at.count(std::string(id))
@@ -2041,6 +2093,10 @@ struct Runtime::Impl {
     }
     try {
       auto j = reply.json();
+      if (auto status = j.find("status"); status != j.end() && status->is_string()) {
+        venue_fields["venue_order_status"] = status->get_ref<const std::string &>().substr(0, 64);
+        venue_fields["venue_reported_delay"] = *status == Json("delayed");
+      }
       if (j.contains("orderID") &&
           !j.at("orderID").get<std::string>().empty() && j.at("orderID") != id)
         throw std::runtime_error(
@@ -2118,9 +2174,11 @@ struct Runtime::Impl {
     row.update(timings);
     audit(std::move(row));
   }
-  void consume_trade(const Json &j) {
+  void consume_trade(const Json &j, std::string_view source,
+                     std::int64_t received_ns) {
     try {
       auto t = parse_trade(j, ledger.orders);
+      auto evidence = execution::trade_evidence_fields(j, source, received_ns);
       if (t.status == "FAILED") {
         private_sizes[t.order].erase(t.id);
         pause("private trade failed; reconciliation required", true);
@@ -2146,21 +2204,25 @@ struct Runtime::Impl {
           throw std::overflow_error("confirmed collateral outflow overflow");
         if (ledger.fill(t.id, t.order, t.shares, t.cost, t.fee)) {
           booked_outflow = static_cast<Units>(outflow);
-          audit({{"result", "live_fill"},
+          Json row{{"result", "live_fill"},
                  {"order_id", t.order},
                  {"trade_id", t.id},
                  {"side", intent.side},
                  {"shares", dollars(t.shares)},
                  {"amount", dollars(t.cost)},
                  {"fee", dollars(t.fee)},
-                 {"status", "CONFIRMED"}});
+                 {"status", "CONFIRMED"}};
+          row.update(evidence);
+          audit(std::move(row));
         }
       } else if (delivered > intent.matched_shares)
         ledger.status(intent.id, intent.status, delivered, intent.matched_cost);
-      audit({{"result", "live_fill_update"},
+      Json row{{"result", "live_fill_update"},
              {"order_id", t.order},
              {"trade_id", t.id},
-             {"status", t.status}});
+             {"status", t.status}};
+      row.update(evidence);
+      audit(std::move(row));
     } catch (const std::exception &e) {
       ++errors;
       pause("accounting disagreement or unauthorized fill", true);
@@ -2168,6 +2230,7 @@ struct Runtime::Impl {
     }
   }
   void on_user(std::string_view raw) {
+    const auto received_ns = mono_ns();
     if (raw == "PONG") {
       user_pong = mono_s();
       return;
@@ -2179,7 +2242,7 @@ struct Runtime::Impl {
       for (auto &v : j) {
         auto type = v.value("event_type", "");
         if (type == "trade")
-          consume_trade(v);
+          consume_trade(v, "websocket", received_ns);
         else if (type == "order") {
           auto id = v.value("id", "");
           auto i = ledger.orders.find(id);
@@ -2396,9 +2459,10 @@ struct Runtime::Impl {
                 target += "&next_cursor=" + cursor;
               auto j = rest.get(target, auth("/data/trades"));
               auto trades = j.at("data");
-              post("trade reconciliation", [this, trades = std::move(trades)] {
+              const auto received_ns = mono_ns();
+              post("trade reconciliation", [this, received_ns, trades = std::move(trades)] {
                 for (auto &t : trades)
-                  consume_trade(t);
+                  consume_trade(t, "rest_reconciliation", received_ns);
               });
               cursor = j.value("next_cursor", "");
               if (cursor.empty() || cursor == "LTE=")

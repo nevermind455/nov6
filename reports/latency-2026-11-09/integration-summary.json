@@ -1,0 +1,28 @@
+{
+  "native_cpp": true,
+  "paper_seconds": 360,
+  "paper_final": {
+    "peak_rss_kib": 50704,
+    "native_cpp": true,
+    "stopped": true,
+    "exit_code": 0,
+    "paper_order_calls": 0,
+    "signals": 1328,
+    "orders": 9,
+    "paper_fills": 1,
+    "dry_run_orders": 0,
+    "errors": 0
+  },
+  "round_ends": [
+    1794214800,
+    1794215100
+  ],
+  "dashboard_seconds": 270,
+  "dashboard_sizes": [
+    "170x50",
+    "100x30"
+  ],
+  "probe_samples": 5,
+  "sanitized_probe_samples": 3,
+  "checks": "passed"
+}

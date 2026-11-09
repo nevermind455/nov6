@@ -1,0 +1,50 @@
+ BTC SNIPER   PAPER   NO REAL ORDERS · $0 AT RISK   btc-updown-5m-1794214800  T-194s   ACTIVE                                                                 04:01:45 ET
+┌─ TRIGGER ────────────────────────────────────────────┐┌─ MARKET ────────────────────────────────────────────────────┐┌─ ACCOUNT PAPER ─────────────────────────────────┐
+│feed      coinbase LIVE                               ││round     btc-updown-5m-1794214800                           ││CASH           $994.48                           │
+│BTC mid   99,800.74                                   ││left      ███████████████████████████▉░░░░░░░░░░░░░░░  194s  ││POSITION VALUE $7.37                             │
+│fair      vol 1.30bp  DOWN .26->.26 <=.24             ││          UP                       DOWN                      ││EQUITY         $1,001.85                         │
+│move      -0.54bp /250ms k0.5                         ││best bid  0.730                    0.240                     ││REALIZED P/L   $0.00                             │
+│signals   889  222.2/min  last -0.54bp 0s ago         ││best ask  0.760                    0.270                     ││UNREALIZED P/L +$1.85                            │
+│orders    5  fill 1  miss 4  20%                      ││book      LIVE 496ms               LIVE 496ms                ││TOTAL P/L      +$1.85                            │
+│order     FAK +0.02 snd N/A ack 476ms sim             ││this rnd  fills 1/20  UP 0  DN 31 /200sh                     ││FEES  WON/LOST $0.30  0/0                        │
+│                                                      ││                                                             ││                                                 │
+└──────────────────────────────────────────────────────┘└─────────────────────────────────────────────────────────────┘└─────────────────────────────────────────────────┘
+┌─ ORDERS ──────────────────────────────────────────────────────────────────────────────────────────┐┌─ HEALTH ──────────────────────────────────────────────────────────┐
+│TIME     SIDE BTC     ASK   LIMIT RESULT  FILLED        DETAIL                                     ││NET ms    coinbase 0  clob 1                                       │
+│04:01:31 UP   +4.78   0.790 0.810 REFUSED               unknown book state at the modelled arrival…││COINBASE  LIVE         sockets 2/2 behind 1ms backlog max 0        │
+│04:01:04 DOWN -3.73   0.170 0.180 FILLED  30.7@0.170                                               ││POLY BOOK LIVE         resync waiting 0                            │
+│04:00:47 UP   +3.74   0.890 0.890 REFUSED               unknown book state at the modelled arrival…││CLOB H2   OK                                                       │
+│04:00:47 DOWN -4.28   0.140 0.150 REFUSED               unknown book state at the modelled arrival…││USER WS   ABSENT       paper                                       │
+│04:00:36 DOWN -4.20   0.110 0.110 REFUSED               unknown book state at the modelled arrival…││SETTLE    OK           pending 0                                   │
+│                                                                                                   ││LEDGER    OK           entries 3                                   │
+│                                                                                                   ││JOURNAL   OK                                                       │
+│                                                                                                   ││CLOCK     OK           offset -0.24s                               │
+│                                                                                                   ││LOOP LAG  OK           max 0ms                                     │
+│                                                                                                   ││skips    ask not below fair value 380  ask outside price band 334  │
+└───────────────────────────────────────────────────────────────────────────────────────────────────┘└───────────────────────────────────────────────────────────────────┘
+┌─ POSITION ─────────────────────────────────────────────────────────┐┌─ SETTLEMENT ──────────────────── 04:00-04:05 ┐┌─ MARKETS ────────────────────────────────────────┐
+│SIDE   SHARES   AVG   COST   BID   VALUE     P/L                    ││MARKET STATUS ACTIVE                          ││ACTIVE MARKET                                     │
+│UP      0.000    --  $0.00  .730   $0.00   $0.00                    ││RESULT        --                              ││04:00-04:05 ACTIVE          T-194s                │
+│DOWN   30.706  .170  $5.52  .240   $7.37  +$1.85                    ││PENDING AGE   --                              ││PREVIOUS MARKETS                                  │
+│                                                                    ││LAST SETTLED  --                              ││  none yet this session                           │
+│                                                                    ││                                              ││                                                  │
+│                                                                    ││                                              ││                                                  │
+│                                                                    ││                                              ││                                                  │
+└────────────────────────────────────────────────────────────────────┘└──────────────────────────────────────────────┘└──────────────────────────────────────────────────┘
+┌─ SNIPER EXECUTION LATENCY (paper: ACK/fill simulated) ────────────────────────────────────────────────────┐┌─ EXECUTION QUALITY ───────────────────────────────────────┐
+│ms             LAST      AVG      P50      P95      P99      MAX        n                                  ││attempted 5  sent 5  acked 5  pending 0                    │
+│TRIG>DEC       0.00     0.00     0.00     0.00     0.00     0.00        5                                  ││filled 1 partial 0 zero 0 rej 4 fail 0                     │
+│TRIG>ACK …      476      476      476      476      476      476        5                                  ││fill rate 20%  reject rate 80%                             │
+│                                                                                                           ││last  signal 99,839.98  ref ask .790  limit .810           │
+│                                                                                                           ││      avg fill --  slip N/A                                │
+│                                                                                                           ││avg slippage +0.00c  over 1 fills                          │
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────┘└───────────────────────────────────────────────────────────┘
+┌─ EVENTS ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│04:01:04 sniper    FILLED DOWN 30.7 @ 0.170                                                                                                                             │
+│03:57:45 coinbase  socket 2 connected                                                                                                                                   │
+│03:57:45 coinbase  socket 1 connected                                                                                                                                   │
+│03:57:45 market    connected                                                                                                                                            │
+│03:57:45 bot       started                                                                                                                                              │
+│                                                                                                                                                                        │
+│                                                                                                                                                                        │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

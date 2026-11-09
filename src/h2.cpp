@@ -39,6 +39,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     std::deque<Write> writes;
     std::vector<std::string> serialized_ids;
     std::size_t queued_bytes = 0;
+    H2ConnectionInfo info;
     bool up = false, writing = false, goaway = false, failed = false;
     Impl *owner;
     Pipe(net::io_context &i, net::ssl::context &c, Impl *o)
@@ -62,6 +63,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
   std::shared_ptr<Pipe> pipe;
   double last_ping = 0;
   unsigned failures = 0;
+  std::uint64_t connection_generation = 0;
   Impl(net::io_context &i, net::ssl::context &c, bool l,
        std::atomic<std::uint64_t> &b, H2Callbacks cb, int t, std::string h,
        std::string po)
@@ -212,6 +214,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     if (stopped || (pipe && !pipe->failed))
       return;
     auto p = std::make_shared<Pipe>(io, ctx, this);
+    p->info.generation = ++connection_generation;
     pipe = p;
     p->stream.set_verify_mode(net::ssl::verify_peer);
     p->stream.set_verify_callback(net::ssl::host_name_verification(host));
@@ -251,6 +254,10 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
                   return;
                 if (ec)
                   return self->fail(p, "HTTP/2 connect failed");
+                if (transport::configure_tcp_socket(
+                        beast::get_lowest_layer(p->stream).socket()))
+                  return self->fail(p, "HTTP/2 TCP options failed");
+                p->info.tcp_no_delay = p->info.tcp_keep_alive = true;
                 if (!proxy) {
                   self->tls(p);
                   return;
@@ -310,6 +317,7 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
               {NGHTTP2_SETTINGS_ENABLE_PUSH, 0},
               {NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, 1 << 20}};
           nghttp2_submit_settings(p->session, NGHTTP2_FLAG_NONE, settings, 2);
+          p->info.ready_ns = mono_ns();
           p->up = true;
           self->failures = 0;
           beast::get_lowest_layer(p->stream).expires_never();
@@ -515,6 +523,11 @@ H2Client::H2Client(net::io_context &io, net::ssl::context &ctx, bool live,
 void H2Client::start() { p_->connect(); }
 void H2Client::stop() { p_->stop(); }
 bool H2Client::ready() const { return p_->pipe && p_->pipe->up; }
+std::optional<H2ConnectionInfo> H2Client::connection_info() const {
+  if (!ready())
+    return std::nullopt;
+  return p_->pipe->info;
+}
 bool H2Client::post(std::string id, std::string body, const Headers &h) {
   return p_->post(std::move(id), std::move(body), h);
 }

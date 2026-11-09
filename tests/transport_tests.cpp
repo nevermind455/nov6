@@ -1,6 +1,7 @@
 #include "sniper/network.hpp"
 #include <atomic>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/post.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/write.hpp>
@@ -24,8 +25,8 @@ struct FakeClob {
   std::thread thread;
   bool drop = false, goaway = false, goaway_accepts_request = false;
   bool flow_controlled = false, early_response = false;
-  int http_status = 200;
-  std::atomic<int> requests{0};
+  int http_status = 200, expected_requests = 1;
+  std::atomic<int> requests{0}, connections{0};
   std::atomic<std::size_t> received_bytes{0};
   std::atomic<bool> settings_acknowledged{false}, window_exhausted{false};
   std::atomic<bool> upload_released{false};
@@ -157,6 +158,7 @@ struct FakeClob {
       try {
         net::ssl::stream<tcp::socket> socket(io, tls);
         acceptor.accept(socket.next_layer());
+        ++connections;
         socket.handshake(net::ssl::stream_base::server);
         Session state{this};
         nghttp2_session_callbacks *callbacks = nullptr;
@@ -205,6 +207,12 @@ struct FakeClob {
             flush();
           }
           if (state.complete) {
+            if (requests < expected_requests) {
+              // flush() serialized the complete response to the completed
+              // request. Reuse this TLS/nghttp2 session for the next stream.
+              state = Session{this};
+              continue;
+            }
             if (flow_controlled) {
               std::unique_lock lock(upload_mutex);
               upload_wake.wait_for(lock, std::chrono::seconds(5),
@@ -397,4 +405,96 @@ TEST(NativeHttp2, EarlyResponseKeepsFlowControlledUploadProviderAlive) {
         _exit(::testing::Test::HasFailure() ? 1 : 0);
       },
       ::testing::ExitedWithCode(0), "");
+}
+TEST(NativeHttp2, SequentialOrdersReuseTheWarmLowLatencyTlsConnection) {
+  net::io_context io;
+  net::ssl::context tls(net::ssl::context::tls_client);
+  FakeClob fake(tls, false, 200);
+  fake.expected_requests = 2;
+  fake.start();
+  std::atomic<std::uint64_t> blocked{0};
+  int written = 0, replies = 0, unknown = 0;
+  bool first_submitted = false, second_submitted = false;
+  std::optional<H2ConnectionInfo> first_connection, second_connection;
+  H2Client *client_ptr = nullptr;
+  H2Callbacks callbacks;
+  callbacks.written = [&](auto id, auto stamp) {
+    EXPECT_TRUE(id == "offline-first" || id == "offline-second");
+    EXPECT_GT(stamp, 0);
+    ++written;
+    if (written == 2 && replies == 2)
+      io.stop();
+  };
+  callbacks.reply = [&](auto id, const HttpResult &response) {
+    EXPECT_EQ(response.status, 200);
+    EXPECT_EQ(response.body, fake.response);
+    ++replies;
+    if (id == "offline-first") {
+      EXPECT_EQ(replies, 1);
+      // Dispatch outside the nghttp2 response callback, as normal event-loop
+      // decisions do, rather than recursively calling its serializer.
+      net::post(io, [&] {
+        second_connection = client_ptr->connection_info();
+        second_submitted = client_ptr->post(
+            "offline-second", R"({"offline":2})", {});
+      });
+    } else {
+      EXPECT_EQ(id, "offline-second");
+      EXPECT_EQ(replies, 2);
+      if (written == 2)
+        io.stop();
+    }
+  };
+  callbacks.unknown = [&](auto id, auto why) {
+    ADD_FAILURE() << id << ": " << why;
+    ++unknown;
+    io.stop();
+  };
+  H2Client client(io, tls, true, blocked, std::move(callbacks), 2,
+                  "127.0.0.1",
+                  std::to_string(fake.acceptor.local_endpoint().port()));
+  client_ptr = &client;
+  EXPECT_FALSE(client.connection_info());
+  net::steady_timer poll(io);
+  std::function<void()> start_when_ready = [&] {
+    poll.expires_after(std::chrono::milliseconds(10));
+    poll.async_wait([&](auto ec) {
+      if (ec)
+        return;
+      if (!client.ready()) {
+        start_when_ready();
+        return;
+      }
+      first_connection = client.connection_info();
+      first_submitted = client.post("offline-first", R"({"offline":1})", {});
+    });
+  };
+  client.start();
+  start_when_ready();
+  io.run_for(std::chrono::seconds(5));
+  client.stop();
+  EXPECT_FALSE(client.connection_info());
+  io.restart();
+  io.poll();
+  fake.join();
+  ASSERT_TRUE(first_submitted);
+  ASSERT_TRUE(second_submitted);
+  ASSERT_TRUE(first_connection);
+  ASSERT_TRUE(second_connection);
+  EXPECT_GT(first_connection->generation, 0u);
+  EXPECT_GT(first_connection->ready_ns, 0);
+  EXPECT_LE(first_connection->ready_ns, mono_ns());
+  EXPECT_EQ(second_connection->generation, first_connection->generation);
+  EXPECT_EQ(second_connection->ready_ns, first_connection->ready_ns);
+  EXPECT_TRUE(first_connection->tcp_no_delay);
+  EXPECT_TRUE(first_connection->tcp_keep_alive);
+  EXPECT_TRUE(second_connection->tcp_no_delay);
+  EXPECT_TRUE(second_connection->tcp_keep_alive);
+  EXPECT_EQ(fake.connections, 1);
+  EXPECT_EQ(fake.requests, 2);
+  EXPECT_EQ(fake.received, R"({"offline":1}{"offline":2})");
+  EXPECT_EQ(written, 2);
+  EXPECT_EQ(replies, 2);
+  EXPECT_EQ(unknown, 0);
+  EXPECT_EQ(blocked, 0);
 }

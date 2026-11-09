@@ -4,6 +4,11 @@
 namespace sniper {
 class Ledger;
 namespace execution {
+// Local application observations in steady-clock nanoseconds. Missing stages
+// remain absent; these stamps are not venue or hardware-wire timestamps.
+Json order_timing_fields(const std::array<std::int64_t, 8> &);
+Json trade_evidence_fields(const Json &, std::string_view source,
+                           std::int64_t received_ns);
 // A REST balance can precede fills already confirmed on the event loop.
 Units spendable_collateral(Units sampled_balance, Units sampled_outflow,
                            Units current_outflow);

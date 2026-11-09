@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdint>
 #include <istream>
+#include <limits>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -228,6 +229,11 @@ struct Order {
   std::optional<Reason> refusal;
   std::optional<double> first_fill_wall;
   std::string venue_reply;
+  // These observations may only be joined inside their sending process run.
+  std::uint64_t timing_run = 0;
+  std::optional<std::int64_t> full_write_ns, confirmation_received_ns;
+  std::string confirmation_source;
+  bool write_conflict = false, confirmation_incomplete = false;
 };
 
 inline std::string text(const Json &row, const char *key) {
@@ -245,6 +251,27 @@ inline std::optional<double> num(const Json &row, const char *key) {
     return std::nullopt;
   double x = it->get<double>();
   return std::isfinite(x) ? std::optional(x) : std::nullopt;
+}
+// Subtract integer monotonic stamps before converting the duration to double.
+// An integral legacy JSON float is accepted only within the exact int64 range.
+inline std::optional<std::int64_t> monotonic_ns(const Json &row, const char *key) {
+  auto it = row.find(key);
+  if (it == row.end())
+    return std::nullopt;
+  if (it->is_number_unsigned()) {
+    auto value = it->get<std::uint64_t>();
+    if (value > 0 && value <= static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()))
+      return static_cast<std::int64_t>(value);
+  } else if (it->is_number_integer()) {
+    auto value = it->get<std::int64_t>();
+    if (value > 0)
+      return value;
+  } else if (it->is_number_float()) {
+    const double value = it->get<double>();
+    if (std::isfinite(value) && value > 0 && value < 0x1p63 && std::floor(value) == value)
+      return static_cast<std::int64_t>(value);
+  }
+  return std::nullopt;
 }
 
 class Report {
@@ -345,7 +372,7 @@ public:
            {"partially_filled", 0}, {"matched_unconfirmed", 0},
            {"unfilled", 0}, {"rejected", 0}, {"unknown_outcome", 0},
            {"no_reply_yet", 0}};
-    Stats to_fill;
+    Stats to_fill, websocket_confirmation, reconciliation_confirmation;
     for (auto &[id, ord] : orders_) {
       if (!ord.sent)
         continue;
@@ -368,6 +395,16 @@ public:
         inc("no_reply_yet");
       if (ord.first_fill_wall && std::isfinite(ord.sent_wall))
         to_fill.add((*ord.first_fill_wall - ord.sent_wall) * 1000.0);
+      if (!ord.write_conflict && !ord.confirmation_incomplete &&
+          ord.full_write_ns && ord.confirmation_received_ns &&
+          *ord.confirmation_received_ns >= *ord.full_write_ns) {
+        const double elapsed = static_cast<double>(*ord.confirmation_received_ns -
+                                                    *ord.full_write_ns) / 1e6;
+        if (ord.confirmation_source == "websocket")
+          websocket_confirmation.add(elapsed);
+        else if (ord.confirmation_source == "rest_reconciliation")
+          reconciliation_confirmation.add(elapsed);
+      }
     }
     o["paper_orders"] = paper_orders_;
     o["orphan_fill_rows"] = orphan_fills_;
@@ -375,8 +412,20 @@ public:
     Json lat;
     for (auto &[k, s] : stage_)
       lat[k] = s.json();
+    if (!lat.contains("pre_send_checks"))
+      lat["pre_send_checks"] = Stats{}.json();
     lat["send_to_first_fill_ms"] = to_fill.json();
+    lat["send_to_websocket_confirmation_evidence_ms"] = websocket_confirmation.json();
+    lat["send_to_reconciliation_confirmation_evidence_ms"] = reconciliation_confirmation.json();
     out["latency_ms"] = lat;
+    out["latency_evidence"] = {
+        {"legacy_trigger_to_dispatch_includes_checks", legacy_dispatch_fallbacks_},
+        {"pre_send_checks_missing_boundary", missing_check_boundaries_},
+        {"trigger_to_dispatch_note", "T0 to T1; legacy rows without T1 retain the T0-to-T2 fallback, which includes checks"},
+        {"confirmation_note", "first recorded positive CONFIRMED receipt per order, joined only within its dispatch run; client receipt time is not venue execution time"},
+        {"legacy_fill_note", "send_to_first_fill_ms retains the legacy dispatch/fill wall-clock rows, not full-wire monotonic timing"},
+        {"request_write_note", "T4 to T5 includes final guards, headers, enqueueing and complete socket write"},
+        {"network_and_ack_note", "includes network and venue response time; cannot isolate an exchange-imposed delay"}};
     Json cause{{"missed_with_disruption_within_30s", near_disruption_},
                {"missed_without_disruption", missed_ - near_disruption_},
                {"note", "counts journal rows (rate-limited); a disruption shortly before a data or timing miss is a suspected cause, not a confirmed one"}};
@@ -388,6 +437,7 @@ private:
   std::uint64_t rows_ = 0, malformed_ = 0, runs_ = 0, orphan_fills_ = 0,
                 missed_ = 0, near_disruption_ = 0;
   double signals_ = 0;
+  std::uint64_t legacy_dispatch_fallbacks_ = 0, missing_check_boundaries_ = 0;
   std::map<std::string, std::uint64_t> decisions_, skip_counts_, live_refusals_, unclassified_;
   std::map<std::string, std::pair<Reason, std::uint64_t>> outcomes_;
   std::map<std::string, Order> orders_;
@@ -472,12 +522,26 @@ private:
     auto ack = row.find("acknowledged");
     bool is_reply = ack != row.end();
     if (result == "pending" && !is_reply) { // the dispatch row
+      if (!o.sent || o.timing_run != runs_) {
+        o.timing_run = runs_;
+        o.full_write_ns.reset();
+        o.confirmation_received_ns.reset();
+        o.confirmation_source.clear();
+        o.write_conflict = o.confirmation_incomplete = false;
+      }
       o.sent = true;
       o.side = text(row, "side");
       o.condition = text(row, "condition_id");
       o.sent_wall = num(row, "wall").value_or(NAN);
       o.target = num(row, "order_shares").value_or(num(row, "shares").value_or(NAN));
     }
+    if (o.sent && o.timing_run == runs_)
+      if (auto write = monotonic_ns(row, "T5_ns")) {
+        if (o.full_write_ns && *o.full_write_ns != *write)
+          o.write_conflict = true;
+        else
+          o.full_write_ns = write;
+      }
     if (is_reply && ack->is_boolean()) {
       if (ack->get<bool>())
         o.acknowledged = true;
@@ -485,16 +549,27 @@ private:
         o.unknown = true;
     }
     if (is_reply) {
-      auto ns = [&](const char *k) { return num(row, k); };
-      auto t0 = ns("T0_ns"), t2 = ns("T2_ns"), t3 = ns("T3_ns"), t4 = ns("T4_ns"),
+      auto ns = [&](const char *k) { return monotonic_ns(row, k); };
+      auto t0 = ns("T0_ns"), t1 = ns("T1_ns"), t2 = ns("T2_ns"), t3 = ns("T3_ns"), t4 = ns("T4_ns"),
            t5 = ns("T5_ns"), t6 = ns("T6_ns");
-      auto span = [&](const char *name, std::optional<double> a, std::optional<double> b) {
+      auto span = [&](const char *name, std::optional<std::int64_t> a,
+                       std::optional<std::int64_t> b) {
         if (a && b && *b >= *a && *a > 0)
-          stage_[name].add((*b - *a) / 1e6);
+          stage_[name].add(static_cast<double>(*b - *a) / 1e6);
       };
       if (o.acknowledged && !o.timed) {
         o.timed = true;
-        span("trigger_to_dispatch", t0, t2);
+        if (row.contains("T1_ns")) {
+          span("trigger_to_dispatch", t0, t1);
+          span("pre_send_checks", t1, t2);
+          if (!t1 || !t2 || *t2 < *t1)
+            ++missing_check_boundaries_;
+        } else {
+          span("trigger_to_dispatch", t0, t2);
+          if (t0 && t2 && *t2 >= *t0)
+            ++legacy_dispatch_fallbacks_;
+          ++missing_check_boundaries_;
+        }
         span("signing", t2, t3);
         span("durable_intent", t3, t4);
         span("request_write", t4, t5);
@@ -517,6 +592,20 @@ private:
       o.confirmed += num(row, "shares").value_or(0);
       if (!o.first_fill_wall)
         o.first_fill_wall = num(row, "wall");
+      // Reconciliation can be posted after a later websocket callback. Select
+      // the first monotonic receipt, not the order in which rows were written.
+      if (o.sent && o.timing_run == runs_ && text(row, "status") == "CONFIRMED" &&
+          num(row, "shares").value_or(0) > 0) {
+        auto receipt = monotonic_ns(row, "evidence_received_ns");
+        auto source = text(row, "evidence_source");
+        if (!receipt || (source != "websocket" && source != "rest_reconciliation"))
+          o.confirmation_incomplete = true;
+        else if (!o.confirmation_received_ns || *receipt < *o.confirmation_received_ns) {
+          o.confirmation_received_ns = receipt;
+          o.confirmation_source = source;
+        } else if (*receipt == *o.confirmation_received_ns && source != o.confirmation_source)
+          o.confirmation_incomplete = true;
+      }
     } else if (result == "pending" && is_reply && o.unknown) {
       Reason r{"UNKNOWN_ORDER_OUTCOME", Kind::UnknownOutcome, "never retried; reconcile with the account trades"};
       auto &e = outcomes_[r.code];

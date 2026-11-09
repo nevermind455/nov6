@@ -5,6 +5,39 @@
 #include <sys/stat.h>
 #include <unistd.h>
 using namespace sniper;
+TEST(ExecutionTiming, DispatchAndSigningBoundariesStayDistinct) {
+  std::array<std::int64_t, 8> stamps{100, 200, 300, 400, 500, 0, 700, 0};
+  auto fields = execution::order_timing_fields(stamps);
+  EXPECT_EQ(fields["T0_ns"], 100);
+  EXPECT_EQ(fields["T1_ns"], 200);
+  EXPECT_EQ(fields["T2_ns"], 300);
+  EXPECT_EQ(fields["T6_ns"], 700);
+  EXPECT_FALSE(fields.contains("T5_ns"));
+  EXPECT_FALSE(fields.contains("T7_ns"));
+}
+TEST(ExecutionTiming, PrivateEvidenceKeepsItsSourceAndRawVenueClock) {
+  Json trade{{"match_time", "1900000000"}, {"last_update", 1900000001000LL},
+             {"timestamp", nullptr}, {"created_at", Json::object()},
+             {"apiKey", "never copy unrelated data"}};
+  auto fields = execution::trade_evidence_fields(trade, "websocket", 123456789);
+  EXPECT_EQ(fields["evidence_source"], "websocket");
+  EXPECT_EQ(fields["evidence_received_ns"], 123456789);
+  EXPECT_EQ(fields["venue_event_times_raw"]["match_time"], "1900000000");
+  EXPECT_EQ(fields["venue_event_times_raw"]["last_update"], 1900000001000LL);
+  EXPECT_EQ(fields["venue_event_times_raw"].size(), 2u);
+  EXPECT_FALSE(fields.contains("apiKey"));
+  auto polled = execution::trade_evidence_fields(trade, "rest_reconciliation", 200);
+  EXPECT_EQ(polled["evidence_source"], "rest_reconciliation");
+  EXPECT_EQ(polled["evidence_received_ns"], 200);
+}
+TEST(ExecutionTiming, MissingReceiptAndUnboundedVenueTextAreNotInvented) {
+  Json trade{{"match_time", std::string(256, 'x')},
+             {"timestamp", std::numeric_limits<double>::infinity()}};
+  auto fields = execution::trade_evidence_fields(trade, "websocket", 0);
+  EXPECT_FALSE(fields.contains("evidence_received_ns"));
+  EXPECT_EQ(fields["venue_event_times_raw"]["match_time"].get<std::string>().size(), 128u);
+  EXPECT_FALSE(fields["venue_event_times_raw"].contains("timestamp"));
+}
 namespace {
 struct RuntimeDirectory {
   std::filesystem::path path = std::filesystem::temp_directory_path() /

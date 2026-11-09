@@ -1,5 +1,21 @@
 # Changelog
 
+## 9 November 2026 — execution latency and measurement
+
+* Precompute immutable EIP-712 signing data, avoid duplicate token parsing and
+  temporary hashing allocations, preserving fresh order fields and signatures.
+* Verify TCP_NODELAY and SO_KEEPALIVE on native connections and expose the
+  warmed order session's generation and readiness in execution evidence.
+* Separate dispatch from pre-send checks, capture private evidence receipt and
+  source, and report same-run monotonic confirmation observations separately
+  from REST polling and the legacy wall-clock metric.
+* Add `sniper-net-probe`, a native read-only `/time` probe for AMS3 and candidate
+  hosts, with setup/first-request/warm-request measurements and strict failures.
+
+See [the measured review](reports/LATENCY_2026-11-09.md) and
+[the execution timing guide](docs/EXECUTION_LATENCY.md). No strategy gate,
+durability check, production deployment or VPS location was changed by this work.
+
 ## Unreleased — missed-order diagnostics, fault pauses and round switch timing
 
 * **Fix: a repeated fault only paused new orders the first time.** `pause()`

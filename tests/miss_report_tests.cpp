@@ -1,8 +1,10 @@
 #include "miss_report.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <limits>
 #include <regex>
 #include <sstream>
 
@@ -20,6 +22,34 @@ std::string source(const char *path) {
   std::stringstream s;
   s << in.rdbuf();
   return s.str();
+}
+Json dispatch_row(const char *id, std::int64_t base = 0) {
+  return Json{{"result", "pending"}, {"order_id", id}, {"side", "UP"},
+              {"order_shares", 10}, {"wall", 100.0},
+              {"T0_ns", base + 1000000}, {"T1_ns", base + 1020000},
+              {"T2_ns", base + 1060000}};
+}
+Json acknowledgement_row(const char *id, std::int64_t base = 0) {
+  auto row = dispatch_row(id, base);
+  row["acknowledged"] = true;
+  row["T3_ns"] = base + 1090000;
+  row["T4_ns"] = base + 1500000;
+  row["T5_ns"] = base + 1600000;
+  row["T6_ns"] = base + 31600000;
+  return row;
+}
+Json confirmation_row(const char *id, Json receipt = 21600000,
+                      const char *source_name = "websocket", double shares = 2,
+                      const char *status = "CONFIRMED") {
+  return Json{{"result", "live_fill"}, {"order_id", id}, {"shares", shares},
+              {"status", status}, {"wall", 100.4},
+              {"evidence_received_ns", std::move(receipt)},
+              {"evidence_source", source_name}};
+}
+std::size_t samples(const Json &report, const char *metric) {
+  const auto &latency = report.at("latency_ms");
+  auto found = latency.find(metric);
+  return found == latency.end() ? 0 : found->value("n", std::size_t(0));
 }
 } // namespace
 
@@ -192,4 +222,171 @@ TEST(MissReport, MalformedLinesAreCounted) {
   auto bad = read_lines(in, [&](const Json &j) { r.add(j); });
   EXPECT_EQ(bad, 1u);
   EXPECT_EQ(r.json()["malformed_rows"], 1);
+}
+
+TEST(MissReport, DispatchEntrySeparatesSignalSchedulingFromPresendChecks) {
+  Report current;
+  current.add(dispatch_row("new"));
+  current.add(acknowledgement_row("new"));
+  auto now = current.json();
+  const auto &lat = now["latency_ms"];
+  EXPECT_DOUBLE_EQ(lat["trigger_to_dispatch"]["p50"].get<double>(), 0.02);
+  EXPECT_DOUBLE_EQ(lat["pre_send_checks"]["p50"].get<double>(), 0.04);
+  EXPECT_DOUBLE_EQ(lat["signing"]["p50"].get<double>(), 0.03);
+  EXPECT_DOUBLE_EQ(lat["durable_intent"]["p50"].get<double>(), 0.41);
+  EXPECT_DOUBLE_EQ(lat["request_write"]["p50"].get<double>(), 0.1);
+  EXPECT_DOUBLE_EQ(lat["network_and_ack"]["p50"].get<double>(), 30.0);
+  EXPECT_DOUBLE_EQ(lat["trigger_to_ack"]["p50"].get<double>(), 30.6);
+  EXPECT_EQ(now["latency_evidence"]["legacy_trigger_to_dispatch_includes_checks"], 0);
+  EXPECT_EQ(now["latency_evidence"]["pre_send_checks_missing_boundary"], 0);
+
+  Report legacy;
+  auto send = dispatch_row("old"), ack = acknowledgement_row("old");
+  send.erase("T1_ns");
+  ack.erase("T1_ns");
+  legacy.add(send);
+  legacy.add(ack);
+  auto old = legacy.json();
+  EXPECT_DOUBLE_EQ(old["latency_ms"]["trigger_to_dispatch"]["p50"].get<double>(), 0.06);
+  EXPECT_EQ(samples(old, "pre_send_checks"), 0u);
+  EXPECT_EQ(old["latency_evidence"]["legacy_trigger_to_dispatch_includes_checks"], 1);
+  EXPECT_EQ(old["latency_evidence"]["pre_send_checks_missing_boundary"], 1);
+}
+
+TEST(MissReport, InvalidOrReversedDispatchBoundariesDoNotInventCheckLatency) {
+  for (const auto &invalid : std::vector<Json>{nullptr, 0, -1, true, 1020000.5,
+           std::numeric_limits<std::uint64_t>::max(), 1e100}) {
+    Report report;
+    report.add(dispatch_row("A"));
+    auto ack = acknowledgement_row("A");
+    ack["T1_ns"] = invalid;
+    report.add(ack);
+    auto out = report.json();
+    EXPECT_EQ(samples(out, "trigger_to_dispatch"), 0u) << invalid;
+    EXPECT_EQ(samples(out, "pre_send_checks"), 0u) << invalid;
+    EXPECT_EQ(out["latency_evidence"]["legacy_trigger_to_dispatch_includes_checks"], 0);
+    EXPECT_EQ(out["latency_evidence"]["pre_send_checks_missing_boundary"], 1);
+  }
+  Report reversed;
+  reversed.add(dispatch_row("A"));
+  auto ack = acknowledgement_row("A");
+  ack["T1_ns"] = 1070000; // dispatch entry after the recorded check completion
+  reversed.add(ack);
+  auto out = reversed.json();
+  EXPECT_EQ(samples(out, "pre_send_checks"), 0u);
+  EXPECT_EQ(out["latency_evidence"]["pre_send_checks_missing_boundary"], 1);
+}
+
+TEST(MissReport, ConfirmationEvidenceJoinsBeforeOrAfterAckAndUsesItsEarliestSource) {
+  Report report;
+  report.add(dispatch_row("websocket-first"));
+  report.add(confirmation_row("websocket-first", 11600000, "websocket", 0));
+  report.add(confirmation_row("websocket-first", 15600000, "websocket", 2, "MINED"));
+  auto update = confirmation_row("websocket-first", 17600000);
+  update["result"] = "live_fill_update";
+  report.add(update);
+  auto first = confirmation_row("websocket-first", 21600000);
+  report.add(first); // first positive CONFIRMED evidence precedes HTTP ACK
+  report.add(acknowledgement_row("websocket-first"));
+  report.add(first); // repeated evidence must not add a latency observation
+  report.add(confirmation_row("websocket-first", 51600000, "rest_reconciliation"));
+
+  report.add(dispatch_row("reconciliation-first"));
+  report.add(acknowledgement_row("reconciliation-first"));
+  report.add(confirmation_row("reconciliation-first", 61600000));
+  // Posted later, but actually received before the websocket event above.
+  report.add(confirmation_row("reconciliation-first", 51600000, "rest_reconciliation"));
+  auto out = report.json();
+  const auto &lat = out["latency_ms"];
+  EXPECT_EQ(lat["send_to_websocket_confirmation_evidence_ms"]["n"], 1);
+  EXPECT_DOUBLE_EQ(lat["send_to_websocket_confirmation_evidence_ms"]["p50"].get<double>(), 20.0);
+  EXPECT_EQ(lat["send_to_reconciliation_confirmation_evidence_ms"]["n"], 1);
+  EXPECT_DOUBLE_EQ(lat["send_to_reconciliation_confirmation_evidence_ms"]["p50"].get<double>(), 50.0);
+  EXPECT_EQ(out["orders"]["submitted"], 2);
+  EXPECT_EQ(out["orders"]["acknowledged"], 2);
+  EXPECT_EQ(lat["send_to_first_fill_ms"]["n"], 2); // legacy wall metric survives
+  EXPECT_DOUBLE_EQ(lat["send_to_first_fill_ms"]["p50"].get<double>(), 400.0);
+}
+
+TEST(MissReport, IncompleteOrConflictingConfirmationEvidenceCannotClaimLatency) {
+  const auto metric = "send_to_websocket_confirmation_evidence_ms";
+  std::vector<Json> invalid;
+  for (const auto &receipt : std::vector<Json>{nullptr, 0, -1, true, 21600000.5,
+           std::numeric_limits<std::uint64_t>::max(), 1e100}) {
+    invalid.push_back(confirmation_row("A", receipt));
+  }
+  auto missing = confirmation_row("A");
+  missing.erase("evidence_received_ns");
+  invalid.push_back(missing);
+  missing = confirmation_row("A");
+  missing.erase("evidence_source");
+  invalid.push_back(missing);
+  invalid.push_back(confirmation_row("A", 31600000, "unknown"));
+  invalid.push_back(confirmation_row("A", 21600000, "rest_reconciliation"));
+  for (const auto &bad : invalid) {
+    Report report;
+    report.add(dispatch_row("A"));
+    report.add(acknowledgement_row("A"));
+    report.add(confirmation_row("A"));
+    report.add(bad);
+    auto out = report.json();
+    EXPECT_EQ(samples(out, metric), 0u) << bad;
+    EXPECT_EQ(samples(out, "send_to_reconciliation_confirmation_evidence_ms"), 0u) << bad;
+    EXPECT_EQ(out["orders"]["submitted"], 1);
+    EXPECT_EQ(out["orders"]["acknowledged"], 1);
+  }
+  Report reversed;
+  reversed.add(dispatch_row("A"));
+  reversed.add(acknowledgement_row("A"));
+  reversed.add(confirmation_row("A", 1500000)); // before completed full write
+  EXPECT_EQ(samples(reversed.json(), metric), 0u);
+  Report conflicting_write;
+  conflicting_write.add(dispatch_row("A"));
+  conflicting_write.add(acknowledgement_row("A"));
+  auto conflicting_ack = acknowledgement_row("A");
+  conflicting_ack["T5_ns"] = 1700000;
+  conflicting_write.add(conflicting_ack);
+  conflicting_write.add(confirmation_row("A"));
+  EXPECT_EQ(samples(conflicting_write.json(), metric), 0u);
+  Report missing_status;
+  missing_status.add(dispatch_row("A"));
+  missing_status.add(acknowledgement_row("A"));
+  auto no_status = confirmation_row("A");
+  no_status.erase("status");
+  missing_status.add(no_status);
+  EXPECT_EQ(samples(missing_status.json(), metric), 0u);
+}
+
+TEST(MissReport, ConfirmationTimesNeverJoinMonotonicClocksAcrossRestarts) {
+  Report report;
+  report.add(Json{{"result", "start"}, {"wall", 1}});
+  report.add(dispatch_row("old-order"));
+  report.add(acknowledgement_row("old-order"));
+  report.add(Json{{"result", "start"}, {"wall", 2}});
+  report.add(acknowledgement_row("old-order"));
+  report.add(confirmation_row("old-order", 21600000));
+  EXPECT_EQ(samples(report.json(), "send_to_websocket_confirmation_evidence_ms"), 0u);
+  // A current-run dispatch and receipt still produce their own observation.
+  report.add(dispatch_row("new-order"));
+  report.add(confirmation_row("new-order", 21600000));
+  report.add(acknowledgement_row("new-order"));
+  auto out = report.json();
+  EXPECT_EQ(samples(out, "send_to_websocket_confirmation_evidence_ms"), 1u);
+  EXPECT_DOUBLE_EQ(out["latency_ms"]["send_to_websocket_confirmation_evidence_ms"]["p50"].get<double>(), 20.0);
+}
+
+TEST(MissReport, MonotonicDurationsKeepIntegerPrecisionNearInt64Limit) {
+  const auto base = std::numeric_limits<std::int64_t>::max() - 100000000;
+  Report report;
+  report.add(dispatch_row("A", base));
+  report.add(acknowledgement_row("A", base));
+  report.add(confirmation_row("A", base + 21600000));
+  auto out = report.json();
+  const auto &lat = out["latency_ms"];
+  EXPECT_DOUBLE_EQ(lat["trigger_to_dispatch"]["p50"].get<double>(), 0.02);
+  EXPECT_DOUBLE_EQ(lat["pre_send_checks"]["p50"].get<double>(), 0.04);
+  EXPECT_DOUBLE_EQ(lat["durable_intent"]["p50"].get<double>(), 0.41);
+  EXPECT_DOUBLE_EQ(lat["request_write"]["p50"].get<double>(), 0.1);
+  EXPECT_DOUBLE_EQ(lat["network_and_ack"]["p50"].get<double>(), 30.0);
+  EXPECT_DOUBLE_EQ(lat["send_to_websocket_confirmation_evidence_ms"]["p50"].get<double>(), 20.0);
 }

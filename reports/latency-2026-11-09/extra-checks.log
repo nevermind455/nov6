@@ -1,0 +1,26 @@
+Live launcher checks passed (no real network or orders).
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.194s
+
+OK
+TAP version 13
+# Subtest: fixture resolution uses 60s window, not final spot tick
+ok 1 - fixture resolution uses 60s window, not final spot tick
+  ---
+  duration_ms: 1.709909
+  ...
+# Subtest: boundary ticks excluded; absent seconds hold last value
+ok 2 - boundary ticks excluded; absent seconds hold last value
+  ---
+  duration_ms: 0.496218
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 180.857339

@@ -1,0 +1,3 @@
+sniper-net-probe [--endpoint https://clob.polymarket.com] [--samples 30] [--interval-ms 200] [--timeout-s 10] [--label ams3]
+Read-only GET /time over one TLS-verified HTTP/2 connection.
+Samples include local queuing, network and server processing; they do not isolate exchange-imposed execution delay.
