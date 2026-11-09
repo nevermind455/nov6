@@ -101,3 +101,16 @@ Compare the bot with your account on polymarket.com: orders, fills, fees and cas
 should all agree. Read `state/live/sniper.jsonl` for anything unexpected. Only then
 consider a larger session, by changing `.env.live` and starting again with
 `--new-canary-session`. That starts a new budget; it does not reset positions.
+
+## Trades you make yourself
+
+The bot halts with "fill the native bot did not authorize" when the wallet has
+a trade it did not place. If it was your own trade, find its `trade_id` in the
+error row and add it, one per line, to `state/live/manual_trades.txt`:
+
+```bash
+grep '"fill the native bot did not authorize"' state/live/sniper.jsonl | grep -o '"trade_id":"[^"]*"' | cut -d'"' -f4 | sort -u
+```
+
+The bot then skips just those trades. Any other unknown trade still halts it,
+so do not list one you do not recognise: move the funds to a new wallet.

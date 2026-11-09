@@ -263,6 +263,7 @@ struct Runtime::Impl {
   DashQuality dash_quality;
   double dash_started_wall = wall_s();
   std::set<std::string> dash_live_acknowledged;
+  std::set<std::string> noted_manual_trades;
   std::map<std::string, double> dash_live_decision_asks;
   std::string dash_live_last_fill_order;
   std::set<std::pair<std::string, std::string>> dash_live_latency_recorded;
@@ -2177,6 +2178,30 @@ struct Runtime::Impl {
   void consume_trade(const Json &j, std::string_view source,
                      std::int64_t received_ns) {
     try {
+      if (is_foreign_trade(j, ledger.orders)) {
+        const std::string trade = j.value("id", "");
+        std::ifstream in(c.state / "manual_trades.txt");
+        if (!trade.empty() && read_manual_trades(in).count(trade)) {
+          if (noted_manual_trades.insert(trade).second)
+            audit({{"result", "manual_trade"},
+                   {"trade_id", trade},
+                   {"reason", "listed in manual_trades.txt; not this bot's fill"}});
+          return;
+        }
+        ++errors;
+        pause("accounting disagreement or unauthorized fill", true);
+        Json row{{"result", "error"},
+                 {"reason", "fill the native bot did not authorize"},
+                 {"trade_id", trade},
+                 {"hint", "if this was your own trade, add its trade_id to "
+                          "state/live/manual_trades.txt"}};
+        for (const char *k : {"taker_order_id", "market", "side", "size", "price",
+                              "status", "match_time"})
+          if (j.contains(k))
+            row[k] = j.at(k);
+        audit(std::move(row));
+        return;
+      }
       auto t = parse_trade(j, ledger.orders);
       auto evidence = execution::trade_evidence_fields(j, source, received_ns);
       if (t.status == "FAILED") {

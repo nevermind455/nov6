@@ -217,6 +217,23 @@ std::map<std::string, Units> resolve_payouts(const RestClient &rest,
   }
   return {};
 }
+std::set<std::string> read_manual_trades(std::istream &in) {
+  std::set<std::string> ids;
+  std::string line;
+  while (std::getline(in, line)) {
+    line = line.substr(0, line.find('#'));
+    auto first = line.find_first_not_of(" \t\r");
+    if (first == std::string::npos)
+      continue;
+    auto last = line.find_last_not_of(" \t\r");
+    ids.insert(line.substr(first, last - first + 1));
+  }
+  return ids;
+}
+bool is_foreign_trade(const Json &j, const std::map<std::string, Intent> &intents) {
+  auto it = j.find("taker_order_id");
+  return it != j.end() && it->is_string() && !intents.count(it->get<std::string>());
+}
 ParsedTrade parse_trade(const Json &j,
                         const std::map<std::string, Intent> &intents) {
   ParsedTrade t;

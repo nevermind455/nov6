@@ -6,6 +6,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <random>
+#include <sstream>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -1039,4 +1040,20 @@ TEST(CanarySpend, AConfirmedMissGivesItsSpendBackAndNeverGoesNegative) {
   EXPECT_EQ(state.spend, 17640000);
   refund_missed_spend(state, 99000000);
   EXPECT_EQ(state.spend, 0);
+}
+
+TEST(ManualTrades, ListedIdsAreReadAndCommentsIgnored) {
+  std::istringstream in("# my own trades\n  abc-1  \n\nxyz-2 # bought by hand\r\n   \n");
+  auto ids = read_manual_trades(in);
+  EXPECT_EQ(ids, (std::set<std::string>{"abc-1", "xyz-2"}));
+  std::istringstream empty("");
+  EXPECT_TRUE(read_manual_trades(empty).empty());
+}
+
+TEST(ManualTrades, OnlyTradesWithAnUnknownTakerOrderAreForeign) {
+  std::map<std::string, Intent> intents{{"mine", Intent{}}};
+  EXPECT_FALSE(is_foreign_trade({{"taker_order_id", "mine"}}, intents));
+  EXPECT_TRUE(is_foreign_trade({{"taker_order_id", "someone"}}, intents));
+  // a malformed trade is left for parse_trade to refuse
+  EXPECT_FALSE(is_foreign_trade({{"id", "t"}}, intents));
 }

@@ -3,6 +3,8 @@
 #include "network.hpp"
 #include "storage.hpp"
 #include <deque>
+#include <istream>
+#include <set>
 namespace sniper {
 struct ServerClock {
   std::deque<double> offsets, rtts;
@@ -21,4 +23,9 @@ struct ParsedTrade {
   Units shares = 0, cost = 0, fee = 0;
 };
 ParsedTrade parse_trade(const Json &, const std::map<std::string, Intent> &);
+// Trade ids the owner has marked as their own manual trades, one per line;
+// blank lines and text after '#' are ignored.
+std::set<std::string> read_manual_trades(std::istream &);
+// A trade on this wallet whose taker order this bot never placed.
+bool is_foreign_trade(const Json &, const std::map<std::string, Intent> &);
 } // namespace sniper
