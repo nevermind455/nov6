@@ -285,6 +285,7 @@ struct Runtime::Impl {
   std::map<std::string, double> rest_final_at; // id -> monotonic seconds
   std::string rest_fault_text;
   double rest_fault_at = -1e30;
+  double user_heard = -1e30; // monotonic time of the private channel's last message
   std::atomic<bool> reconcile_asap{false};
 
   explicit Impl(Config cfg)
@@ -2351,7 +2352,8 @@ struct Runtime::Impl {
                      : std::string()));
     // The stop bounds the whole test: resting fills not settled yet could
     // still lose all they paid, and so could this order.
-    if (!rest::fits_stop(rest_test->realized, rest_open_cost(), missed.stake,
+    if (!rest_test ||
+        !rest::fits_stop(rest_test->realized, rest_open_cost(), missed.stake,
                          units(fixed6(c.s.rest_stop_usd))))
       return no("resting positions still open could reach the loss stop");
     if (!hub || hub->condition != missed.condition)
@@ -2479,8 +2481,8 @@ struct Runtime::Impl {
     const double mono = mono_s();
     const double life = rest::lifetime_s(m.end, wall_s(), policy);
     auto gate = live_readiness(r);
-    if (gate.empty() &&
-        (!effective_balance() || ledger.reserved() > *effective_balance()))
+    const auto spendable = effective_balance();
+    if (gate.empty() && (!spendable || ledger.reserved() > *spendable))
       gate = "collateral fell below outstanding reservations";
     if (gate.empty() && !(life >= policy.min_rest_s))
       gate = "too late in the round to rest";
@@ -2652,6 +2654,11 @@ struct Runtime::Impl {
       hold = "new orders are paused: " + pause_reason;
     else if (std::filesystem::exists(c.stop_file))
       hold = "STOP_LIVE present";
+    // Fills and cancellations arrive on the private channel. Without it an
+    // order would rest with nobody seeing what happens to it. (Changing its
+    // subscriptions is not a loss: only a closed or silent channel is.)
+    else if (!user || !user->connected() || mono - user_heard >= 20)
+      hold = "private channel not ready";
     auto policy = rest_policy();
     // The price to beat is judged on a fresh trigger price only; the timer
     // between ticks handles time, pauses and a silent feed.
@@ -3071,6 +3078,7 @@ struct Runtime::Impl {
   }
   void on_user(std::string_view raw) {
     const auto received_ns = mono_ns();
+    user_heard = mono_s();
     if (raw == "PONG") {
       user_pong = mono_s();
       return;

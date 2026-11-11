@@ -61,6 +61,27 @@ Dashboard: the MARKET panel shows the resting order under the book (side,
 shares, price, time left with a bar, or its state), recomputed every frame;
 the ORDERS table has a line for each order that rested.
 
+A second pass (sanitizer builds, connection-drop stress, static analysis):
+
+* A resting order is cancelled when the private channel closes or goes
+  silent; before, it stayed on the book with its fills unseen until the next
+  reconciliation.
+* A placement answered with any 2xx status and `live` is resting; null
+  `errorMsg` and amount fields are read as absent; an order the venue takes
+  without showing it on the book (`delayed`) is followed and cancelled at
+  once instead of raising the unknown-outcome pause.
+* Cancel replies match the order id whatever its letter case.
+* When a late placement answer arrives for an order whose cancel is already
+  wanted, the cancel goes out at once.
+* A placement answered as resting for an order no longer followed is followed
+  again and cancelled.
+* The same fault in the resting-order watch is reported once in ten seconds.
+* Should one of our orders ever take our own resting order, both sides of
+  the trade are booked.
+* `tools/fake-venue` gained `VENUE_SIGMA`, and its account side was used for
+  the stress runs: with every connection cut every 6 s for ten minutes the
+  ledger equalled the venue's record and no order was left open.
+
 ## 9 November 2026 — execution latency and measurement
 
 * Precompute immutable EIP-712 signing data, avoid duplicate token parsing and

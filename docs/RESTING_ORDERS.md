@@ -69,6 +69,8 @@ Whichever comes first:
 * **the move was given back** (BTC is back at the price before the signal);
 * with `SNIPER_REST_DIR=1`, the side is no longer ahead of the price to beat;
 * the trigger feed stopped being fresh;
+* the private channel is closed or silent (fills and cancellations arrive
+  there: without it nobody would see what happens to the order);
 * new orders are paused, the stop file exists, or the bot is shutting down.
 
 Price checks run on every Coinbase tick, so a cancel leaves in the same
@@ -132,7 +134,7 @@ cancelled. These lines are not counted in the execution figures.
 | `result` | Meaning |
 | --- | --- |
 | `rest_live` | At start: whether the feature is on, and why not |
-| `rest_order` | One per confirmed miss. `outcome`: `resting`, `skipped` (a rule above), `refused` (a live gate), `not resting` (the venue refused it), `unknown` |
+| `rest_order` | One per confirmed miss. `outcome`: `resting`, `skipped` (a rule above), `refused` (a live gate), `not resting` (the venue refused it), `accepted` (taken by the venue but not shown on the book, e.g. `delayed`: followed and cancelled at once), `matched`, `unknown` |
 | `rest_cancel` | A cancel was sent: `why`, `try`, `rested_ms` |
 | `rest_cancel_reply` | The venue's answer to it |
 | `rest_done` | The end: `filled`, `shares`, `cancel_why`, `source` of the final size |
@@ -174,4 +176,10 @@ Unit tests (`tests/rest_tests.cpp`): the post-only body, the cancel request
 and its signature against the real SDK's bytes (`tests/fixtures/rest_vectors.json`);
 the rest and cancel rules; the venue's replies; maker fills; ledger accounting
 across a restart; the loss stop. End to end against `tools/fake-venue` with
-`VENUE_LIVE=1`: see that folder's README. Not tested against the real venue.
+`VENUE_LIVE=1` (see that folder's README): fills and partial fills, every
+cancel reason, failing cancels, a silent private channel, shutdown and a hard
+kill with an order on the book, and every connection cut every 6 seconds for
+ten minutes. After each stress run the ledger was compared with the venue's own
+record of trades and open orders: equal, and nothing left open. The same runs
+and the unit tests were repeated on a build with AddressSanitizer and
+UndefinedBehaviorSanitizer with no report. Not tested against the real venue.
