@@ -1,5 +1,38 @@
 # Changelog
 
+## 11 November 2026 — rest a missed order on the book (`SNIPER_REST_LIVE`)
+
+Opt-in, live only, off by default. No change to any decision, limit or size,
+and none at all unless `SNIPER_REST_LIVE=1`.
+
+* After a FAK the venue confirms matched nothing, the same BUY (its shares at
+  its limit) can rest on the book as a post-only order for at most
+  `SNIPER_REST_S` seconds. A fill is a maker fill: booked at the order's own
+  price with no fee.
+* `SNIPER_REST_DIR=1` (default) rests only the side that beats the price to
+  beat by more than the estimate's own error.
+* It is cancelled early when the trigger fires the other way, when BTC gives
+  the move back, when the side falls behind the price to beat, when the feed
+  goes stale, on any pause, and at shutdown. A cancel is repeated until the
+  venue shows the order gone.
+* While an order may be on the book its market takes no other order of ours.
+* `SNIPER_REST_LIVE_STOP_USD` turns it off for good once the resting orders'
+  own settled loss reaches it (`state/live/rest_live_test.json`).
+* The order sender gained a cancel (`DELETE /order`) on the same HTTP/2
+  connection; the ledger a `rest` flag per order and `rest_realized`; trade
+  handling accepts a trade whose maker leg is our resting order (it was an
+  "unauthorized fill" before); open-order reconciliation expects our own
+  resting order; an inherited resting order is cancelled at start.
+* `sniper-miss-report` prints a `resting_orders` section and knows the new
+  reasons (`RISK_RESTING_ORDER`, `LATE_REST`).
+* `tools/fake-venue` can play the account side (`VENUE_LIVE=1`): orders,
+  cancels, the private channel, trades and balance, for end-to-end runs of
+  `--live` with no real venue.
+
+Details, rules and limits: [docs/RESTING_ORDERS.md](docs/RESTING_ORDERS.md).
+Wire bytes are checked against the real SDK; the feature has not traded on
+the real venue.
+
 ## 9 November 2026 — execution latency and measurement
 
 * Precompute immutable EIP-712 signing data, avoid duplicate token parsing and

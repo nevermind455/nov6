@@ -92,12 +92,22 @@ way: `sniper-replay rec.jsonl out.jsonl` and `py_replay.py REPO rec.jsonl out.js
 
 ## Not implemented (refused when enabled)
 
-Binance/Kraken triggers, extra feeds, the direction add-on, maker/resting
-orders, wide caps, measured live fill odds (`auto` acts as `off`), the paper cash
+Binance/Kraken triggers, extra feeds, the direction add-on, maker-only and
+split maker orders, wide caps, measured live fill odds (`auto` acts as `off`), the paper cash
 mirror (`auto` acts as `off`), strict paper/live parity, the fresh market
 socket, live-sampled delays (`auto` uses the model), `SNIPER_BOOK_CLOCK=wake`.
 Diagnostics that never change a decision are also absent: shadow fills, book
 traces, markout rows, guard diagnostics.
+
+## Implemented beyond the baseline (opt-in, off by default)
+
+* `SNIPER_MISS_RETRY`: one more FAK after a confirmed miss.
+* `SNIPER_REST_LIVE`: the reference's resting order after a miss (the missed
+  FAK's shares at its limit, post-only, cancelled after `SNIPER_REST_S`, its
+  own loss stop), with two additions: `SNIPER_REST_DIR` keeps it to the side
+  beating the price to beat, and it is cancelled early when the trigger price
+  turns against it. See [RESTING_ORDERS.md](RESTING_ORDERS.md). Not validated
+  against the real venue.
 
 ## Remaining differences from the reference
 

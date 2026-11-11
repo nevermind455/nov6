@@ -1775,7 +1775,7 @@ struct Runtime::Impl {
       else if (kind == "subscribed")
         cb_ack[n] = true;
       // The trigger price just moved: a resting order it moved against is
-      // cancelled before anything else is done with this tick.
+      // cancelled as soon as the engine has read this tick.
       if (!rest_book.empty())
         rest_watch(true);
     } catch (const std::exception &e) {
@@ -2248,8 +2248,12 @@ struct Runtime::Impl {
     auto &rule = r.rules[n];
     if (rest_book.busy())
       return no("another resting order is not off the book yet");
-    if (ledger.awaiting(missed.token))
-      return no("an earlier order on this side still awaits its fill size");
+    // Any other order of ours that can still trade in this market could be
+    // matched against the resting one (a buy of each outcome makes a pair).
+    if (!inflight_id[0].empty() || !inflight_id[1].empty())
+      return no("another order of ours is in flight in this market");
+    if (ledger.awaiting(r.up) || ledger.awaiting(r.down))
+      return no("an earlier order in this market still awaits its fill size");
     const auto &signal = rest_signal[n];
     if (signal.id != missed_id)
       return no("the missed order's signal is unknown");

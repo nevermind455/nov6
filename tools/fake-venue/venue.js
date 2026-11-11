@@ -34,7 +34,7 @@ const CFG = {
   quietUser: env('VENUE_QUIET_USER', '0') === '1', // send no order events on the private channel
   balance: +env('VENUE_BALANCE', 100), // dollars
   ptb: env('VENUE_PTB', '1') === '1', // publish the price to beat in Gamma
-  sigma: 1e-4, // per sqrt(second)
+  sigma: +env('VENUE_SIGMA', 1e-4), // BTC volatility per sqrt(second)
   log: env('VENUE_LOG', __dirname + '/venue.log'),
 };
 const logStream = fs.createWriteStream(CFG.log, { flags: 'a' });
