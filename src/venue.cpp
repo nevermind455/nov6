@@ -241,8 +241,10 @@ parse_maker_fills(const Json &j, const std::map<std::string, Intent> &intents) {
   if (legs == j.end() || !legs->is_array())
     return out;
   for (auto &leg : *legs) {
+    // Only a leg that names one of our orders is ours to judge; anything
+    // else is left to the handling of a stranger's trade.
     if (!leg.is_object())
-      throw std::runtime_error("invalid maker leg");
+      continue;
     auto oid = leg.find("order_id");
     if (oid == leg.end() || !oid->is_string())
       continue;

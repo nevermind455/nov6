@@ -557,6 +557,11 @@ TEST(RestTrades, AMakerLegOfOurRestingOrderIsOurFill) {
   EXPECT_TRUE(parse_maker_fills(strangers, intents).empty());
   strangers.erase("maker_orders");
   EXPECT_TRUE(parse_maker_fills(strangers, intents).empty());
+  // odd legs in a stranger's trade are not ours to judge
+  strangers["maker_orders"] = Json::array({"text", 7, nullptr, Json::object()});
+  EXPECT_TRUE(parse_maker_fills(strangers, intents).empty());
+  strangers["maker_orders"] = "none";
+  EXPECT_TRUE(parse_maker_fills(strangers, intents).empty());
 }
 
 TEST(RestTrades, AMakerFillThatDisagreesWithTheOrderIsRefused) {
