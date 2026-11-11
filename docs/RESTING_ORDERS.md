@@ -46,7 +46,15 @@ written in the `rest_order` row as its `reason`.
    about an hour of running after a start (see below).
 6. The best offer is above the limit (otherwise a post-only order would be
    refused by the venue).
-7. Every check a normal live order passes: connections ready, fresh balance,
+7. No other order of the bot can still trade in this market (one in flight,
+   or one whose fill size is not known yet): the two could be matched with
+   each other.
+8. It fits under the loss stop even in the worst case: the settled result of
+   the test, less everything resting fills still open have paid, less this
+   order's stake, must stay above `-SNIPER_REST_LIVE_STOP_USD`. Otherwise the
+   reason is `resting positions still open could reach the loss stop`, until
+   those rounds settle.
+9. Every check a normal live order passes: connections ready, fresh balance,
    collateral, allowance, round caps and the canary budgets. A resting order
    counts as an order, takes a fill slot and reserves its stake, exactly as a
    FAK does; an unfilled one gives its slot and spend back.
@@ -65,8 +73,14 @@ Whichever comes first:
 
 Price checks run on every Coinbase tick, so a cancel leaves in the same
 moment the tick is read. A cancel is asked again until the venue shows the
-order gone: three quick tries, then every 5 seconds with new orders paused and
-an `error` row. A shutdown waits (up to 20 seconds) for the venue to confirm.
+order gone: three quick tries, then every 5 seconds. If the order is still not
+shown gone after three answers, or 5 seconds after the cancel was first wanted
+for any reason (no connection, no answer), an `error` row is written and new
+orders pause. A shutdown waits (up to 20 seconds) for the venue to confirm.
+
+A cancel normally waits for the venue's answer to the placement, because the
+venue must know the order first. If that answer is more than a second late the
+cancel is sent anyway: the order may already be on the book.
 
 ## While it rests
 
@@ -87,10 +101,31 @@ own order.
   is unknown.
 * The ledger keeps `rest_realized`: the settled profit and loss of resting
   orders only. The loss stop reads its change since the test began, from
-  `state/live/rest_live_test.json`. Delete that file to begin a new test.
+  `state/live/rest_live_test.json`. Stop the bot and delete that file to
+  begin a new test.
 * Resting orders are not counted among the FAK orders in the summary's
   `orders`, or in the fill rate and latency figures of `sniper-miss-report`.
   That report has its own `resting_orders` section.
+
+## On the dashboard
+
+With `--dash`, the MARKET panel has a `resting` line under the book:
+
+```
+best bid  0.600       0.350
+best ask  0.650       0.400
+book      LIVE 120ms  LIVE 90ms
+resting   UP 5@0.620  5.3s █████▎░░
+```
+
+It shows the side, the shares (`2/5` once part of it matched), the price it
+rests at, and the time it has left with a bar; the time is recomputed for every
+frame (`DASH_FPS`, default 2 a second), and turns amber under two seconds. In
+other moments it reads `placing`, `cancelling`, `off the book` (cancelled,
+final size still to come), `no order on the book`, or `off: <why>` when the
+loss stop ended the test. The ORDERS table has a line for each order that got
+onto the book: `RESTING`, then `FILLED` or `NO FILL` with the reason it was
+cancelled. These lines are not counted in the execution figures.
 
 ## Journal rows
 

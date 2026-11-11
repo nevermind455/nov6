@@ -141,6 +141,8 @@ never invented. Press Ctrl+C to stop the bot, as usual.
   (0.5 to 10, default 2).
 * The once-a-minute summary is not printed while the dashboard is up, but it is
   still written to the journal. The final report prints when the bot stops.
+* With `SNIPER_REST_LIVE=1` the MARKET panel shows the bot's own resting order
+  under the book, with the seconds it has left; see `docs/RESTING_ORDERS.md`.
 * Without a terminal (a log file, systemd), `--dash` prints one plain status line
   every 10 seconds instead.
 * Times are US Eastern, as the venue names its rounds. WON/LOST counts this run.

@@ -33,6 +33,34 @@ Details, rules and limits: [docs/RESTING_ORDERS.md](docs/RESTING_ORDERS.md).
 Wire bytes are checked against the real SDK; the feature has not traded on
 the real venue.
 
+Found and fixed in a review of the above, before any live use:
+
+* A fault while watching a resting order was caught as a Coinbase error (the
+  feed reconnected) or, from the timer, stopped the bot. It is now reported,
+  pauses new orders and never reaches the caller.
+* A fault while handling the placement or cancel reply could reset the order
+  connection. The placement reply now fails closed (unknown outcome, cancel).
+* A cancel waited for the placement's answer however late it was. After one
+  second it is sent anyway.
+* An order that could not be cancelled because the order connection was down
+  was never reported. Any order not shown gone five seconds after its cancel
+  was wanted is now an error and pauses new orders.
+* A placement reply arriving after the private channel had already shown the
+  order's end put the order back to pending; a late "unknown" could too.
+* The end of an order was written to the ledger again for every repeat of the
+  same evidence, and its `rest_done` row could report fewer shares than had
+  matched.
+* The loss stop counted settled results only, so resting fills still open
+  could take the test past it. One more order must now fit under the stop
+  even if every open resting fill, and itself, lost all it paid.
+* An order the venue confirmed cancelled but still lists is cancelled again.
+* A missed order is not rested while another order of ours can still trade in
+  the market.
+
+Dashboard: the MARKET panel shows the resting order under the book (side,
+shares, price, time left with a bar, or its state), recomputed every frame;
+the ORDERS table has a line for each order that rested.
+
 ## 9 November 2026 — execution latency and measurement
 
 * Precompute immutable EIP-712 signing data, avoid duplicate token parsing and
