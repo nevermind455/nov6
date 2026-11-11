@@ -142,15 +142,24 @@ PostReply parse_post_reply(int http_status, std::string_view body,
       out.detail = "negative amounts in the reply";
       return out;
     }
-    std::string error = j.value("errorMsg", "");
-    if (error.empty() && j.contains("error") && j.at("error").is_string())
-      error = j.at("error").get<std::string>();
+    // the error text, wherever it is and whatever else is null
+    std::string error;
+    for (const char *key : {"errorMsg", "error"})
+      if (auto e = j.find(key); error.empty() && e != j.end() && e->is_string())
+        error = e->get<std::string>();
     std::string status = lower(out.venue_status);
-    if (success && (out.taking > 0 || out.making > 0 || status == "matched")) {
+    const bool ok = http_status >= 200 && http_status < 300;
+    if (success && ok &&
+        (out.taking > 0 || out.making > 0 || status == "matched")) {
       out.kind = Posted::Matched;
       out.detail = "a post-only order matched at placement";
-    } else if (success && status == "live" && http_status == 200) {
+    } else if (success && ok && status == "live") {
       out.kind = Posted::Resting;
+    } else if (success && ok) {
+      out.kind = Posted::Accepted;
+      out.detail = "accepted with status " +
+                   (out.venue_status.empty() ? std::string("unknown")
+                                             : out.venue_status);
     } else if (!success && (http_status == 400 || http_status == 200)) {
       std::string text = lower(error);
       bool crossed = text.find("crosses") != std::string::npos;
@@ -180,21 +189,24 @@ CancelReply parse_cancel_reply(int http_status, std::string_view body,
     out.detail = "unreadable reply (HTTP " + std::to_string(http_status) + ")";
     return out;
   }
-  const std::string id(order_id);
-  if (http_status == 200 && j.is_object()) {
+  // an order id is a hash: its letters' case carries nothing
+  const std::string id = lower(order_id);
+  if (http_status >= 200 && http_status < 300 && j.is_object()) {
     if (auto done = j.find("canceled"); done != j.end() && done->is_array())
       for (auto &v : *done)
-        if (v.is_string() && v.get_ref<const std::string &>() == id) {
+        if (v.is_string() && lower(v.get_ref<const std::string &>()) == id) {
           out.kind = Cancelled::Yes;
           return out;
         }
-    if (auto left = j.find("not_canceled");
-        left != j.end() && left->is_object() && left->contains(id)) {
-      out.kind = Cancelled::NotOpen;
-      auto &why = left->at(id);
-      out.detail = brief(why.is_string() ? why.get<std::string>() : why.dump());
-      return out;
-    }
+    if (auto left = j.find("not_canceled"); left != j.end() && left->is_object())
+      for (auto it = left->begin(); it != left->end(); ++it)
+        if (lower(it.key()) == id) {
+          out.kind = Cancelled::NotOpen;
+          out.detail = brief(it.value().is_string()
+                                 ? it.value().get<std::string>()
+                                 : it.value().dump(-1, ' ', true));
+          return out;
+        }
   }
   out.detail = "HTTP " + std::to_string(http_status) + ": " +
                brief(j.dump(-1, ' ', true), 120);
@@ -228,8 +240,15 @@ void Book::add(Order o) {
     throw std::runtime_error("resting order already tracked");
 }
 void Book::posted(std::string_view id) {
-  if (auto *o = find(id))
-    o->posted = true;
+  auto *o = find(id);
+  if (!o || o->posted)
+    return;
+  o->posted = true;
+  // Cancels sent before the venue had the order found nothing and count for
+  // nothing: start again, now.
+  o->in_flight = false;
+  o->next_cancel = 0;
+  o->cancels = 0;
 }
 void Book::proven(std::string_view id, double mono) {
   if (auto *o = find(id)) {

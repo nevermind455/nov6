@@ -345,9 +345,36 @@ TEST(RestReplies, PlacementAnswers) {
   EXPECT_EQ(matched.making, 3 * U);
   EXPECT_EQ(matched.taking, 5 * U);
 
+  // the venue's other ways of saying the same things
+  EXPECT_EQ(rest::parse_post_reply(
+                201, R"({"success":true,"status":"live","orderID":"0xabc"})", "0xabc")
+                .kind,
+            Posted::Resting);
+  EXPECT_EQ(rest::parse_post_reply(
+                200,
+                R"({"success":true,"status":"LIVE","errorMsg":null,"makingAmount":null,"takingAmount":null})",
+                "0xabc")
+                .kind,
+            Posted::Resting);
+  auto nulls = rest::parse_post_reply(
+      400, R"({"success":false,"errorMsg":null,"error":"invalid post-only order: order crosses book"})",
+      "0xabc");
+  EXPECT_EQ(nulls.kind, Posted::Crossed);
+  EXPECT_EQ(rest::parse_post_reply(400, R"({"errorMsg":null,"error":null})", "0xabc").kind,
+            Posted::Refused);
+  // taken but neither on the book nor matched: followed and cancelled, with
+  // no alarm
+  auto held = rest::parse_post_reply(
+      200, R"({"success":true,"status":"delayed","orderID":"0xabc"})", "0xabc");
+  EXPECT_EQ(held.kind, Posted::Accepted);
+  EXPECT_EQ(held.detail, "accepted with status delayed");
+  EXPECT_EQ(rest::parse_post_reply(200, R"({"success":true})", "0xabc").kind,
+            Posted::Accepted);
+
   // anything else may be on the book: unknown, so it is cancelled
   for (auto [status, body] : std::vector<std::pair<int, const char *>>{
-           {200, R"({"success":true,"status":"delayed","orderID":"0xabc"})"},
+           {200, R"({"success":"yes","status":"live","orderID":"0xabc"})"},
+           {500, R"({"success":true,"status":"live","orderID":"0xabc"})"},
            {200, R"({"success":true,"status":"live","orderID":"0xother"})"},
            {500, R"({"error":"internal"})"},
            {502, "<html>bad gateway</html>"},
@@ -371,6 +398,15 @@ TEST(RestReplies, CancelAnswersAndOrderRecords) {
       "0xabc");
   EXPECT_EQ(gone.kind, Cancelled::NotOpen);
   EXPECT_EQ(gone.detail, "order can't be found - already canceled or matched");
+  // an id is a hash: upper or lower case, it is the same order
+  EXPECT_EQ(rest::parse_cancel_reply(200, R"({"canceled":["0xABCDEF"]})", "0xabcdef").kind,
+            Cancelled::Yes);
+  EXPECT_EQ(rest::parse_cancel_reply(
+                200, R"({"canceled":[],"not_canceled":{"0xABCDEF":"gone"}})", "0xabcdef")
+                .kind,
+            Cancelled::NotOpen);
+  EXPECT_EQ(rest::parse_cancel_reply(200, R"({"canceled":[7,null,{"x":1}],"not_canceled":[]})", "0xabc").kind,
+            Cancelled::Failed);
   // another order's cancel says nothing about ours
   EXPECT_EQ(rest::parse_cancel_reply(200, R"({"canceled":["0xother"]})", "0xabc").kind,
             Cancelled::Failed);
@@ -443,13 +479,24 @@ TEST(RestBook, ALatePlacementAnswerDoesNotLeaveTheOrderUnwatched) {
   EXPECT_TRUE(book.due(100.3).empty());
   EXPECT_TRUE(book.due(100.99).empty());
   ASSERT_EQ(book.due(101.0).size(), 1u);
-  // the venue did not know it yet: asked again, and again once it answers
+  // the venue did not know it yet: asked again ...
   book.cancel_unproven("rest-order", 101.05);
   ASSERT_EQ(book.due(101.31).size(), 1u);
+  EXPECT_EQ(book.find("rest-order")->cancels, 2);
+  // ... and the moment the placement is answered, at once: the earlier
+  // cancels could not have found the order and count for nothing
   book.posted("rest-order");
+  ASSERT_EQ(book.due(101.32).size(), 1u);
+  EXPECT_EQ(book.find("rest-order")->cancels, 1);
+  EXPECT_TRUE(book.unproven_to_report(101.33).empty());
+  // the stale answer to an earlier cancel only schedules the next try
   book.cancel_unproven("rest-order", 101.4);
-  ASSERT_EQ(book.due(101.91).size(), 1u);
+  EXPECT_TRUE(book.due(101.6).empty());
+  ASSERT_EQ(book.due(101.65).size(), 1u);
   book.proven("rest-order", 102.0);
+  EXPECT_FALSE(book.busy());
+  // answering twice changes nothing
+  book.posted("rest-order");
   EXPECT_FALSE(book.busy());
 }
 

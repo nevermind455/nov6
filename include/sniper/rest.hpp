@@ -56,6 +56,8 @@ enum class Posted {
   Crossed, // refused: it would have taken an offer (nothing rests, no trade)
   Refused, // refused for another reason
   Matched, // traded at once (a post-only order should not)
+  Accepted, // taken, but neither resting nor matched (e.g. "delayed"): it
+            // may reach the book, so it is cancelled and followed
   Unknown, // anything else: assume it may be on the book
 };
 struct PostReply {
@@ -136,6 +138,8 @@ public:
   // A resting order was sent, or one from an earlier run was found.
   void add(Order);
   // The venue answered the placement: the order is (or may be) on the book.
+  // A cancel already wanted goes out at once: any sent before this could
+  // not have found the order.
   void posted(std::string_view id);
   // The venue shows it is off the book (a confirmed cancel); its final size
   // is still to come.

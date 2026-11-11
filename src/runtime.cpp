@@ -283,6 +283,8 @@ struct Runtime::Impl {
   };
   RestSignal rest_signal[2];
   std::map<std::string, double> rest_final_at; // id -> monotonic seconds
+  std::string rest_fault_text;
+  double rest_fault_at = -1e30;
   std::atomic<bool> reconcile_asap{false};
 
   explicit Impl(Config cfg)
@@ -2556,6 +2558,14 @@ struct Runtime::Impl {
       answer.detail = "matched totals exceed signed limits";
       row["reason"] = answer.detail;
     }
+    // An order the venue has, that is no longer being followed here, is
+    // followed again and cancelled: nothing of ours rests unwatched.
+    const bool on_venue = answer.kind == rest::Posted::Resting ||
+                          answer.kind == rest::Posted::Matched ||
+                          answer.kind == rest::Posted::Accepted;
+    if (on_venue && !o)
+      rest_adopt(intent, "its placement was answered after it stopped "
+                         "being followed");
     switch (answer.kind) {
     case rest::Posted::Resting:
       // Only forward: evidence of a match that came first is kept.
@@ -2564,6 +2574,15 @@ struct Runtime::Impl {
       rest_book.posted(id);
       row["outcome"] = "resting";
       ++sniper->n["rest orders resting"];
+      break;
+    case rest::Posted::Accepted:
+      // Taken, but not shown on the book (the venue may still be holding
+      // it): it is followed like a resting order and cancelled at once.
+      if (intent.status == "sent" || intent.status == "unknown")
+        ledger.status(id, "pending", intent.matched_shares, intent.matched_cost);
+      rest_book.posted(id);
+      rest_book.cancel(id, "the venue answered: " + answer.detail, mono_s());
+      row["outcome"] = "accepted";
       break;
     case rest::Posted::Crossed:
       // The venue confirmed nothing rests and nothing traded.
@@ -2608,6 +2627,13 @@ struct Runtime::Impl {
     try {
       rest_watch_orders(on_tick);
     } catch (const std::exception &e) {
+      // This runs on every tick: the same fault is reported once in ten
+      // seconds, not twenty times a second.
+      const double mono = mono_s();
+      if (rest_fault_text == e.what() && mono - rest_fault_at < 10)
+        return;
+      rest_fault_text = e.what();
+      rest_fault_at = mono;
       try {
         handler_fault("resting order watch", e.what());
       } catch (...) {
@@ -3033,6 +3059,10 @@ struct Runtime::Impl {
         return;
       }
       book_trade(parse_trade(j, ledger.orders), j, source, received_ns, false);
+      // Should one of our own orders ever take our own resting order, both
+      // sides are ours and both are booked.
+      for (auto &t : parse_maker_fills(j, ledger.orders))
+        book_trade(t, j, source, received_ns, true);
     } catch (const std::exception &e) {
       ++errors;
       pause("accounting disagreement or unauthorized fill", true);
