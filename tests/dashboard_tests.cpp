@@ -60,6 +60,20 @@ Json live_snapshot() {
                      {"loss", 4}, {"max_loss", 20}, {"guard", "OK"}, {"awaiting", 0}};
   return s;
 }
+// A live bot with SNIPER_REST_LIVE: a missed UP order is on the book.
+Json resting_snapshot(const char *state = "resting") {
+  Json s = live_snapshot();
+  s["market"]["resting"] =
+      Json{{"on", true},
+           {"order",
+            {{"side", "UP"}, {"shares", 5.0}, {"matched", 0.0}, {"price", 0.62},
+             {"state", state}, {"left_s", 5.3}, {"life_s", 8.0}, {"rested_s", 2.7},
+             {"why", ""}}}};
+  s["orders"].push_back(Json{{"time", "14:03:25"}, {"side", "UP"}, {"bp", 1.2},
+                             {"ask", 0.66}, {"cap", 0.62}, {"result", "resting"},
+                             {"detail", "on the book for up to 8s"}});
+  return s;
+}
 std::string screen(const std::vector<Row> &frame) {
   std::string out;
   for (auto &row : frame) {
@@ -92,6 +106,51 @@ TEST(Dashboard, EveryFrameIsExactlyTheTerminalSize) {
   expect_geometry(full_snapshot(), 80, 24);
 }
 
+TEST(Dashboard, ARestingOrderIsShownOnTheBookWithItsTimeLeft) {
+  auto text = screen(build(resting_snapshot(), 170, 50));
+  for (const char *part : {"resting", "UP 5@0.620", "5.3s", "RESTING",
+                           "on the book for up to 8s"})
+    EXPECT_NE(text.find(part), std::string::npos) << part;
+  // the next frame has less time left
+  auto later = resting_snapshot();
+  later["market"]["resting"]["order"]["left_s"] = 1.4;
+  text = screen(build(later, 170, 50));
+  EXPECT_NE(text.find("1.4s"), std::string::npos);
+  EXPECT_EQ(text.find("5.3s"), std::string::npos);
+  // part of it matched while it rests
+  later["market"]["resting"]["order"]["matched"] = 2.0;
+  EXPECT_NE(screen(build(later, 170, 50)).find("UP 2/5@0.620"), std::string::npos);
+  // a time that ran out is never drawn negative
+  later["market"]["resting"]["order"]["left_s"] = -3.0;
+  text = screen(build(later, 170, 50));
+  EXPECT_NE(text.find("0.0s"), std::string::npos);
+  EXPECT_EQ(text.find("-3"), std::string::npos);
+  // its other states
+  for (auto [state, shown] : std::vector<std::pair<const char *, const char *>>{
+           {"placing", "placing"}, {"cancelling", "cancelling"},
+           {"cancelled", "off the book"}})
+    EXPECT_NE(screen(build(resting_snapshot(state), 170, 50)).find(shown),
+              std::string::npos)
+        << state;
+  // on, with nothing on the book; and switched off by its loss stop
+  auto idle = live_snapshot();
+  idle["market"]["resting"] = Json{{"on", true}};
+  EXPECT_NE(screen(build(idle, 170, 50)).find("no order on the book"), std::string::npos);
+  idle["market"]["resting"] = Json{{"on", false}, {"off", "off: the loss stop was reached"}};
+  EXPECT_NE(screen(build(idle, 170, 50)).find("off: the loss stop"), std::string::npos);
+  // a phone-sized terminal still shows the order and its time
+  text = screen(build(resting_snapshot(), 90, 30));
+  EXPECT_NE(text.find("UP 5@0.620"), std::string::npos);
+  EXPECT_NE(text.find("5.3s"), std::string::npos);
+  // without the feature the panel is as before
+  EXPECT_EQ(screen(build(live_snapshot(), 170, 50)).find("resting"), std::string::npos);
+  // and the frame keeps its exact size everywhere
+  for (int cols = 1; cols <= 200; cols += 9)
+    for (int rows = 1; rows <= 60; rows += 4)
+      for (const char *state : {"resting", "cancelling", "odd state from somewhere"})
+        expect_geometry(resting_snapshot(state), cols, rows);
+}
+
 TEST(Dashboard, DrawsThePanelsAtACommonSize) {
   auto text = screen(build(full_snapshot(), 170, 50));
   for (const char *part : {"BTC SNIPER", "PAPER", "TRIGGER", "MARKET", "ACCOUNT", "ORDERS",
@@ -120,6 +179,23 @@ TEST(Dashboard, WrongTypesAreDrawnNotThrown) {
   odd["settlement"]["pending"] = "soon";
   odd["skips"] = Json::array({Json::array({nullptr})});
   odd["positions"]["rows"] = Json::array({1, 2, 3});
+  expect_geometry(odd, 170, 50);
+  EXPECT_EQ(screen(build(odd, 170, 50)).find("layout error"), std::string::npos);
+  // a resting order with nonsense in it
+  odd["market"]["resting"] =
+      Json{{"on", "maybe"},
+           {"order",
+            {{"side", 7}, {"shares", "many"}, {"matched", Json::array()}, {"price", nullptr},
+             {"state", 3}, {"left_s", "soon"}, {"life_s", 0}}}};
+  expect_geometry(odd, 170, 50);
+  EXPECT_EQ(screen(build(odd, 170, 50)).find("layout error"), std::string::npos);
+  odd["market"]["resting"]["order"]["state"] = "resting";
+  odd["market"]["resting"]["order"]["life_s"] = 0;
+  odd["market"]["resting"]["order"]["left_s"] = 1e308;
+  expect_geometry(odd, 170, 50);
+  odd["market"]["resting"]["order"] = 7;
+  expect_geometry(odd, 170, 50);
+  odd["market"]["resting"] = "x";
   expect_geometry(odd, 170, 50);
   EXPECT_EQ(screen(build(odd, 170, 50)).find("layout error"), std::string::npos);
 }

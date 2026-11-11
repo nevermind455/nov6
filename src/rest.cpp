@@ -137,6 +137,11 @@ PostReply parse_post_reply(int http_status, std::string_view body,
     bool success = j.value("success", false);
     out.making = reply_amount(j, "makingAmount");
     out.taking = reply_amount(j, "takingAmount");
+    if (out.making < 0 || out.taking < 0) {
+      out = PostReply{};
+      out.detail = "negative amounts in the reply";
+      return out;
+    }
     std::string error = j.value("errorMsg", "");
     if (error.empty() && j.contains("error") && j.at("error").is_string())
       error = j.at("error").get<std::string>();
@@ -226,31 +231,47 @@ void Book::posted(std::string_view id) {
   if (auto *o = find(id))
     o->posted = true;
 }
-void Book::proven(std::string_view id) {
+void Book::proven(std::string_view id, double mono) {
   if (auto *o = find(id)) {
+    if (!o->off_book)
+      o->proven_at = mono;
     o->off_book = true;
     o->in_flight = false;
   }
 }
+bool Book::reopen(std::string_view id) {
+  auto *o = find(id);
+  if (!o || !o->off_book)
+    return false;
+  o->off_book = false;
+  o->wanted = true;
+  o->in_flight = false;
+  o->next_cancel = 0;
+  return true;
+}
 bool Book::off(std::string_view id) {
   return orders_.erase(std::string(id)) > 0;
 }
-bool Book::cancel(std::string_view id, const std::string &why) {
+bool Book::cancel(std::string_view id, const std::string &why, double mono) {
   auto *o = find(id);
   if (!o)
     return false;
   if (!o->wanted) {
     o->wanted = true;
     o->why = why;
+    o->wanted_at = mono;
   }
   return true;
 }
 std::vector<std::string> Book::due(double mono) {
   std::vector<std::string> out;
   for (auto &[id, o] : orders_) {
+    if (!o.wanted || o.off_book)
+      continue;
     // A cancel sent before the venue has the order would find nothing, so it
-    // waits for the placement's answer.
-    if (!o.wanted || !o.posted || o.off_book)
+    // waits for the placement's answer - but not for long: an answer that is
+    // late leaves the order on the book with nobody watching it.
+    if (!o.posted && mono - o.placed_mono < PostGrace)
       continue;
     if (o.in_flight && mono - o.flight_since < FlightTimeout)
       continue;
@@ -271,14 +292,18 @@ void Book::cancel_unproven(std::string_view id, double mono) {
   o->next_cancel = mono + (o->cancels < QuickTries ? Backoff * o->cancels
                                                    : SlowRetry);
 }
-std::vector<std::string> Book::unproven_to_report() {
+std::vector<std::string> Book::unproven_to_report(double mono) {
   std::vector<std::string> out;
-  for (auto &[id, o] : orders_)
-    if (o.wanted && !o.off_book && !o.in_flight && o.cancels >= QuickTries &&
-        !o.warned) {
+  for (auto &[id, o] : orders_) {
+    if (!o.wanted || o.off_book || o.warned)
+      continue;
+    bool refused = !o.in_flight && o.cancels >= QuickTries;
+    bool stuck = mono - o.wanted_at >= StuckAfter;
+    if (refused || stuck) {
       o.warned = true;
       out.push_back(id);
     }
+  }
   return out;
 }
 std::vector<Order> Book::give_up(double wall) {
@@ -290,6 +315,13 @@ std::vector<Order> Book::give_up(double wall) {
     } else
       ++it;
   return out;
+}
+
+bool fits_stop(Units realized, Units open_cost, Units stake, Units stop) {
+  if (stop <= 0 || open_cost < 0 || stake < 0)
+    return false;
+  auto worst = static_cast<__int128>(realized) - open_cost - stake;
+  return worst > -static_cast<__int128>(stop);
 }
 
 Json Test::json() const {

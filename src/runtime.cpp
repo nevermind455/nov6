@@ -623,6 +623,58 @@ struct Runtime::Impl {
     }
     return false;
   }
+  // SNIPER_REST_LIVE in the ORDERS table: one line for each order that got
+  // onto the book, RESTING until its end is known. It is not one of the FAK
+  // orders the execution figures count.
+  void dash_rest_row(const Json &row, const std::string &result,
+                     const std::string &side, double wall) {
+    auto id = dash_str(row, "order_id");
+    if (id.empty())
+      return;
+    auto known = std::find_if(dash_orders.begin(), dash_orders.end(), [&](const Json &o) {
+      return dash_str(o, "order_id") == id;
+    });
+    if (result == "rest_order") {
+      if (dash_str(row, "outcome") != "resting" || known != dash_orders.end())
+        return;
+      dash_orders.push_back(Json{
+          {"time", dash::et_time(wall)},
+          {"side", side},
+          {"bp", dash_field(row, "move_bp")},
+          {"ask", dash_field(row, "ask")},
+          {"cap", dash_field(row, "price")},
+          {"result", "resting"},
+          {"shares", nullptr},
+          {"price", nullptr},
+          {"order_id", id},
+          {"detail", "on the book for up to " +
+                         py::fmt_g(dash_number(row, "life_s", 0)) + "s"},
+          {"round_end", dash_field(row, "round_end")}});
+      while (dash_orders.size() > 40)
+        dash_orders.pop_front();
+      return;
+    }
+    if (known == dash_orders.end())
+      return;
+    auto why = dash_str(row, "cancel_why");
+    if (row.value("filled", false)) {
+      double shares = dash_number(row, "shares", 0);
+      (*known)["result"] = "filled";
+      (*known)["shares"] = shares;
+      (*known)["price"] = dash_field(row, "price");
+      (*known)["detail"] =
+          (shares + 1e-9 < dash_number(row, "of_shares", shares)
+               ? std::string("resting order, part filled")
+               : std::string("resting order")) +
+          (why.empty() ? "" : "; then cancelled: " + why).substr(0, 90);
+    } else {
+      (*known)["result"] = "no fill";
+      (*known)["detail"] =
+          (why.empty() ? std::string("rested; nothing matched")
+                       : "rested; cancelled: " + why)
+              .substr(0, 120);
+    }
+  }
   void dash_take(const Json &row) {
     auto result = dash_str(row, "result"), reason = dash_str(row, "reason"),
          side = dash_str(row, "side");
@@ -675,6 +727,10 @@ struct Runtime::Impl {
                  row.value("filled", false) ? "good" : "info");
     else if (result == "rest_live_off")
       dash_event("rest", "resting test OFF: " + reason, "bad");
+    if (result == "rest_order" || result == "rest_done") {
+      dash_rest_row(row, result, side, wall);
+      return;
+    }
     if (result != "filled" && result != "refused" && result != "pending" &&
         result != "error" && result != "live_fill_update" && result != "live_fill")
       return;
@@ -982,6 +1038,34 @@ struct Runtime::Impl {
     }
     market["max_fills"] = c.s.max_fills_round;
     market["max_side_shares"] = c.s.max_side_shares;
+    // SNIPER_REST_LIVE: our own order on the book and the time it has left
+    // there. Built anew for every frame, so the time counts down live.
+    if (c.live && c.s.rest_live) {
+      Json resting{{"on", rest_test && !rest_test->off}};
+      if (rest_test && rest_test->off)
+        resting["off"] = "off: " + rest_test->reason;
+      for (auto &[id, o] : rest_book.orders()) {
+        auto it = ledger.orders.find(id);
+        if (it == ledger.orders.end())
+          continue;
+        resting["order"] = Json{
+            {"side", o.side},
+            {"shares", dollars(it->second.target)},
+            {"matched", dollars(it->second.matched_shares)},
+            {"price", dollars(it->second.limit)},
+            {"state", o.off_book ? "cancelled"
+                      : o.wanted ? "cancelling"
+                      : o.posted ? "resting"
+                                 : "placing"},
+            {"left_s", std::max(0.0, o.deadline_mono - now)},
+            {"life_s", o.deadline_mono - o.placed_mono},
+            {"rested_s", now - o.placed_mono},
+            {"why", o.why}};
+        if (!o.off_book)
+          break; // one that is still on the book comes first
+      }
+      market["resting"] = std::move(resting);
+    }
     snap["market"] = std::move(market);
     // ---- orders in this market only: the table clears when a new one starts
     Json orders = Json::array();
@@ -1774,10 +1858,6 @@ struct Runtime::Impl {
         cb_last_tick[n] = tm;
       else if (kind == "subscribed")
         cb_ack[n] = true;
-      // The trigger price just moved: a resting order it moved against is
-      // cancelled as soon as the engine has read this tick.
-      if (!rest_book.empty())
-        rest_watch(true);
     } catch (const std::exception &e) {
       // CoinbaseSubscribeError: an error message or a wrong ack
       audit({{"result", "coinbase_reconnect"},
@@ -1786,6 +1866,11 @@ struct Runtime::Impl {
       coinbase[n]->reconnect();
       return;
     }
+    // The trigger price just moved: a resting order it moved against is
+    // cancelled as soon as the engine has read this tick. (Outside the block
+    // above: a fault here is not a Coinbase fault.)
+    if (!rest_book.empty())
+      rest_watch(true);
     for (auto &plan : sniper->take_dispatched()) {
       ++orders_sent;
       if (paper)
@@ -2120,7 +2205,8 @@ struct Runtime::Impl {
     return p;
   }
   rest::Now rest_now(const std::string &side, const std::string &token,
-                     double end, Units min_shares, bool with_direction) {
+                     double end, Units min_shares, bool with_direction,
+                     bool with_book = true) {
     rest::Now now;
     double mono = mono_s();
     now.wall = wall_s();
@@ -2130,13 +2216,32 @@ struct Runtime::Impl {
     now.min_shares = min_shares;
     now.direction = with_direction ? sniper->direction_view(side, end)
                                    : Json::object();
+    if (!with_book)
+      return now;
     auto view = book.view(token);
     if (view.status == LIVE && view.updated_mono && !view.asks.empty()) {
-      double age = (mono - *view.updated_mono) * 1000.0;
-      if (age >= 0 && age <= c.s.stale_ms)
-        now.best_ask = units(fixed6(view.asks.front().first));
+      double age = (mono - *view.updated_mono) * 1000.0, ask = view.asks.front().first;
+      if (age >= 0 && age <= c.s.stale_ms && std::isfinite(ask) && ask > 0 && ask < 1)
+        now.best_ask = units(fixed6(ask));
     }
     return now;
+  }
+  // What the resting fills not settled yet paid, and what resting orders
+  // still open could pay: the most they can still lose.
+  Units rest_open_cost() const {
+    __int128 total = 0;
+    for (const auto &[id, o] : ledger.orders) {
+      (void)id;
+      if (!o.rest || ledger.settled_conditions.count(o.condition))
+        continue;
+      if (o.unresolved() || o.status == "matched")
+        total += std::max<Units>(o.reserve, o.booked_cost + o.booked_fee);
+      else
+        total += static_cast<__int128>(o.booked_cost) + o.booked_fee;
+    }
+    return total > std::numeric_limits<Units>::max()
+               ? std::numeric_limits<Units>::max()
+               : static_cast<Units>(total);
   }
   // The test is running: opted in, live, and the resting orders' own settled
   // loss since it began still under SNIPER_REST_LIVE_STOP_USD. Its record
@@ -2212,7 +2317,7 @@ struct Runtime::Impl {
     o.posted = true;
     o.row = Json{{"result", "rest_order"}, {"side", i.side}};
     rest_book.add(std::move(o));
-    rest_book.cancel(i.id, why);
+    rest_book.cancel(i.id, why, mono_s());
   }
   void rest_after_miss(const std::string &missed_id) {
     auto found = ledger.orders.find(missed_id);
@@ -2242,6 +2347,11 @@ struct Runtime::Impl {
                 (rest_test && !rest_test->reason.empty()
                      ? ": " + rest_test->reason
                      : std::string()));
+    // The stop bounds the whole test: resting fills not settled yet could
+    // still lose all they paid, and so could this order.
+    if (!rest::fits_stop(rest_test->realized, rest_open_cost(), missed.stake,
+                         units(fixed6(c.s.rest_stop_usd))))
+      return no("resting positions still open could reach the loss stop");
     if (!hub || hub->condition != missed.condition)
       return no("the round changed");
     Round &r = *hub;
@@ -2406,6 +2516,15 @@ struct Runtime::Impl {
   }
   // The venue answered the resting order's placement.
   void on_rest_reply(const std::string &id, const HttpResult &reply) {
+    try {
+      rest_reply(id, reply);
+    } catch (const std::exception &e) {
+      // Whatever went wrong, the order may be on the book: fail closed.
+      on_unknown(id, std::string("resting order reply: ") + e.what());
+    }
+    rest_watch(false);
+  }
+  void rest_reply(const std::string &id, const HttpResult &reply) {
     auto &intent = ledger.orders.at(id);
     const double rtt =
         sent_at.count(id) ? (mono_s() - sent_at.at(id)) * 1000 : 0;
@@ -2422,6 +2541,14 @@ struct Runtime::Impl {
       row["venue_order_status"] = answer.venue_status;
     if (!answer.detail.empty())
       row["reason"] = answer.detail;
+    // The private channel can be faster than this reply. If it already
+    // showed the order's end, the reply changes nothing in the ledger.
+    if (rest_final_at.count(id)) {
+      row["outcome"] = answer.kind == rest::Posted::Resting ? "resting" : "ended";
+      row["note"] = "its end was already known when the reply came";
+      audit(row);
+      return;
+    }
     if (answer.kind == rest::Posted::Matched &&
         (answer.making > intent.stake + 1 ||
          answer.making > multiply(answer.taking, intent.limit) + 1)) {
@@ -2431,7 +2558,9 @@ struct Runtime::Impl {
     }
     switch (answer.kind) {
     case rest::Posted::Resting:
-      ledger.status(id, "pending");
+      // Only forward: evidence of a match that came first is kept.
+      if (intent.status == "sent" || intent.status == "unknown")
+        ledger.status(id, "pending", intent.matched_shares, intent.matched_cost);
       rest_book.posted(id);
       row["outcome"] = "resting";
       ++sniper->n["rest orders resting"];
@@ -2455,27 +2584,38 @@ struct Runtime::Impl {
     case rest::Posted::Matched:
       if (answer.taking > 0 && answer.making > 0)
         ledger.status(id, "matched", answer.taking, answer.making);
-      else
-        ledger.status(id, "pending");
+      else if (intent.status == "sent" || intent.status == "unknown")
+        ledger.status(id, "pending", intent.matched_shares, intent.matched_cost);
       rest_book.posted(id);
-      rest_book.cancel(id, "it matched at placement");
+      rest_book.cancel(id, "it matched at placement", mono_s());
       row["outcome"] = "matched";
       break;
     case rest::Posted::Unknown:
       row["outcome"] = "unknown";
       audit(row);
       on_unknown(id, answer.detail);
-      rest_watch(false);
       return;
     }
     audit(row);
-    rest_watch(false);
   }
   // Decide which resting orders go, send the cancels that are due, and tell
-  // the operator about one that cannot be shown off the book.
+  // the operator about one that cannot be shown off the book. Called on every
+  // trigger tick and from the timer, also while stopping: a fault in here is
+  // reported and pauses new orders, and never reaches the caller.
   void rest_watch(bool on_tick) {
     if (rest_book.empty() || !sniper || !c.live)
       return;
+    try {
+      rest_watch_orders(on_tick);
+    } catch (const std::exception &e) {
+      try {
+        handler_fault("resting order watch", e.what());
+      } catch (...) {
+        ++errors;
+      }
+    }
+  }
+  void rest_watch_orders(bool on_tick) {
     const double mono = mono_s(), wall = wall_s();
     std::string hold;
     if (stopping)
@@ -2496,20 +2636,23 @@ struct Runtime::Impl {
         continue;
       const int n = o.side == "UP" ? 0 : 1;
       const bool opposite = sniper->signals_by_side[1 - n] != o.signals_other;
-      auto now = rest_now(o.side, o.token, o.end, 0, on_tick && policy.direction);
+      auto now = rest_now(o.side, o.token, o.end, 0, policy.direction, false);
       auto why = rest::cancel_reason(o, now, policy, opposite, hold);
       if (!why.empty())
-        rest_book.cancel(id, why);
+        rest_book.cancel(id, why, mono);
     }
     if (sender && sender->ready())
       for (auto &id : rest_book.due(mono))
         rest_send_cancel(id, mono);
-    for (auto &id : rest_book.unproven_to_report()) {
+    for (auto &id : rest_book.unproven_to_report(mono)) {
       ++errors;
       audit({{"result", "error"},
              {"order_id", id},
-             {"reason", "resting order is not shown cancelled yet: asking "
-                        "again every 5s - check it on Polymarket"}});
+             {"reason", sender && sender->ready()
+                            ? "resting order is not shown cancelled yet: "
+                              "asking again every 5s - check it on Polymarket"
+                            : "resting order cannot be cancelled: the order "
+                              "connection is down - check it on Polymarket"}});
       pause("resting order not shown cancelled", true);
     }
     for (auto &o : rest_book.give_up(wall)) {
@@ -2558,21 +2701,27 @@ struct Runtime::Impl {
       rest_book.cancel_unproven(id, mono);
   }
   void on_cancel_reply(const std::string &id, const HttpResult &reply) {
-    auto answer = rest::parse_cancel_reply(reply.status, reply.body, id);
-    Json row{{"result", "rest_cancel_reply"},
-             {"order_id", id},
-             {"http_status", reply.status},
-             {"canceled", answer.kind == rest::Cancelled::Yes}};
-    if (!answer.detail.empty())
-      row["reason"] = answer.detail;
-    audit(std::move(row));
+    // Whatever happens below, the order's own record is read next.
+    reconcile_asap = true;
+    rest::CancelReply answer;
+    try {
+      answer = rest::parse_cancel_reply(reply.status, reply.body, id);
+      Json row{{"result", "rest_cancel_reply"},
+               {"order_id", id},
+               {"http_status", reply.status},
+               {"canceled", answer.kind == rest::Cancelled::Yes}};
+      if (!answer.detail.empty())
+        row["reason"] = answer.detail;
+      audit(std::move(row));
+    } catch (const std::exception &) {
+      answer = rest::CancelReply{};
+    }
     if (answer.kind == rest::Cancelled::Yes)
       // Off the book: its market is free again. Its final size comes from the
       // venue's record of it (the private channel, or the read asked for here).
-      rest_book.proven(id);
+      rest_book.proven(id, mono_s());
     else
       rest_book.cancel_unproven(id, mono_s());
-    reconcile_asap = true;
   }
   // The venue shows this resting order can match no more, with this final
   // size: from the private channel, its own record, or its trades.
@@ -2580,12 +2729,21 @@ struct Runtime::Impl {
     auto it = ledger.orders.find(id);
     if (it == ledger.orders.end())
       return;
-    ledger.status(id, size ? "matched" : "no_match", size);
-    if (!size) {
-      ledger.release_missed_spend(id);
-      ledger.release_fill_slot(id);
+    // Several sources report the same end (the private channel, the order's
+    // record every few seconds, its trades). The ledger is written again
+    // only when one of them has something new: a larger size, or an order
+    // that is not closed yet.
+    const bool known = rest_final_at.count(id) > 0;
+    if (!known || size > it->second.matched_shares || it->second.unresolved()) {
+      ledger.status(id, size ? "matched" : "no_match", size);
+      if (!size) {
+        ledger.release_missed_spend(id);
+        ledger.release_fill_slot(id);
+      }
     }
     release(id);
+    // A match seen earlier counts even when this source says less.
+    size = std::max(size, it->second.matched_shares);
     auto *o = rest_book.find(id);
     Json row{{"result", "rest_done"},
              {"order_id", id},
@@ -2758,6 +2916,12 @@ struct Runtime::Impl {
     auto i = ledger.orders.find(std::string(id));
     if (i == ledger.orders.end() || i->second.status == "confirmed")
       return;
+    // A resting order whose end the venue already showed: the missing reply
+    // to its placement no longer matters.
+    if (i->second.rest && rest_final_at.count(std::string(id))) {
+      sent_at.erase(std::string(id));
+      return;
+    }
     ledger.status(id, "unknown");
     auto timings = timing_fields(id);
     release(id);
@@ -2772,7 +2936,7 @@ struct Runtime::Impl {
     // cancelled, which is harmless if it is not.
     if (i->second.rest) {
       rest_book.posted(id);
-      rest_book.cancel(id, "its placement outcome is unknown");
+      rest_book.cancel(id, "its placement outcome is unknown", mono_s());
     }
   }
   // One fill of one of our orders: record it, and book it once confirmed.
@@ -2829,7 +2993,8 @@ struct Runtime::Impl {
     row.update(evidence);
     audit(std::move(row));
     // A resting order matched in full is done: no cancellation will follow.
-    if (maker && delivered >= intent.target)
+    if (maker && delivered >= intent.target &&
+        (!rest_final_at.count(t.order) || intent.unresolved()))
       rest_final(t.order, delivered, "fully matched");
   }
   void consume_trade(const Json &j, std::string_view source,
@@ -3207,6 +3372,18 @@ struct Runtime::Impl {
                     auto ended = rest_final_at.find(id);
                     bool just_ended = ended != rest_final_at.end() &&
                                       mono_s() - ended->second < 15;
+                    // The venue answered "cancelled" a while ago and still
+                    // lists it: it is cancelled again.
+                    if (auto *known = rest_book.find(id);
+                        known && known->off_book &&
+                        mono_s() - known->proven_at > 15 && rest_book.reopen(id)) {
+                      ++errors;
+                      audit({{"result", "error"},
+                             {"order_id", id},
+                             {"reason", "the venue still lists a resting order "
+                                        "it said was cancelled: cancelling again"}});
+                      pause("our resting order is still open on the venue", true);
+                    }
                     if (!rest_book.find(id) && !just_ended) {
                       if (!mine->second.unresolved())
                         ledger.status(id, "pending", mine->second.matched_shares,

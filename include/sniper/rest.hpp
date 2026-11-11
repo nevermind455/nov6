@@ -91,11 +91,13 @@ struct Order {
   bool posted = false;      // the venue answered its placement
   bool wanted = false;      // a cancel is wanted
   std::string why;          // ... for this reason (the first one given)
+  double wanted_at = 0;     // ... since this monotonic time
   int cancels = 0;          // cancel requests sent
   bool in_flight = false;
   double flight_since = 0, next_cancel = 0;
   bool warned = false;      // the operator was told it is not proven off
   bool off_book = false;    // proven off the book; only its final size is due
+  double proven_at = 0;     // ... since this monotonic time
   Json row;                 // its rest_order journal row, written once
   std::uint64_t signals_other = 0; // opposite-side signals seen when placed
 };
@@ -117,6 +119,12 @@ public:
   static constexpr double SlowRetry = 5.0;     // seconds
   static constexpr double FlightTimeout = 2.0; // a cancel unanswered this long
   static constexpr double GiveUpAfterEnd = 120.0;
+  // A placement normally answers in tens of milliseconds. Past this a wanted
+  // cancel no longer waits for the answer: the order may be on the book.
+  static constexpr double PostGrace = 1.0;
+  // A cancel wanted this long with the order still not shown gone is
+  // reported, whatever the reason (no connection, no answer, refusals).
+  static constexpr double StuckAfter = 5.0;
 
   bool empty() const { return orders_.empty(); }
   std::size_t size() const { return orders_.size(); }
@@ -131,26 +139,36 @@ public:
   void posted(std::string_view id);
   // The venue shows it is off the book (a confirmed cancel); its final size
   // is still to come.
-  void proven(std::string_view id);
+  void proven(std::string_view id, double mono = 0);
+  // The venue still lists an order it said it cancelled: it is cancelled
+  // again. False when it is not here or was not proven off.
+  bool reopen(std::string_view id);
   // It never rested, or its final size is known: nothing more to follow.
   bool off(std::string_view id);
-  // Cancel it; the first reason is kept. False when it is not here.
-  bool cancel(std::string_view id, const std::string &why);
+  // Cancel it; the first reason (and its time) is kept. False when it is not
+  // here.
+  bool cancel(std::string_view id, const std::string &why, double mono = 0);
   // Orders to send a cancel for now; each is marked in flight.
   std::vector<std::string> due(double mono);
   // A cancel request ended without showing the order off the book.
   void cancel_unproven(std::string_view id, double mono);
-  // Orders asked to cancel QuickTries times and still not proven off, that
-  // the operator has not been told about yet.
-  std::vector<std::string> unproven_to_report();
+  // Orders the operator has not been told about yet that are still not
+  // proven off: after QuickTries answered cancels, or StuckAfter seconds
+  // from when the cancel was first wanted.
+  std::vector<std::string> unproven_to_report(double mono = 0);
   // Orders whose market closed GiveUpAfterEnd ago: nothing of them can match
   // any more. They are dropped from the book and returned (off_book says
   // whether the venue ever showed the order gone).
   std::vector<Order> give_up(double wall);
 };
 
+// Whether one more resting order of this stake keeps the test inside its loss
+// stop even if every resting fill still unsettled, and this order, lost all
+// they paid. `realized` is the settled result since the test began.
+bool fits_stop(Units realized, Units open_cost, Units stake, Units stop);
+
 // The test's own record, kept beside the ledger so the loss stop survives a
-// restart. Delete the file to begin a new test.
+// restart. Delete the file (with the bot stopped) to begin a new test.
 struct Test {
   double started_wall = 0, off_wall = 0;
   bool off = false;

@@ -352,7 +352,8 @@ TEST(RestReplies, PlacementAnswers) {
            {500, R"({"error":"internal"})"},
            {502, "<html>bad gateway</html>"},
            {200, "[]"},
-           {200, R"({"success":true,"status":"live","makingAmount":"x"})"}}) {
+           {200, R"({"success":true,"status":"live","makingAmount":"x"})"},
+           {200, R"({"success":true,"status":"matched","makingAmount":"-3","takingAmount":"5"})"}}) {
     EXPECT_EQ(rest::parse_post_reply(status, body, "0xabc").kind, Posted::Unknown)
         << body;
   }
@@ -400,34 +401,65 @@ TEST(RestBook, AMarketIsBusyUntilItsOrderIsShownOffTheBook) {
   EXPECT_FALSE(book.in_market("0xanother"));
 
   // a cancel waits for the placement's answer: the venue has to know the order
-  EXPECT_TRUE(book.cancel("rest-order", "the move was given back"));
+  EXPECT_TRUE(book.cancel("rest-order", "the move was given back", 100.1));
   EXPECT_TRUE(book.due(100.2).empty());
   book.posted("rest-order");
   EXPECT_EQ(book.due(100.3), std::vector<std::string>{"rest-order"});
-  // one request at a time, and the first reason is kept
+  // one request at a time, and the first reason (and its time) is kept
   EXPECT_TRUE(book.due(100.4).empty());
-  book.cancel("rest-order", "it rested its time");
+  book.cancel("rest-order", "it rested its time", 100.5);
   EXPECT_EQ(book.find("rest-order")->why, "the move was given back");
-  EXPECT_FALSE(book.cancel("no-such-order", "x"));
+  EXPECT_DOUBLE_EQ(book.find("rest-order")->wanted_at, 100.1);
+  EXPECT_FALSE(book.cancel("no-such-order", "x", 100.5));
 
   // the venue confirmed the cancel: the market is free, the final size is due
-  book.proven("rest-order");
+  book.proven("rest-order", 100.6);
   EXPECT_FALSE(book.busy());
   EXPECT_FALSE(book.in_market(COND));
   EXPECT_FALSE(book.empty());
   EXPECT_TRUE(book.due(200).empty());
+  EXPECT_TRUE(book.unproven_to_report(200).empty());
+  EXPECT_DOUBLE_EQ(book.find("rest-order")->proven_at, 100.6);
+  // ... unless the venue still lists it later: then it is cancelled again
+  EXPECT_FALSE(book.reopen("no-such-order"));
+  EXPECT_TRUE(book.reopen("rest-order"));
+  EXPECT_FALSE(book.reopen("rest-order")); // already reopened
+  EXPECT_TRUE(book.busy());
+  EXPECT_EQ(book.due(130), std::vector<std::string>{"rest-order"});
+  book.proven("rest-order", 130.1);
   EXPECT_TRUE(book.off("rest-order"));
   EXPECT_TRUE(book.empty());
   EXPECT_FALSE(book.off("rest-order"));
 }
 
+TEST(RestBook, ALatePlacementAnswerDoesNotLeaveTheOrderUnwatched) {
+  // The placement's answer is late and BTC turned: after a second the cancel
+  // goes out anyway, because the order may already be on the book.
+  rest::Book book;
+  auto o = resting(100.0);
+  o.posted = false;
+  book.add(o);
+  book.cancel("rest-order", "the trigger fired the other way", 100.2);
+  EXPECT_TRUE(book.due(100.3).empty());
+  EXPECT_TRUE(book.due(100.99).empty());
+  ASSERT_EQ(book.due(101.0).size(), 1u);
+  // the venue did not know it yet: asked again, and again once it answers
+  book.cancel_unproven("rest-order", 101.05);
+  ASSERT_EQ(book.due(101.31).size(), 1u);
+  book.posted("rest-order");
+  book.cancel_unproven("rest-order", 101.4);
+  ASSERT_EQ(book.due(101.91).size(), 1u);
+  book.proven("rest-order", 102.0);
+  EXPECT_FALSE(book.busy());
+}
+
 TEST(RestBook, ACancelIsAskedAgainUntilTheVenueShowsTheOrderGone) {
   rest::Book book;
   book.add(resting());
-  book.cancel("rest-order", "it rested its time");
   double t = 108.0;
+  book.cancel("rest-order", "it rested its time", t);
   ASSERT_EQ(book.due(t).size(), 1u);
-  EXPECT_TRUE(book.unproven_to_report().empty());
+  EXPECT_TRUE(book.unproven_to_report(t).empty());
   // an unanswered cancel is sent again after two seconds
   EXPECT_TRUE(book.due(t + 1.9).empty());
   ASSERT_EQ(book.due(t + 2.0).size(), 1u);
@@ -441,8 +473,8 @@ TEST(RestBook, ACancelIsAskedAgainUntilTheVenueShowsTheOrderGone) {
   book.cancel_unproven("rest-order", t);
   // three tries without proof: the operator is told once, and it keeps
   // asking every five seconds
-  EXPECT_EQ(book.unproven_to_report(), std::vector<std::string>{"rest-order"});
-  EXPECT_TRUE(book.unproven_to_report().empty());
+  EXPECT_EQ(book.unproven_to_report(t), std::vector<std::string>{"rest-order"});
+  EXPECT_TRUE(book.unproven_to_report(t + 60).empty());
   EXPECT_TRUE(book.due(t + 4.9).empty());
   ASSERT_EQ(book.due(t + 5.0).size(), 1u);
   EXPECT_TRUE(book.busy());
@@ -453,6 +485,42 @@ TEST(RestBook, ACancelIsAskedAgainUntilTheVenueShowsTheOrderGone) {
   ASSERT_EQ(left.size(), 1u);
   EXPECT_FALSE(left[0].off_book);
   EXPECT_TRUE(book.empty());
+}
+
+TEST(RestBook, AnOrderThatCannotBeCancelledAtAllIsReported) {
+  // No connection, so no cancel was ever sent: after five seconds the
+  // operator is told all the same.
+  rest::Book book;
+  book.add(resting());
+  book.cancel("rest-order", "the move was given back", 200.0);
+  EXPECT_TRUE(book.unproven_to_report(204.9).empty());
+  EXPECT_EQ(book.unproven_to_report(205.0), std::vector<std::string>{"rest-order"});
+  EXPECT_TRUE(book.unproven_to_report(300.0).empty()); // once
+  EXPECT_EQ(book.find("rest-order")->cancels, 0);
+  // an order nobody wants cancelled is never reported
+  rest::Book quiet;
+  quiet.add(resting());
+  EXPECT_TRUE(quiet.unproven_to_report(1e9).empty());
+}
+
+TEST(RestTest, OpenRestingFillsCountAgainstTheLossStop) {
+  const Units stop = 10 * U;
+  // nothing open: a $3 order fits
+  EXPECT_TRUE(rest::fits_stop(0, 0, 3 * U, stop));
+  // $6 still open: one more $3 order could make it $9 lost - still inside
+  EXPECT_TRUE(rest::fits_stop(0, 6 * U, 3 * U, stop));
+  // $9 open: another would make $12 possible - it waits for settlements
+  EXPECT_FALSE(rest::fits_stop(0, 9 * U, 3 * U, stop));
+  // exactly the stop is not inside it
+  EXPECT_FALSE(rest::fits_stop(0, 7 * U, 3 * U, stop));
+  EXPECT_TRUE(rest::fits_stop(0, 7 * U - 1, 3 * U, stop));
+  // settled losses and gains move the room
+  EXPECT_FALSE(rest::fits_stop(-5 * U, 3 * U, 3 * U, stop));
+  EXPECT_TRUE(rest::fits_stop(4 * U, 9 * U, 3 * U, stop));
+  // nonsense inputs never open the gate
+  EXPECT_FALSE(rest::fits_stop(0, 0, 3 * U, 0));
+  EXPECT_FALSE(rest::fits_stop(0, -1, 3 * U, stop));
+  EXPECT_FALSE(rest::fits_stop(0, 0, -1, stop));
 }
 
 TEST(RestTest, TheLossStopTurnsTheTestOffForGood) {

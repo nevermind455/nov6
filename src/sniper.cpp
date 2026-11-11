@@ -896,10 +896,11 @@ std::shared_ptr<Plan> Sniper::decide(const std::string &side, Json &row,
     return skip("no current round", row);
   double end = *end_opt;
   std::string token = side == "UP" ? up : down;
-  if (env.awaiting_fak(side, cond, token))
-    return skip("awaiting FAK fill size", row);
+  // (asked first: the resting order itself also awaits its fill size)
   if (env.resting_in(cond))
     return skip("our resting order is in this market", row);
+  if (env.awaiting_fak(side, cond, token))
+    return skip("awaiting FAK fill size", row);
   double left = end - env.wall();
   row["round_end"] = end_json(end);
   row["left_s"] = py::round(left, 1);
