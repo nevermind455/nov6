@@ -66,6 +66,13 @@ struct SniperSettings {
   // and its move still holds. 0 = off (the reference behaviour).
   int miss_retry = 0;
   double miss_retry_ms = 1000;
+  // SNIPER_REST_LIVE (live only): after a FAK that matched nothing, rest the
+  // same BUY - its shares at its limit - as a post-only order for at most
+  // rest_s seconds, then cancel it. rest_dir keeps it to the side that is
+  // beating the price to beat. Off for good once the resting orders' own
+  // settled loss reaches rest_stop_usd.
+  bool rest_live = false, rest_dir = true;
+  double rest_s = 5, rest_stop_usd = 10;
   bool ptb_skip_close = false;
   double ptb_margin_bp = 1.0;
   std::string primary_feed = "coinbase";
@@ -131,6 +138,9 @@ struct SniperEnv {
                             const std::string & /*token*/) {
     return false;
   }
+  // live SNIPER_REST_LIVE: an order of ours may be resting in this market;
+  // it takes no other order of ours until that one is off the book.
+  virtual bool resting_in(const std::string & /*cond*/) { return false; }
   // broker attributes
   virtual double trade_window_seconds() = 0;
   virtual double min_seconds_to_expiry() = 0;
@@ -265,6 +275,12 @@ public:
   void retry_after_miss(const std::string &side, const Plan *missed = nullptr);
   // The paper outcomes that are a zero-fill miss of the order's own price.
   static bool retryable_outcome(const std::string &outcome);
+  // SNIPER_REST_LIVE: the price-to-beat view the decisions use.
+  Json direction_view(const std::string &side, double end) {
+    return ptb_view(side, end);
+  }
+  // Trigger signals seen for each side (UP, DOWN), whatever became of them.
+  std::uint64_t signals_by_side[2]{0, 0};
   // _set_bankroll(_read_bankroll(), read_at)
   void refresh_bankroll(double read_at);
   // _refresh_hybrid_risk: worker-only accounting refresh

@@ -55,9 +55,12 @@ Headers l2_headers(const Signer &, const Credentials &, std::string_view method,
                    std::string_view path, std::string_view body = {},
                    std::int64_t timestamp = 0);
 std::string wallet_for(std::string_view signer, int signature_type);
+// post_only (a GTC that may only rest, never take) appends "postOnly":true,
+// as the SDK does; the venue refuses one that would cross the book.
 std::string serialize_order(const UnsignedOrder &, std::string_view signature,
                             std::string_view owner,
-                            std::string_view order_type = "FAK");
+                            std::string_view order_type = "FAK",
+                            bool post_only = false);
 struct SignedOrder {
   UnsignedOrder order;
   Hash digest{};
@@ -66,6 +69,8 @@ struct SignedOrder {
 SignedOrder build_order(const Signer &, std::string_view maker,
                         int signature_type, std::string_view token, Units stake,
                         Units cap, const Rules &, const Credentials &,
-                        std::string_view type = "FAK");
+                        std::string_view type = "FAK", bool post_only = false);
+// DELETE /order: the request body that cancels one resting order.
+std::string cancel_order_body(std::string_view order_id);
 Units fee_total(Units shares, Units price, Units rate, int exponent);
 } // namespace sniper

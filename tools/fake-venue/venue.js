@@ -1,6 +1,8 @@
-// Fake Polymarket + Coinbase venue for end-to-end paper testing of sniper-cpp.
+// Fake Polymarket + Coinbase venue for end-to-end testing of sniper-cpp.
 // Development only: the bot never loads this. Every host the bot talks to is
-// served locally behind an HTTP CONNECT proxy; see README.md here.
+// served locally behind an HTTP CONNECT proxy; see README.md here. With
+// VENUE_LIVE=1 it also plays the account side (orders, cancels, the private
+// channel, trades, balance), so `--live` can be exercised with no real venue.
 'use strict';
 const fs = require('fs');
 const net = require('net');
@@ -23,6 +25,15 @@ const CFG = {
   gammaStallAfter: +env('VENUE_GAMMA_STALL_AFTER_S', 0), // 0 = never stall
   gammaStallMs: +env('VENUE_GAMMA_STALL_MS', 12000),
   proxyDropEvery: +env('VENUE_PROXY_DROP_EVERY_S', 0), // cut every tunnel (0 = never)
+  live: env('VENUE_LIVE', '0') === '1', // accept orders (never without it)
+  fak: env('VENUE_FAK', 'miss'), // miss | book: what a FAK does
+  orderDelayMs: +env('VENUE_ORDER_DELAY_MS', 300), // the taker hold before a FAK's reply
+  restFillRate: +env('VENUE_REST_FILL_RATE', 0.05), // sellers hitting a resting bid, per second
+  restPartial: +env('VENUE_REST_PARTIAL', 0.3), // share of those fills that are partial
+  cancelFail: +env('VENUE_CANCEL_FAIL', 0), // share of cancels answered with HTTP 500
+  quietUser: env('VENUE_QUIET_USER', '0') === '1', // send no order events on the private channel
+  balance: +env('VENUE_BALANCE', 100), // dollars
+  ptb: env('VENUE_PTB', '1') === '1', // publish the price to beat in Gamma
   sigma: 1e-4, // per sqrt(second)
   log: env('VENUE_LOG', __dirname + '/venue.log'),
 };
@@ -187,9 +198,37 @@ function sendBooks(c, assets) {
   }
   if (out.length) c.ws.send(JSON.stringify(out));
 }
+// ---------------------------------------------------------------- private (user) WS
+const userClients = new Set();
+function sendUser(market, msg) {
+  const raw = JSON.stringify(msg);
+  for (const c of userClients) if (c.markets.has(market)) { c.ws.send(raw); count('user_event ' + msg.event_type + (msg.type ? ' ' + msg.type : '')); }
+}
 function marketServer(port) {
   const srv = https.createServer(tlsOpts);
-  const wss = new WebSocketServer({ server: srv, path: '/ws/market' });
+  const wss = new WebSocketServer({ noServer: true });
+  const userWss = new WebSocketServer({ noServer: true });
+  srv.on('upgrade', (req, socket, head) => {
+    const path = new URL(req.url, 'https://x').pathname;
+    const target = path === '/ws/market' ? wss : path === '/ws/user' && CFG.live ? userWss : null;
+    if (!target) { socket.destroy(); return; }
+    target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
+  });
+  userWss.on('connection', (ws) => {
+    const c = { ws, markets: new Set() };
+    userClients.add(c); count('user_ws_connect');
+    ws.on('message', (data) => {
+      const s = data.toString();
+      if (s === 'PING') { ws.send('PONG'); return; }
+      let j; try { j = JSON.parse(s); } catch { count('user_bad'); return; }
+      const ids = (j.markets || []).map(String);
+      if (j.operation === 'unsubscribe') for (const m of ids) c.markets.delete(m);
+      else for (const m of ids) c.markets.add(m);
+      log('USER_SUB', j.operation || 'initial', ids.length);
+    });
+    ws.on('close', () => userClients.delete(c));
+    ws.on('error', () => userClients.delete(c));
+  });
   wss.on('connection', (ws) => {
     const c = { ws, assets: new Set() };
     marketClients.add(c); count('market_ws_connect');
@@ -209,6 +248,144 @@ function marketServer(port) {
     ws.on('error', () => marketClients.delete(c));
   });
   srv.listen(port, '127.0.0.1');
+}
+
+// ---------------------------------------------------------------- account (VENUE_LIVE=1)
+// One account. A FAK misses (or takes the book); a post-only GTC rests until
+// it is cancelled, a seller hits it, or the market maker's ask comes down to
+// it. Order ids are the order's EIP-712 hash, as on the real venue.
+const EXCHANGE = '0xE111180000d2663C0091e4f400237545B87B996B';
+const NEG_EXCHANGE = '0xe2222d279d744050d28e00520010520000310F59';
+const w32 = (n) => Buffer.from(BigInt(n).toString(16).padStart(64, '0'), 'hex');
+const raw32 = (h) => Buffer.from(String(h).replace(/^0x/, '').padStart(64, '0'), 'hex');
+const ORDER_TYPE = Buffer.from(kec('Order(uint256 salt,address maker,address signer,uint256 tokenId,uint256 makerAmount,uint256 takerAmount,uint8 side,uint8 signatureType,uint256 timestamp,bytes32 metadata,bytes32 builder)'));
+const ORDER_DOMAIN = Buffer.from(kec(Buffer.concat([
+  Buffer.from(kec('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')),
+  Buffer.from(kec('Polymarket CTF Exchange')), Buffer.from(kec('2')), w32(137), raw32(EXCHANGE)])));
+function orderHash(o) {
+  const struct = kec(Buffer.concat([ORDER_TYPE, w32(o.salt), raw32(o.maker), raw32(o.signer), w32(o.tokenId),
+    w32(o.makerAmount), w32(o.takerAmount), w32(o.side === 'BUY' ? 0 : 1), w32(o.signatureType),
+    w32(o.timestamp), raw32(o.metadata), raw32(o.builder)]));
+  return '0x' + hex(kec(Buffer.concat([Buffer.from([0x19, 0x01]), ORDER_DOMAIN, Buffer.from(struct)])));
+}
+const account = { balance: Math.round(CFG.balance * 1e6), orders: new Map(), trades: [], nextTrade: 1 };
+const sh = (n) => String(Math.round(n * 1e6) / 1e6);
+function orderJson(o) {
+  return { id: o.id, status: o.status, owner: o.owner, maker_address: o.maker, market: o.market, asset_id: o.asset_id,
+    side: 'BUY', original_size: sh(o.size), size_matched: sh(o.matched), price: fmtP(o.price), outcome: o.outcome,
+    order_type: o.type, created_at: Math.floor(o.created / 1000), expiration: '0', associate_trades: o.trades };
+}
+function orderEvent(o, type) {
+  if (CFG.quietUser) return;
+  sendUser(o.market, { event_type: 'order', type, id: o.id, market: o.market, asset_id: o.asset_id, side: 'BUY',
+    price: fmtP(o.price), original_size: sh(o.size), size_matched: sh(o.matched), outcome: o.outcome,
+    owner: o.owner, order_owner: o.owner, status: o.status, timestamp: String(Date.now()) });
+}
+function tradeEvent(t) { sendUser(t.market, { event_type: 'trade', type: 'TRADE', ...t, last_update: String(Math.floor(Date.now() / 1000)), timestamp: String(Date.now()) }); }
+// The trade's life on the real venue: MATCHED, then MINED, then CONFIRMED.
+function settleTrade(t, cost) {
+  tradeEvent(t);
+  setTimeout(() => { t.status = 'MINED'; tradeEvent(t); }, 700);
+  setTimeout(() => { t.status = 'CONFIRMED'; account.balance -= cost; tradeEvent(t); }, 1500);
+}
+function fillResting(o, qty, why) {
+  qty = Math.min(qty, o.size - o.matched);
+  if (qty <= 0 || o.status !== 'LIVE') return;
+  o.matched = Math.round((o.matched + qty) * 1e6) / 1e6;
+  if (o.matched >= o.size - 1e-9) o.status = 'MATCHED';
+  const t = { id: 'trade-' + account.nextTrade++, taker_order_id: '0x' + hex(kec('taker' + account.nextTrade)),
+    market: o.market, asset_id: o.asset_id, side: 'SELL', size: sh(qty), price: fmtP(o.price), status: 'MATCHED',
+    outcome: o.outcome, owner: 'someone-else', trade_owner: o.owner, trader_side: 'MAKER',
+    match_time: String(Math.floor(Date.now() / 1000)),
+    maker_orders: [{ order_id: o.id, asset_id: o.asset_id, matched_amount: sh(qty), price: fmtP(o.price),
+      outcome: o.outcome, owner: o.owner, maker_address: o.maker, side: 'BUY' }] };
+  o.trades.push(t.id); account.trades.push(t);
+  count('rest_fill ' + why); log('REST_FILL', o.id.slice(0, 12), sh(qty), '@', fmtP(o.price), why);
+  orderEvent(o, 'UPDATE');
+  settleTrade(t, Math.round(qty * o.price * 1e6));
+}
+let lastRestStep = Date.now();
+function stepResting() {
+  const now = Date.now(), dt = (now - lastRestStep) / 1000;
+  lastRestStep = now;
+  for (const o of account.orders.values()) {
+    if (o.status !== 'LIVE') continue;
+    const r = byToken(o.asset_id);
+    if (!r || now / 1000 >= r.end) { o.status = 'CANCELED_MARKET_RESOLVED'; orderEvent(o, 'CANCELLATION'); count('rest_expired'); continue; }
+    // the market maker's ask came down to our bid: it takes us (the adverse fill)
+    if (bestOf(r.books[o.asset_id]).ask <= o.price + 1e-9) { fillResting(o, o.size - o.matched, 'ask_came_down'); continue; }
+    if (Math.random() < CFG.restFillRate * dt)
+      fillResting(o, Math.random() < CFG.restPartial ? Math.max(1, Math.floor((o.size - o.matched) / 2)) : o.size - o.matched, 'seller');
+  }
+}
+function readBody(req, done) { let body = ''; req.on('data', (d) => (body += d)); req.on('end', () => done(body)); }
+function accountHandler(req, res, url) {
+  const path = url.pathname;
+  if (path === '/auth/ban-status/closed-only') return jsonReply(res, 200, { closed_only: false }), true;
+  if (path === '/balance-allowance')
+    return jsonReply(res, 200, { balance: String(account.balance), allowances: { [EXCHANGE]: '1000000000000000', [NEG_EXCHANGE]: '1000000000000000' } }), true;
+  if (path === '/data/trades') return jsonReply(res, 200, { data: account.trades, next_cursor: 'LTE=', count: account.trades.length }), true;
+  if (path === '/data/orders') {
+    const market = url.searchParams.get('market');
+    const open = [...account.orders.values()].filter((o) => o.status === 'LIVE' && (!market || o.market === market)).map(orderJson);
+    return jsonReply(res, 200, { data: open, next_cursor: 'LTE=', count: open.length }), true;
+  }
+  let m = path.match(/^\/data\/order\/(0x[0-9a-f]{64})$/);
+  if (m) { const o = account.orders.get(m[1]); return jsonReply(res, 200, o ? orderJson(o) : 'null'), true; }
+  if (path === '/order' && req.method === 'DELETE') {
+    readBody(req, (body) => {
+      let id; try { id = JSON.parse(body).orderID; } catch { return jsonReply(res, 400, { error: 'bad json' }); }
+      if (Math.random() < CFG.cancelFail) { count('cancel_failed_on_purpose'); return jsonReply(res, 500, { error: 'fake venue: cancel failed' }); }
+      const o = account.orders.get(id);
+      if (!o || o.status !== 'LIVE') { count('cancel_not_open'); return jsonReply(res, 200, { canceled: [], not_canceled: { [id]: "order can't be found - already canceled or matched" } }); }
+      o.status = 'CANCELED'; count('cancel_ok'); log('CANCEL', id.slice(0, 12), 'matched', sh(o.matched), 'rested_ms', Date.now() - o.created);
+      jsonReply(res, 200, { canceled: [id], not_canceled: {} });
+      orderEvent(o, 'CANCELLATION');
+    });
+    return true;
+  }
+  if (path === '/order' && req.method === 'POST') {
+    readBody(req, (body) => {
+      let j; try { j = JSON.parse(body); } catch { return jsonReply(res, 400, { error: 'bad json' }); }
+      const od = j.order, r = byToken(String(od.tokenId));
+      if (!r) return jsonReply(res, 400, { error: 'market not found' });
+      const id = orderHash(od), size = Number(od.takerAmount) / 1e6, price = Math.round(Number(od.makerAmount) / Number(od.takerAmount) * 1e6) / 1e6;
+      const best = bestOf(r.books[String(od.tokenId)]);
+      count('order ' + j.orderType + (j.postOnly ? ' postOnly' : ''));
+      log('ORDER', j.orderType, j.postOnly ? 'postOnly' : '', id.slice(0, 12), sh(size), '@', price, 'best ask', best.ask);
+      if (j.orderType === 'GTC') {
+        if (!j.postOnly) return jsonReply(res, 400, { error: 'fake venue: only post-only resting orders' });
+        if (size < 5) { count('rest_too_small'); return jsonReply(res, 400, { error: 'order ' + id + ' is invalid. Size (' + size + ') lower than the minimum: 5' }); }
+        if (best.ask <= price + 1e-9) { count('rest_crossed'); return jsonReply(res, 400, { error: 'invalid post-only order: order crosses book' }); }
+        if ([...account.orders.values()].some((o) => o.status === 'LIVE')) count('SECOND_RESTING_ORDER');
+        const o = { id, owner: j.owner, maker: od.maker, market: r.cid, asset_id: String(od.tokenId), outcome: String(od.tokenId) === r.up ? 'Up' : 'Down',
+          price, size, matched: 0, status: 'LIVE', type: 'GTC', created: Date.now(), trades: [] };
+        account.orders.set(id, o); count('rest_live');
+        jsonReply(res, 200, { errorMsg: '', orderID: id, takingAmount: '', makingAmount: '', status: 'live', transactionsHashes: null, success: true });
+        orderEvent(o, 'PLACEMENT');
+        return;
+      }
+      // a taker order is held, then matched against the book as it is then
+      setTimeout(() => {
+        if ([...account.orders.values()].some((o) => o.status === 'LIVE')) count('FAK_WHILE_RESTING');
+        const now = bestOf(r.books[String(od.tokenId)]);
+        if (CFG.fak !== 'book' || now.ask > price + 1e-9) {
+          count('fak_miss');
+          return jsonReply(res, 400, { error: 'no orders found to match with FAK order. FAK orders are partially filled or killed if no match is found.' });
+        }
+        const cost = Math.round(size * now.ask * 1e6);
+        const t = { id: 'trade-' + account.nextTrade++, taker_order_id: id, market: r.cid, asset_id: String(od.tokenId), side: 'BUY',
+          size: sh(size), price: fmtP(now.ask), status: 'MATCHED', owner: j.owner, trade_owner: j.owner, trader_side: 'TAKER',
+          match_time: String(Math.floor(Date.now() / 1000)),
+          maker_orders: [{ order_id: '0x' + hex(kec('mm' + account.nextTrade)), asset_id: String(od.tokenId), matched_amount: sh(size), price: fmtP(now.ask), outcome: 'x', owner: 'mm' }] };
+        account.trades.push(t); count('fak_fill');
+        jsonReply(res, 200, { errorMsg: '', orderID: id, takingAmount: sh(size), makingAmount: sh(cost / 1e6), status: 'matched', success: true });
+        settleTrade(t, cost + Math.round(size * 0.07 * now.ask * (1 - now.ask) * 1e6));
+      }, CFG.orderDelayMs);
+    });
+    return true;
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------- Coinbase WS
@@ -246,6 +423,7 @@ function tickLoop() {
   count('cb_ticker');
   ensureRounds();
   for (const r of rounds.values()) if (ms / 1000 < r.end + 5 && ms / 1000 > r.start - 600) requote(r, ms, false);
+  if (CFG.live) stepResting();
   setTimeout(tickLoop, 40 + Math.random() * 120);
 }
 setInterval(() => {
@@ -266,6 +444,7 @@ function gammaEvent(start) {
   const won = closed ? upWon(r) : null;
   return {
     id: String(start), slug: 'btc-updown-5m-' + start, active: true, closed, endDate: isoS(r.end),
+    ...(CFG.ptb && r.strike !== null ? { eventMetadata: { priceToBeat: r.strike } } : {}),
     markets: [{
       id: String(6700000 + (start / 300) % 100000), conditionId: r.cid, slug: 'btc-updown-5m-' + start,
       active: true, closed, acceptingOrders: !closed, enableOrderBook: true, version: 'v1',
@@ -321,6 +500,7 @@ function clobHandler(req, res) {
     return jsonReply(res, 200, { condition_id: r.cid, closed, tokens: [
       { token_id: r.up, outcome: 'Up', winner: closed && won }, { token_id: r.down, outcome: 'Down', winner: closed && !won }] });
   }
+  if (CFG.live && accountHandler(req, res, url)) return;
   if (url.pathname === '/order') { count('ORDER_POST_SEEN'); return jsonReply(res, 400, { errorMsg: 'fake venue: paper must not post' }); }
   jsonReply(res, 404, { error: 'not found' });
 }

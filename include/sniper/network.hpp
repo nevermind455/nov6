@@ -82,6 +82,10 @@ public:
   // Absence means no ready connection; generations change after reconnects.
   std::optional<H2ConnectionInfo> connection_info() const;
   bool post(std::string id, std::string body, const Headers &headers);
+  // DELETE /order with this body: cancel one resting order. The reply (or an
+  // unknown outcome) arrives through the same callbacks under `id`. A cancel
+  // whose outcome is unknown is safe to send again.
+  bool cancel(std::string id, std::string body, const Headers &headers);
   bool get_time();
 };
 } // namespace sniper

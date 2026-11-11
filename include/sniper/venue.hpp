@@ -35,4 +35,12 @@ inline bool missing_fak_is_unfilled(const Intent &i, double wall,
 }
 // A trade on this wallet whose taker order this bot never placed.
 bool is_foreign_trade(const Json &, const std::map<std::string, Intent> &);
+// SNIPER_REST_LIVE: this bot's resting orders among a trade's maker legs, one
+// entry per order (its legs added up). A maker pays no fee and trades at its
+// own price. The trade id is "<trade id>:<order id>", since one trade can fill
+// several makers. Empty when no maker leg is one of our orders; throws when a
+// leg names one of our orders that was not placed to rest, or disagrees with
+// what that order authorized.
+std::vector<ParsedTrade> parse_maker_fills(const Json &,
+                                           const std::map<std::string, Intent> &);
 } // namespace sniper

@@ -334,6 +334,7 @@ void Sniper::signal(double mid, double t, std::int64_t t_ns) {
   ++n["signals"];
   std::string why = cb_fresh.why_not(t / 1000.0);
   std::string side = *direction > 0 ? "UP" : "DOWN";
+  ++signals_by_side[idx(side)];
   if (!why.empty()) {
     Json window = window_fields(t);
     trigger.q.values.clear();
@@ -897,6 +898,8 @@ std::shared_ptr<Plan> Sniper::decide(const std::string &side, Json &row,
   std::string token = side == "UP" ? up : down;
   if (env.awaiting_fak(side, cond, token))
     return skip("awaiting FAK fill size", row);
+  if (env.resting_in(cond))
+    return skip("our resting order is in this market", row);
   double left = end - env.wall();
   row["round_end"] = end_json(end);
   row["left_s"] = py::round(left, 1);
