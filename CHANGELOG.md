@@ -26,6 +26,14 @@ nowhere why it went.
 
 See [docs/WEBSOCKETS.md](docs/WEBSOCKETS.md). No strategy rule changed.
 
+Checked before going live: a fresh clone verifies against
+`reports/SHA256SUMS` and passes its own tests; the build on `main` and this
+one give byte-identical decisions on three recorded feeds; a live state
+written by the `main` build is continued by this one, taken back by `main`
+and continued again with the ledger equal to the venue's record throughout
+(`tools/fake-venue`, whose trade ids are now unique across restarts and which
+no longer fails on a round older than itself).
+
 ## 11 November 2026 — rest a missed order on the book (`SNIPER_REST_LIVE`)
 
 Opt-in, live only, off by default. No change to any decision, limit or size,

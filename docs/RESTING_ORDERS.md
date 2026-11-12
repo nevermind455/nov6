@@ -162,6 +162,12 @@ Counters in the summary row: `rest orders sent`, `rest orders resting`,
   rests, nothing cancels it until the bot starts again (it cancels inherited
   resting orders first thing) or the round ends. The exposure is one order's
   stake.
+* **Going back to an older build.** Stop the bot normally first: a clean stop
+  cancels a resting order and waits for the venue to confirm. An older build
+  starts and trades on this build's ledger, but it does not know the resting
+  fields and leaves them out when it writes the ledger. After coming back to
+  this build the resting test's loss history is gone: delete
+  `state/live/rest_live_test.json` to begin a clean test.
 * **Fills are selected against the bot.** A resting buy is filled by someone
   who wants to sell at that price at that moment. The early cancel is what
   protects it; the loss stop bounds the test if that is not enough. Judge it

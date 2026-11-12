@@ -1,7 +1,7 @@
 4e6cb12c7539e4c539a4b11cca8d3bdf51c88da0b554a5e70428786c79b8cb23  ./.env.example
 403380d30bea5124c68f1110990a1649615dc2128f1f8624bf98ded345ab3a5a  ./.github/workflows/build.yml
 c60c41043056a15facf348d62a9e55b1e62063185e130b2b96579b3efe8f69a4  ./.gitignore
-90b789aa2430b8664d929771afe55a01bcc602ad000ca16f72dbdaa62454fdc0  ./CHANGELOG.md
+1e18be772b8b48b9fa524dcbf162c96f2014c9c74da1bfc72a738a0ae8779f73  ./CHANGELOG.md
 a10798b257eb21217fcc572a8ee78f24aeac49313e3b5c5ef3e56431eda9c6d6  ./CMakeLists.txt
 0dc95b10e2d5265b96aee1bba96a14182977f0c311a7571e0a5e88fedfddb83a  ./README.md
 9e505e68eb4eacd1601afa478c628cc21a05ea890c2deac458e0b7cd38c6060c  ./bin/sniper-cpp
@@ -17,7 +17,7 @@ d7a71acce1cbc68d58268fb5e4507632604864da970e328f0c209162e235befe  ./docs/ACCEPTA
 91540a781834f7ee89f4f61362201806a0b08684530786551f86eb9e86faa2c6  ./docs/GO_LIVE.md
 67c0a2324ed295916aecdbe15f6851fb2698a7d80205e3d9111f7bff36dbcc4b  ./docs/MISSED_ORDERS.md
 47977c7e51920cce2e7ee8f86e0c77d01081d6f4f2eb28f8a795f39fb0f83336  ./docs/PAPER_VALIDATION.md
-bf26398d69cb59c41753185dc08e1881d2d4adf3aea05689b119f1bdb1f3db17  ./docs/RESTING_ORDERS.md
+6e4856ee64b98e7445ae5d25e785cc49683e47697ef45009ea2cd8c80f6d0642  ./docs/RESTING_ORDERS.md
 d970fe54936765870e5afa7b6800bc6c7182af2a268c56a1b991ad2d39714d2a  ./docs/SPEC_COMPLIANCE.md
 63b80057e5148e06b9e63ae23ee7e4d5863434631f66ef5490700260d5f6b12f  ./docs/WEBSOCKETS.md
 d6b72a8860396933202e921d6fb097ca351ca88295adad5b2289eb97fc0f0403  ./include/sniper/book.hpp
@@ -180,7 +180,7 @@ d5cf977f25562a522a7b86662b16ecb83dc4e079ce2569e611c2f8d5e13e45e1  ./tools/fake-v
 856578bd2b1fceb6e8b840f02e5ebb623f616b937861c117981a22124a388683  ./tools/fake-venue/oracle.test.js
 a4b7b2b486724d37995ad6a26d0a7c90b75378fc52c7f2b02cef858581cfdbc8  ./tools/fake-venue/package-lock.json
 4aa1187d2342a35b32816cbd7517d77dcb0a65d9516a4128474e4d2093748cad  ./tools/fake-venue/package.json
-86f6b1cdab6ac3de95af68fafec2eb52bc150bb3a56853c53b28ea93df5f2f2a  ./tools/fake-venue/venue.js
+573d14857789a4c81a8517f58cd973b01e424421c968c8c255670578e887ea70  ./tools/fake-venue/venue.js
 da68a6c0488b15a1001e16cc0994d8ba108758812313e7fa1b017b3cc84a8641  ./tools/replay/compare.py
 35cf082c45f8d5c61dce26f511f3ccc69cf23d1b3aebd3fbbfe9bd5c4551915e  ./tools/replay/diff_cases.py
 732f4d7cd805c4b9dca7935ed3cccfe9f89ece31eb82adaf986c3f1b8082f298  ./tools/replay/diff_tool.cpp

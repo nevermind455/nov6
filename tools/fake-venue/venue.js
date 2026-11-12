@@ -272,6 +272,9 @@ function orderHash(o) {
     w32(o.timestamp), raw32(o.metadata), raw32(o.builder)]));
   return '0x' + hex(kec(Buffer.concat([Buffer.from([0x19, 0x01]), ORDER_DOMAIN, Buffer.from(struct)])));
 }
+// Trade ids are unique across restarts of this venue, as the real venue's
+// are: a client's ledger refuses to book the same trade id twice.
+const RUN = Date.now().toString(36);
 const account = { balance: Math.round(CFG.balance * 1e6), orders: new Map(), trades: [], nextTrade: 1 };
 const sh = (n) => String(Math.round(n * 1e6) / 1e6);
 function orderJson(o) {
@@ -297,7 +300,7 @@ function fillResting(o, qty, why) {
   if (qty <= 0 || o.status !== 'LIVE') return;
   o.matched = Math.round((o.matched + qty) * 1e6) / 1e6;
   if (o.matched >= o.size - 1e-9) o.status = 'MATCHED';
-  const t = { id: 'trade-' + account.nextTrade++, taker_order_id: '0x' + hex(kec('taker' + account.nextTrade)),
+  const t = { id: 'trade-' + RUN + '-' + account.nextTrade++, taker_order_id: '0x' + hex(kec('taker' + account.nextTrade)),
     market: o.market, asset_id: o.asset_id, side: 'SELL', size: sh(qty), price: fmtP(o.price), status: 'MATCHED',
     outcome: o.outcome, owner: 'someone-else', trade_owner: o.owner, trader_side: 'MAKER',
     match_time: String(Math.floor(Date.now() / 1000)),
@@ -378,7 +381,7 @@ function accountHandler(req, res, url) {
           return jsonReply(res, 400, { error: 'no orders found to match with FAK order. FAK orders are partially filled or killed if no match is found.' });
         }
         const cost = Math.round(size * now.ask * 1e6);
-        const t = { id: 'trade-' + account.nextTrade++, taker_order_id: id, market: r.cid, asset_id: String(od.tokenId), side: 'BUY',
+        const t = { id: 'trade-' + RUN + '-' + account.nextTrade++, taker_order_id: id, market: r.cid, asset_id: String(od.tokenId), side: 'BUY',
           size: sh(size), price: fmtP(now.ask), status: 'MATCHED', owner: j.owner, trade_owner: j.owner, trader_side: 'TAKER',
           match_time: String(Math.floor(Date.now() / 1000)),
           maker_orders: [{ order_id: '0x' + hex(kec('mm' + account.nextTrade)), asset_id: String(od.tokenId), matched_amount: sh(size), price: fmtP(now.ask), outcome: 'x', owner: 'mm' }] };
@@ -451,7 +454,10 @@ if (CFG.snapshotEvery > 0)
 
 // ---------------------------------------------------------------- REST (gamma, clob h1/h2, rpc)
 const isoS = (s) => new Date(s * 1000).toISOString().replace('.000Z', 'Z');
-function resolved(r) { return Date.now() / 1000 >= r.end + CFG.resolveDelay; }
+// A round from before this venue started has no price history here: it is
+// never reported resolved (a client may still hold positions from an earlier
+// run of the venue), instead of failing the whole process.
+function resolved(r) { return r.start >= initialSecond - 300 && Date.now() / 1000 >= r.end + CFG.resolveDelay; }
 function upWon(r) { return twap60(priceAt, r.end) >= (r.strike ?? twap60(priceAt, r.start)); }
 function gammaEvent(start) {
   const r = roundFor(start), closed = resolved(r);
