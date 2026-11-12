@@ -331,7 +331,12 @@ function accountHandler(req, res, url) {
   if (path === '/auth/ban-status/closed-only') return jsonReply(res, 200, { closed_only: false }), true;
   if (path === '/balance-allowance')
     return jsonReply(res, 200, { balance: String(account.balance), allowances: { [EXCHANGE]: '1000000000000000', [NEG_EXCHANGE]: '1000000000000000' } }), true;
-  if (path === '/data/trades') return jsonReply(res, 200, { data: account.trades, next_cursor: 'LTE=', count: account.trades.length }), true;
+  if (path === '/data/trades') {
+    // as the real venue: only trades matched at or after ?after= (unix seconds)
+    const after = Number(url.searchParams.get('after') || 0);
+    const data = account.trades.filter((t) => Number(t.match_time) >= after);
+    return jsonReply(res, 200, { data, next_cursor: 'LTE=', count: data.length }), true;
+  }
   if (path === '/data/orders') {
     const market = url.searchParams.get('market');
     const open = [...account.orders.values()].filter((o) => o.status === 'LIVE' && (!market || o.market === market)).map(orderJson);

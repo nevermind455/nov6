@@ -180,7 +180,7 @@ d5cf977f25562a522a7b86662b16ecb83dc4e079ce2569e611c2f8d5e13e45e1  ./tools/fake-v
 856578bd2b1fceb6e8b840f02e5ebb623f616b937861c117981a22124a388683  ./tools/fake-venue/oracle.test.js
 a4b7b2b486724d37995ad6a26d0a7c90b75378fc52c7f2b02cef858581cfdbc8  ./tools/fake-venue/package-lock.json
 4aa1187d2342a35b32816cbd7517d77dcb0a65d9516a4128474e4d2093748cad  ./tools/fake-venue/package.json
-573d14857789a4c81a8517f58cd973b01e424421c968c8c255670578e887ea70  ./tools/fake-venue/venue.js
+48af0737ebd5e2512740cf291342b1a6ae967f3134f93ca9ecf50b0bde7d45b8  ./tools/fake-venue/venue.js
 da68a6c0488b15a1001e16cc0994d8ba108758812313e7fa1b017b3cc84a8641  ./tools/replay/compare.py
 35cf082c45f8d5c61dce26f511f3ccc69cf23d1b3aebd3fbbfe9bd5c4551915e  ./tools/replay/diff_cases.py
 732f4d7cd805c4b9dca7935ed3cccfe9f89ece31eb82adaf986c3f1b8082f298  ./tools/replay/diff_tool.cpp
