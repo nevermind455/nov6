@@ -34,6 +34,9 @@ const CFG = {
   quietUser: env('VENUE_QUIET_USER', '0') === '1', // send no order events on the private channel
   balance: +env('VENUE_BALANCE', 100), // dollars
   ptb: env('VENUE_PTB', '1') === '1', // publish the price to beat in Gamma
+  marketKillEvery: +env('VENUE_MARKET_KILL_EVERY_S', 0), // close ONE market websocket this often (0 = never)
+  noPong: env('VENUE_NO_PONG', '0') === '1', // never answer the text PING on the market channel
+  marketFlap: env('VENUE_MARKET_FLAP', '0') === '1', // close every market websocket 100 ms after it connects
   sigma: +env('VENUE_SIGMA', 1e-4), // BTC volatility per sqrt(second)
   log: env('VENUE_LOG', __dirname + '/venue.log'),
 };
@@ -230,11 +233,12 @@ function marketServer(port) {
     ws.on('error', () => userClients.delete(c));
   });
   wss.on('connection', (ws) => {
-    const c = { ws, assets: new Set() };
-    marketClients.add(c); count('market_ws_connect');
+    const c = { ws, assets: new Set(), since: Date.now() };
+    marketClients.add(c); count('market_ws_connect'); log('MARKET_WS_CONNECT', marketClients.size);
+    if (CFG.marketFlap) setTimeout(() => ws.close(), 100);
     ws.on('message', (data) => {
       const s = data.toString();
-      if (s === 'PING') { ws.send('PONG'); count('market_ping'); return; }
+      if (s === 'PING') { count('market_ping'); if (!CFG.noPong) ws.send('PONG'); return; }
       let j; try { j = JSON.parse(s); } catch { ws.send('INVALID OPERATION'); count('market_bad'); return; }
       const ids = (j.assets_ids || []).map(String);
       log('MARKET_SUB', s.slice(0, 300));
@@ -430,6 +434,16 @@ setInterval(() => {
   const raw = JSON.stringify({ type: 'heartbeat', last_trade_id: tradeId, product_id: 'BTC-USD', sequence: seq, time: iso(Date.now()) });
   for (const ws of cbClients) ws.send(raw);
 }, 1000);
+// Single-socket loss: the oldest market connection is cut, cleanly and
+// abruptly in turn. A client with a standby should not lose the feed.
+let marketKills = 0;
+if (CFG.marketKillEvery > 0)
+  setInterval(() => {
+    const oldest = [...marketClients].sort((a, b) => a.since - b.since)[0];
+    if (!oldest) return;
+    count('market_ws_killed'); log('MARKET_WS_KILL', marketClients.size);
+    if (marketKills++ % 2) oldest.ws.terminate(); else oldest.ws.close();
+  }, CFG.marketKillEvery * 1000);
 if (CFG.snapshotEvery > 0)
   setInterval(() => {
     for (const c of marketClients) for (const a of c.assets) { const r = byToken(a); if (r) c.ws.send(JSON.stringify({ event_type: 'book', ...bookJson(r, a, r.lastChange) })); }

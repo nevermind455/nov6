@@ -293,6 +293,19 @@ public:
     else if (result == "guard" || result == "coinbase_reconnect" ||
              result == "discovery_refused")
       disruptions_.push_back({num(row, "wall").value_or(NAN), result + ": " + text(row, "reason")});
+    else if (result == "ws") {
+      // A venue or trigger socket came up or went down. A standby going is
+      // not a loss of data; anything else that goes down is a disruption.
+      auto socket = text(row, "socket");
+      bool up = flag(row, "up", true), standby = text(row, "role") == "standby";
+      ++sockets_[socket + (up ? " up" : standby ? " standby down" : " down")];
+      if (!up && !standby) {
+        ++socket_down_reasons_[socket + ": " + text(row, "reason")];
+        disruptions_.push_back({num(row, "wall").value_or(NAN),
+                                socket + " websocket down: " + text(row, "reason")});
+      }
+      return;
+    }
     if (result == "skipped" || result == "refused" || result == "filled" ||
         result == "pending")
       ++decisions_[result];
@@ -434,6 +447,8 @@ public:
     o["paper_orders"] = paper_orders_;
     o["orphan_fill_rows"] = orphan_fills_;
     out["orders"] = o;
+    if (!sockets_.empty())
+      out["sockets"] = Json{{"events", sockets_}, {"down_reasons", socket_down_reasons_}};
     if (!rest_outcomes_.empty() || !rest_ended_.empty() || !rest_off_.empty()) {
       std::uint64_t considered = 0;
       for (auto &[outcome, n] : rest_outcomes_)
@@ -482,6 +497,7 @@ private:
       rest_cancel_why_;
   double rest_filled_shares_ = 0;
   std::string rest_off_;
+  std::map<std::string, std::uint64_t> sockets_, socket_down_reasons_;
   std::map<std::string, std::pair<Reason, std::uint64_t>> outcomes_;
   std::map<std::string, Order> orders_;
   std::map<std::string, Stats> stage_;

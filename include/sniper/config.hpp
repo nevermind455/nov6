@@ -19,6 +19,9 @@ struct Config {
   bool fair = true, kelly_on = true, hybrid = true, flat = false,
        min_entry = false, fair_no_limit = false;
   bool ptb_skip = false, settle_onchain = true;
+  // A second, warm connection to the venue's market feed that takes over at
+  // once when the first drops (SNIPER_MARKET_STANDBY, on by default).
+  bool market_standby = true;
   double ptb_margin = 1, min_gap = 0, baseline_bp = 1, dd_stop = .2,
          dd_pause = 600, min_entry_dd = 0;
   Units risk_fraction = 0, max_order = 0, start_cash = 1000 * U,

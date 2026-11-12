@@ -148,7 +148,18 @@ struct Runtime::Impl {
   std::unique_ptr<FileLock> wallet_lock;
   std::unique_ptr<H2Client> sender;
   std::vector<std::unique_ptr<WebSocket>> coinbase;
-  std::unique_ptr<WebSocket> market, user;
+  // Two connections to the venue's market feed. One is live: its frames
+  // build the books. The other is a warm standby, subscribed to the same
+  // tokens and otherwise ignored. When the live one drops the standby takes
+  // over at once (no reconnect to wait for) and the lost one reconnects
+  // behind it. With SNIPER_MARKET_STANDBY=0 there is only the first.
+  std::array<std::unique_ptr<WebSocket>, 2> market;
+  int market_live = -1;                // the live one, -1 while none is up
+  std::uint64_t market_failovers = 0, market_outages = 0;
+  double market_feed_since = 0;        // monotonic: the feed up without a gap
+  std::string market_fault_text;
+  double market_fault_at = -1e30;
+  std::unique_ptr<WebSocket> user;
   BookState book{8.0, 30.0, nullptr, nullptr, [this] { return venue_wall(); }};
   ServerClock clock;
   // the reference's decision engine, paper broker and hub state
@@ -397,41 +408,11 @@ struct Runtime::Impl {
     cb.unknown = [this](auto id, auto why) { on_unknown(id, why); };
     sender = std::make_unique<H2Client>(io, tls, c.live, blocked, std::move(cb),
                                         c.send_timeout_s);
-    market = std::make_unique<WebSocket>(
-        io, tls, "wss://ws-subscriptions-clob.polymarket.com/ws/market",
-        [this](auto raw, int) {
-          if (raw == "PONG")
-            return;
-          rec_frame("mkt", raw);
-          int refused = 0;
-          try {
-            refused = handle_market_frame(book, raw);
-          } catch (...) {
-            ++errors;
-          }
-          if (refused) // poly_market._request_resync
-            for (auto &t : book.needs_resync())
-              resync_wanted.insert(t);
-          paper_poll();
-        },
-        [this](bool up) {
-          rec(Json{{"k", "mconn"}, {"up", up}});
-          dash_event("market", up ? "connected" : "disconnected", up ? "good" : "warn");
-          book.connected = up;
-          book.desync_all(up ? "connect" : "disconnect");
-          if (up) {
-            for (auto &t : book.needs_resync())
-              resync_wanted.insert(t);
-            if (!subscribed.empty()) {
-              Json sub{{"assets_ids", std::vector<std::string>(
-                                          subscribed.begin(), subscribed.end())},
-                       {"type", "market"},
-                       {"custom_feature_enabled", true}};
-              market->send(sub.dump());
-            }
-          }
-        },
-        25, true);
+    for (int k = 0; k < (c.market_standby ? 2 : 1); ++k)
+      market[k] = std::make_unique<WebSocket>(
+          io, tls, "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+          [this, k](auto raw, int) { on_market(k, raw); },
+          [this, k](bool up) { on_market_state(k, up); }, 25, true);
     for (int n = 0; n < c.conns; ++n)
       coinbase.push_back(std::make_unique<WebSocket>(
           io, tls, "wss://ws-feed.exchange.coinbase.com",
@@ -446,6 +427,11 @@ struct Runtime::Impl {
                        "socket " + std::to_string(n + 1) +
                            (up ? " connected" : " disconnected"),
                        up ? "good" : "warn");
+            ws_row("coinbase", n, up,
+                   n < static_cast<int>(coinbase.size()) && coinbase[n]
+                       ? coinbase[n]->last_failure()
+                       : std::string(),
+                   "trigger");
             if (up) {
               if (!any) { // the first socket up restarts the rule
                 rec(Json{{"k", "cbconn"}, {"up", true}});
@@ -466,6 +452,8 @@ struct Runtime::Impl {
           [this](auto raw, int) { on_user(raw); },
           [this](bool up) {
             user_pong = -1;
+            ws_row("user", 0, up, user ? user->last_failure() : std::string(),
+                   "private");
             if (up) {
               Json sub{
                   {"auth",
@@ -503,8 +491,9 @@ struct Runtime::Impl {
       sender->stop();
     for (auto &ws : coinbase)
       ws->stop();
-    if (market)
-      market->stop();
+    for (auto &m : market)
+      if (m)
+        m->stop();
     if (user)
       user->stop();
   }
@@ -1242,6 +1231,32 @@ struct Runtime::Impl {
       book_state = a == LIVE && b == LIVE ? std::string(LIVE) : a == LIVE ? b : a;
     }
     add("POLY BOOK", book_state, "resync waiting " + std::to_string(resync_wanted.size()));
+    {
+      // The connections themselves, apart from how fresh the books are.
+      int total = 0, up_n = 0;
+      std::uint64_t drops = 0;
+      for (auto &m : this->market) // (a local above is called market too)
+        if (m) {
+          ++total;
+          up_n += m->connected();
+          drops += m->drops();
+        }
+      auto held = [](double s) {
+        long long t = static_cast<long long>(std::max(0.0, s));
+        return t >= 3600   ? std::to_string(t / 3600) + "h" + std::to_string(t % 3600 / 60) + "m"
+               : t >= 60   ? std::to_string(t / 60) + "m" + std::to_string(t % 60) + "s"
+                           : std::to_string(t) + "s";
+      };
+      std::string detail = std::to_string(up_n) + "/" + std::to_string(total) + " up";
+      if (market_live >= 0)
+        detail += " held " + held(now - market_feed_since);
+      detail += " drops " + std::to_string(drops);
+      if (market_failovers)
+        detail += " switches " + std::to_string(market_failovers);
+      if (market_outages)
+        detail += " outages " + std::to_string(market_outages);
+      add("POLY WS", market_live < 0 ? "DOWN" : up_n == total ? "OK" : "WARN", detail);
+    }
     add("CLOB H2", sender->ready() ? "OK" : "WAIT", "");
     if (c.live)
       add("USER WS", user && user->connected() ? "OK" : "DOWN", "");
@@ -1581,6 +1596,124 @@ struct Runtime::Impl {
                 {"taker_delay_ms", m.taker_delay_ms.value_or(0.0)},
                 {"taker_delay_flagged", m.taker_delay_flagged}};
   }
+  // ------------------------------------------------------------ venue sockets
+  // One journal row for every socket that comes up or goes down, with why
+  // it went and where in the round it happened.
+  void ws_row(const char *socket, int n, bool up, const std::string &reason,
+              const char *role) {
+    Json row{{"result", "ws"}, {"socket", socket}, {"n", n + 1},
+             {"up", up},       {"role", role}};
+    if (!up && !reason.empty())
+      row["reason"] = reason.substr(0, 160);
+    if (hub_window >= 0)
+      row["left_s"] = py::round(static_cast<double>(hub_window + 300) - wall_s(), 1);
+    try {
+      audit(std::move(row));
+    } catch (...) {
+      ++errors;
+    }
+  }
+  void market_send_all(const std::string &text) {
+    for (auto &m : market)
+      if (m && m->connected())
+        m->send(text);
+  }
+  // A frame from market connection k. Only the live one builds the books;
+  // the standby is read and dropped, which is what keeps it warm.
+  void on_market(int k, std::string_view raw) {
+    if (raw == "PONG" || k != market_live)
+      return;
+    try {
+      rec_frame("mkt", raw);
+      int refused = 0;
+      try {
+        refused = handle_market_frame(book, raw);
+      } catch (...) {
+        ++errors;
+      }
+      if (refused) // poly_market._request_resync
+        for (auto &t : book.needs_resync())
+          resync_wanted.insert(t);
+      paper_poll();
+    } catch (const std::exception &e) {
+      // A fault of ours must never cost the connection: it is reported
+      // (once in ten seconds) and the socket stays up.
+      const double mono = mono_s();
+      if (market_fault_text == e.what() && mono - market_fault_at < 10)
+        return;
+      market_fault_text = e.what();
+      market_fault_at = mono;
+      try {
+        handler_fault("market feed handler", e.what());
+      } catch (...) {
+        ++errors;
+      }
+    }
+  }
+  // The feed as the books see it: up while any connection is live.
+  void market_feed(bool up) {
+    rec(Json{{"k", "mconn"}, {"up", up}});
+    dash_event("market", up ? "connected" : "disconnected", up ? "good" : "warn");
+    book.connected = up;
+    book.desync_all(up ? "connect" : "disconnect");
+    if (up) {
+      market_feed_since = mono_s();
+      for (auto &t : book.needs_resync())
+        resync_wanted.insert(t);
+    } else
+      ++market_outages;
+  }
+  void on_market_state(int k, bool up) {
+    const std::string why = market[k] ? market[k]->last_failure() : std::string();
+    if (up) {
+      // subscribe first: this is what makes a standby ready to take over
+      if (!subscribed.empty())
+        market[k]->send(Json{{"assets_ids", std::vector<std::string>(
+                                                subscribed.begin(), subscribed.end())},
+                             {"type", "market"},
+                             {"custom_feature_enabled", true}}
+                            .dump());
+      if (market_live < 0) {
+        market_live = k;
+        ws_row("market", k, true, why, "live");
+        market_feed(true);
+      } else {
+        ws_row("market", k, true, why, "standby");
+        dash_event("market", "standby connected", "good");
+      }
+      return;
+    }
+    if (k != market_live) {
+      ws_row("market", k, false, why, "standby");
+      dash_event("market", "standby lost: reconnecting", "warn");
+      return;
+    }
+    const int other = 1 - k;
+    if (market[other] && market[other]->connected()) {
+      // The standby takes over. Its frames were not applied while it stood
+      // by, so every book starts again from a snapshot, asked for at once
+      // on the connection that is live now.
+      market_live = other;
+      ++market_failovers;
+      ws_row("market", k, false, why, "live: the standby took over");
+      dash_event("market", "socket lost: the standby took over", "warn");
+      // In a recording a takeover is a disconnect and a connect with nothing
+      // between them: the same two steps the books take here, so a replay
+      // rebuilds them exactly.
+      rec(Json{{"k", "mconn"}, {"up", false}});
+      book.desync_all("disconnect");
+      rec(Json{{"k", "mconn"}, {"up", true}});
+      book.desync_all("connect");
+      for (auto &t : subscribed) {
+        resync_wanted.insert(t);
+        request_ws_snapshot(t, book.view(t));
+      }
+      return;
+    }
+    market_live = -1;
+    ws_row("market", k, false, why, "live: no standby to take over");
+    market_feed(false);
+  }
   // ------------------------------------------------------------ the hub
   bool activate_rules(const Round &r) {
     return execution::cache_round_rules(market_rules, r, wall_s());
@@ -1653,16 +1786,15 @@ struct Runtime::Impl {
           drop.push_back(t);
       subscribed = want;
       book.set_active(std::vector<std::string>(want.begin(), want.end()));
-      if (market->connected()) {
-        if (!add.empty())
-          market->send(Json{{"assets_ids", add},
-                            {"operation", "subscribe"},
-                            {"custom_feature_enabled", true}}
-                           .dump());
-        if (!drop.empty())
-          market->send(
-              Json{{"assets_ids", drop}, {"operation", "unsubscribe"}}.dump());
-      }
+      // every connection follows the same tokens, the standby too
+      if (!add.empty())
+        market_send_all(Json{{"assets_ids", add},
+                             {"operation", "subscribe"},
+                             {"custom_feature_enabled", true}}
+                            .dump());
+      if (!drop.empty())
+        market_send_all(
+            Json{{"assets_ids", drop}, {"operation", "unsubscribe"}}.dump());
     }
     sync_user_markets();
   }
@@ -1699,18 +1831,19 @@ struct Runtime::Impl {
         (prior != next_ws_snapshot.end() &&
          prior->second.first == view.generation && now < prior->second.second))
       return;
-    if (!market->connected() || !subscribed.count(token))
+    if (market_live < 0 || !subscribed.count(token))
       return;
-    market->send(
+    auto &live = *market[market_live];
+    live.send(
         Json{{"assets_ids", Json::array({token})}, {"operation", "unsubscribe"}}
             .dump());
     auto g = book.subscription_gap(token, view.generation);
     rec(Json{{"k", "ws_gap"}, {"token", token}, {"generation", view.generation}});
     if (g)
-      market->send(Json{{"assets_ids", Json::array({token})},
-                        {"operation", "subscribe"},
-                        {"custom_feature_enabled", true}}
-                       .dump());
+      live.send(Json{{"assets_ids", Json::array({token})},
+                     {"operation", "subscribe"},
+                     {"custom_feature_enabled", true}}
+                    .dump());
     next_ws_snapshot[token] = {view.generation, now + 1.5};
   }
   // feeds/hub._resync_loop: REST /book recovery and refresh of quiet books
@@ -3694,7 +3827,9 @@ struct Runtime::Impl {
     fetch_wake.notify_all();
     for (auto &ws : coinbase)
       ws->stop();
-    market->stop();
+    for (auto &m : market)
+      if (m)
+        m->stop();
     if (sniper)
       sniper->closing = true;
     paper_timer.cancel();
@@ -3734,7 +3869,9 @@ struct Runtime::Impl {
         begin_stop(sig == SIGTERM ? 143 : 130);
     });
     sender->start();
-    market->start();
+    for (auto &m : market)
+      if (m)
+        m->start();
     for (auto &ws : coinbase)
       ws->start();
     if (user)

@@ -317,9 +317,11 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
   Url url;
   Message message;
   State state;
-  double silence, last_rx = 0, last_ping = 0;
+  double silence, last_rx = 0, last_ping = 0, up_since = 0;
   bool app_ping, up = false, stopped = false;
   unsigned retry = 0;
+  std::string failure; // why the connection last went down
+  std::uint64_t drops = 0;
   tcp::resolver resolver;
   net::steady_timer retry_timer, watch;
   std::shared_ptr<Pipe> pipe;
@@ -336,19 +338,28 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
   bool current(const std::shared_ptr<Pipe> &p) const {
     return !stopped && pipe == p && !p->failed;
   }
-  void fail(const std::shared_ptr<Pipe> &p) {
+  void fail(const std::shared_ptr<Pipe> &p, std::string why) {
     if (!current(p))
       return;
     p->failed = true;
     bool was_up = up;
     up = p->up = false;
+    failure = std::move(why);
+    if (was_up)
+      ++drops;
     watch.cancel();
     resolver.cancel();
     beast::error_code ignored;
     beast::get_lowest_layer(p->socket).socket().close(ignored);
     p->queue.clear();
     auto self = shared_from_this();
-    double delay = std::min(8., .25 * std::pow(2., std::min(retry++, 5u)));
+    // A connection that was up and dropped is reopened at once: the venue
+    // closing a socket is no reason to stay away. Attempts that fail back
+    // off (0.25 s, 0.5 s ... 8 s) so a venue that is down is not hammered.
+    double delay = was_up && retry == 0
+                       ? 0.0
+                       : std::min(8., .25 * std::pow(2., std::min(retry, 5u)));
+    ++retry;
     retry_timer.expires_after(std::chrono::milliseconds(
         static_cast<int>(delay * 1000 + retry % 7 * 13)));
     retry_timer.async_wait([self, p](beast::error_code ec) {
@@ -358,9 +369,13 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
     if (was_up && state)
       state(false);
   }
+  void fail(const std::shared_ptr<Pipe> &p, const char *what,
+            const beast::error_code &ec) {
+    fail(p, std::string(what) + ": " + ec.message());
+  }
   void fail() {
     if (pipe)
-      fail(pipe);
+      fail(pipe, "reconnect asked by the bot");
   }
   void connect() {
     if (stopped || (pipe && !pipe->failed))
@@ -373,19 +388,19 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
         net::ssl::host_name_verification(url.host));
     if (!SSL_set_tlsext_host_name(p->socket.next_layer().native_handle(),
                                   url.host.c_str()))
-      return fail(p);
+      return fail(p, "TLS SNI failed");
     std::optional<Url> proxy;
     try {
       proxy = connect_proxy_for(url);
     } catch (...) {
-      return fail(p);
+      return fail(p, "invalid HTTP CONNECT proxy");
     }
     auto dest = proxy ? *proxy : url;
     auto self = shared_from_this();
     watch.expires_after(std::chrono::seconds(10));
     watch.async_wait([self, p](beast::error_code ec) {
       if (!ec && self->current(p) && !p->up)
-        self->fail(p);
+        self->fail(p, "connection setup timed out");
     });
     resolver.async_resolve(
         dest.host, dest.port,
@@ -394,7 +409,7 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
           if (!self->current(p))
             return;
           if (ec)
-            return self->fail(p);
+            return self->fail(p, "DNS", ec);
           beast::get_lowest_layer(p->socket).expires_after(
               std::chrono::seconds(10));
           beast::get_lowest_layer(p->socket).async_connect(
@@ -402,10 +417,10 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
                 if (!self->current(p))
                   return;
                 if (ec)
-                  return self->fail(p);
+                  return self->fail(p, "connect", ec);
                 if (transport::configure_tcp_socket(
                         beast::get_lowest_layer(p->socket).socket()))
-                  return self->fail(p);
+                  return self->fail(p, "TCP options failed");
                 if (!proxy)
                   return self->tls(p);
                 p->tunnel.method(http::verb::connect);
@@ -419,7 +434,7 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
                       if (!self->current(p))
                         return;
                       if (ec)
-                        return self->fail(p);
+                        return self->fail(p, "proxy write", ec);
                       http::async_read(
                           beast::get_lowest_layer(p->socket), p->buffer,
                           p->tunnel_reply,
@@ -427,7 +442,7 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
                             if (!self->current(p))
                               return;
                             if (ec || p->tunnel_reply.get().result_int() != 200)
-                              return self->fail(p);
+                              return self->fail(p, "proxy refused the tunnel");
                             p->buffer.consume(p->buffer.size());
                             self->tls(p);
                           });
@@ -442,25 +457,43 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
           if (!self->current(p))
             return;
           if (ec)
-            return self->fail(p);
+            return self->fail(p, "TLS handshake", ec);
           beast::get_lowest_layer(p->socket).expires_never();
-          p->socket.set_option(
-              ws::stream_base::timeout::suggested(beast::role_type::client));
+          auto timeouts =
+              ws::stream_base::timeout::suggested(beast::role_type::client);
+          if (self->app_ping) {
+            // Hold the link: when nothing has arrived for half the silence
+            // limit the socket itself sends a WebSocket ping, and the pong
+            // counts as life. A link is only given up when even that goes
+            // unanswered. (Feeds without an application ping keep the plain
+            // rule: no data within the limit means the feed is stale.)
+            timeouts.idle_timeout = std::chrono::milliseconds(
+                static_cast<long long>(self->silence * 1000.0));
+            timeouts.keep_alive_pings = true;
+            p->socket.control_callback(
+                [w = std::weak_ptr<Impl>(self)](ws::frame_type kind,
+                                                beast::string_view) {
+                  if (auto s = w.lock(); s && kind != ws::frame_type::close)
+                    s->last_rx = mono_s();
+                });
+          }
+          p->socket.set_option(timeouts);
           p->socket.async_handshake(self->url.authority(), self->url.target,
                                     [self, p](beast::error_code ec) {
                                       if (!self->current(p))
                                         return;
                                       if (ec)
-                                        return self->fail(p);
+                                        return self->fail(p, "WebSocket handshake", ec);
                                       self->watch.cancel();
                                       p->up = self->up = true;
-                                      self->retry = 0;
-                                      self->last_rx = mono_s();
+                                      // (retry is cleared once the link has
+                                      // held for a while: see tick)
+                                      self->last_rx = self->up_since = mono_s();
                                       self->last_ping = 0;
                                       try {
                                         if (self->state) self->state(true);
                                       } catch (...) {
-                                        return self->fail(p);
+                                        return self->fail(p, "fault in the bot's connect handler");
                                       }
                                       self->read(p);
                                       self->tick(p);
@@ -476,7 +509,12 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
           if (!self->current(p))
             return;
           if (ec)
-            return self->fail(p);
+            return self->fail(p, ec == beast::error::timeout
+                                     ? "no answer to keep-alive pings"
+                                     : ec == ws::error::closed
+                                           ? "closed by the venue"
+                                           : "read",
+                              ec);
           self->last_rx = mono_s();
           auto text = beast::buffers_to_string(p->buffer.data());
           p->buffer.consume(p->buffer.size());
@@ -486,7 +524,7 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
           try {
             self->message(text, static_cast<int>(pending / 4096));
           } catch (...) {
-            return self->fail(p);
+            return self->fail(p, "fault in the bot's message handler");
           }
           self->read(p);
         });
@@ -497,7 +535,7 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
       return;
     p->queue.push_back(std::make_shared<std::string>(std::move(value)));
     if (p->queue.size() > 256)
-      return fail(p);
+      return fail(p, "send queue overflow");
     if (!p->writing)
       write(p);
   }
@@ -515,7 +553,7 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
                             if (!self->current(p))
                               return;
                             if (ec)
-                              return self->fail(p);
+                              return self->fail(p, "write", ec);
                             if (!p->queue.empty())
                               p->queue.pop_front();
                             self->write(p);
@@ -529,8 +567,15 @@ struct WebSocket::Impl : std::enable_shared_from_this<WebSocket::Impl> {
     watch.async_wait([self, p](beast::error_code ec) {
       if (ec || !self->current(p))
         return;
+      // Only a link that has held counts as a good connection. One that the
+      // venue drops straight after accepting it keeps backing off, so a
+      // flapping venue is never met with a storm of reconnects.
+      if (self->retry && mono_s() - self->up_since >= 5.0)
+        self->retry = 0;
       if (mono_s() - self->last_rx > self->silence)
-        return self->fail(p);
+        return self->fail(p, "silent for " +
+                                 std::to_string(static_cast<int>(self->silence)) +
+                                 " s");
       if (self->app_ping && mono_s() - self->last_ping >= 10) {
         self->last_ping = mono_s();
         self->send("PING");
@@ -561,4 +606,7 @@ void WebSocket::stop() { p_->stop(); }
 void WebSocket::send(std::string s) { p_->send(std::move(s)); }
 bool WebSocket::connected() const { return p_->up; }
 void WebSocket::reconnect() { p_->fail(); }
+std::string WebSocket::last_failure() const { return p_->failure; }
+std::uint64_t WebSocket::drops() const { return p_->drops; }
+double WebSocket::up_since() const { return p_->up ? p_->up_since : 0.0; }
 } // namespace sniper

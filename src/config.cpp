@@ -158,6 +158,7 @@ Config Config::load(int argc, char **argv) {
   c.canary_hard_stop = c.flag("SNIPER_CANARY_HARD_STOP", true);
   c.dash_fps = c.numeric("DASH_FPS", 2, 0.5, 10);
   c.settle_onchain = c.flag("SETTLE_ONCHAIN", true);
+  c.market_standby = c.flag("SNIPER_MARKET_STANDBY", true);
   c.rpc = c.text("POLYGON_RPC", "https://polygon-bor-rpc.publicnode.com");
   c.start_cash = units(c.text("PAPER_START_BALANCE", "1000"));
   c.state = c.root / "state" / (c.live ? "live" : "paper");
