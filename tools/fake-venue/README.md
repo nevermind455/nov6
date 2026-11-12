@@ -89,4 +89,7 @@ Stress knobs (environment variables for `node venue.js`):
 | `VENUE_GAMMA_STALL_AFTER_S` | `0` | After this uptime, Gamma replies take `VENUE_GAMMA_STALL_MS` (12 s) |
 | `VENUE_PROXY_DROP_EVERY_S` | `0` | Cut every tunnelled connection (both websockets, HTTP/2, REST) this often; reconnection stress |
 | `VENUE_REST_TS` | `lastchange` | REST `/book` timestamp: time of last change, or `now` |
+| `VENUE_MARKET_KILL_EVERY_S` | `0` | Cut ONE market websocket (the oldest) this often, cleanly and abruptly in turn; a client with a standby should not lose the feed |
+| `VENUE_NO_PONG` | `0` | `1`: never answer the text `PING` on the market channel (with a large `VENUE_MM_LAG_MEAN` the link is silent but alive) |
+| `VENUE_MARKET_FLAP` | `0` | `1`: close every market websocket 100 ms after it connects; reconnects must back off |
 | `VENUE_PROXY_PORT`, `VENUE_PORT_BASE` | `18080`, `19000` | Run several venues at once |

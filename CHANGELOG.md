@@ -1,5 +1,31 @@
 # Changelog
 
+## 12 November 2026 — holding the venue's websockets
+
+The bot never closed a venue websocket on purpose, but it could give one up
+too easily, took a quarter of a second or more to get it back, and wrote
+nowhere why it went.
+
+* **Keep-alive.** The venue sockets send WebSocket pings when nothing has
+  arrived for half the silence limit, and a pong counts as life. Before, 25
+  seconds without a text reply closed a link that was still healthy.
+* **A warm standby for the market feed** (`SNIPER_MARKET_STANDBY`, default
+  on): a second connection, subscribed to the same tokens, takes over in the
+  same instant when the live one drops; the books restart from fresh
+  snapshots. On the fake venue with one market socket cut every 10 s the feed
+  was down 0 ms per cut, against about 267 ms with one connection.
+* **Reconnect** at once after a drop; a link that does not hold backs off
+  (24 connections in a minute against a venue that drops every socket, where
+  the old code made 159).
+* A fault in the bot's own market handler no longer costs the connection.
+* **Every socket up/down is journalled** (`"result":"ws"`) with its reason
+  and the seconds left in the round; `sniper-miss-report` has a `sockets`
+  section; the dashboard has a `POLY WS` line.
+* `tools/fake-venue`: `VENUE_MARKET_KILL_EVERY_S`, `VENUE_NO_PONG`,
+  `VENUE_MARKET_FLAP`.
+
+See [docs/WEBSOCKETS.md](docs/WEBSOCKETS.md). No strategy rule changed.
+
 ## 11 November 2026 — rest a missed order on the book (`SNIPER_REST_LIVE`)
 
 Opt-in, live only, off by default. No change to any decision, limit or size,
