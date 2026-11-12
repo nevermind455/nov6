@@ -809,6 +809,10 @@ struct LiveStubEnv : SniperEnv {
   bool halted = false;
   bool is_live = true;
   int dispatched = 0;
+  std::string resting_cond; // SNIPER_REST_LIVE: our order rests in this market
+  bool resting_in(const std::string &cond) override {
+    return !resting_cond.empty() && cond == resting_cond;
+  }
   std::vector<std::shared_ptr<Plan>> plans;
   LiveStubEnv() {
     rules.condition_id = "0xcond";
@@ -1234,4 +1238,54 @@ TEST(MissRetry, OutcomesAndSettings) {
   EXPECT_THROW(sniper_settings(std::map<std::string, std::string>{
                    {"SNIPER_MISS_RETRY_MS", "0"}}),
                std::invalid_argument);
+}
+
+// SNIPER_REST_LIVE, the engine's side of it: a market where an order of ours
+// may be resting takes no other order, and every trigger signal is counted by
+// side so a resting order can see the trigger fire against it.
+TEST(RestEngine, AMarketWithOurRestingOrderTakesNoOtherOrder) {
+  RetryRig rig(0);
+  EXPECT_EQ(rig.sn->signals_by_side[0] + rig.sn->signals_by_side[1], 0u);
+  rig.env.resting_cond = "0xcond";
+  rig.fire_up();
+  EXPECT_EQ(rig.ups(), 0);
+  EXPECT_EQ(rig.env.dispatched, 0);
+  EXPECT_EQ(rig.sn->n["skip: our resting order is in this market"], 1u);
+  // the signal itself was seen
+  EXPECT_EQ(rig.sn->signals_by_side[0], 1u);
+  EXPECT_EQ(rig.sn->signals_by_side[1], 0u);
+  EXPECT_EQ(rig.sn->n["signals"], 1u);
+  // off the book again: the next signal trades as before
+  rig.env.resting_cond.clear();
+  rig.env.now += 2.0;
+  rig.fire_up();
+  EXPECT_EQ(rig.ups(), 1);
+  EXPECT_EQ(rig.sn->signals_by_side[0], 2u);
+  // another market's resting order does not hold this one
+  rig.sn->release("UP"); // the venue answered the order above
+  rig.env.resting_cond = "0xother";
+  rig.env.now += 2.0;
+  rig.fire_up();
+  EXPECT_EQ(rig.ups(), 2);
+  rig.sn->release("UP");
+  // a fall is counted on the other side, held or not
+  rig.env.resting_cond = "0xcond";
+  for (int k = 0; k < 4; ++k) {
+    rig.env.now += 1.0;
+    rig.quote();
+    rig.tick();
+  }
+  rig.env.now += 0.3;
+  rig.quote();
+  rig.tick();
+  rig.env.now += 0.01;
+  rig.mid /= 1.00012;
+  rig.tick();
+  EXPECT_EQ(rig.sn->signals_by_side[1], 1u);
+  EXPECT_EQ(rig.sn->signals_by_side[0], 3u);
+  EXPECT_EQ(rig.sn->n["signals"], 4u);
+  EXPECT_EQ(rig.env.dispatched, 2);
+  // the price-to-beat view the resting rules read
+  auto view = rig.sn->direction_view("UP", rig.env.wall() + 120.0);
+  EXPECT_TRUE(view.contains("ptb"));
 }

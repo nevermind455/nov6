@@ -424,7 +424,10 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
       self->tick(p);
     });
   }
-  bool post(std::string id, std::string body, const Headers &headers) {
+  // One request with a body on the order connection. `bound` is how many
+  // other order-path requests may already be in flight.
+  bool submit(const char *method, const char *path, std::string id,
+              std::string body, const Headers &headers, long bound) {
     if (!live) {
       ++blocked;
       throw std::runtime_error(
@@ -434,7 +437,8 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     if (stopped || !p || !p->up ||
         std::count_if(
             p->requests.begin(), p->requests.end(),
-            [](const auto &item) { return item.second->id != "__clock"; }) >= 2)
+            [](const auto &item) { return item.second->id != "__clock"; }) >=
+            bound)
       return false;
     if (nghttp2_session_get_remote_window_size(p->session) <
         static_cast<int>(body.size()))
@@ -444,10 +448,10 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     r->body = std::move(body);
     r->started = mono_s();
     std::vector<std::pair<std::string, std::string>> h{
-        {":method", "POST"},
+        {":method", method},
         {":scheme", "https"},
         {":authority", Url{"https", host, port, "/"}.authority()},
-        {":path", "/order"},
+        {":path", path},
         {"content-type", "application/json"},
         {"content-length", std::to_string(r->body.size())},
         {"user-agent", "sniper-native-cpp/1.0"}};
@@ -471,6 +475,14 @@ struct H2Client::Impl : std::enable_shared_from_this<H2Client::Impl> {
     p->requests[sid] = r;
     flush(p);
     return true;
+  }
+  bool post(std::string id, std::string body, const Headers &headers) {
+    return submit("POST", "/order", std::move(id), std::move(body), headers, 2);
+  }
+  // A cancel must not wait behind orders: it has its own, wider bound.
+  bool cancel(std::string id, std::string body, const Headers &headers) {
+    return submit("DELETE", "/order", std::move(id), std::move(body), headers,
+                  6);
   }
   bool get_time() {
     auto p = pipe;
@@ -530,6 +542,9 @@ std::optional<H2ConnectionInfo> H2Client::connection_info() const {
 }
 bool H2Client::post(std::string id, std::string body, const Headers &h) {
   return p_->post(std::move(id), std::move(body), h);
+}
+bool H2Client::cancel(std::string id, std::string body, const Headers &h) {
+  return p_->cancel(std::move(id), std::move(body), h);
 }
 } // namespace sniper
 

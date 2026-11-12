@@ -26,7 +26,7 @@ find_library(SECP256K1_LIBRARY NAMES libsecp256k1.a secp256k1 REQUIRED)
 add_library(sniper_core
   src/config.cpp src/crypto.cpp src/storage.cpp src/book.cpp src/strategy.cpp
   src/pyrt.cpp src/sniper.cpp src/paper.cpp src/settings.cpp
-  src/network.cpp src/h2.cpp src/venue.cpp src/runtime.cpp
+  src/network.cpp src/h2.cpp src/venue.cpp src/rest.cpp src/runtime.cpp
   src/dashboard.cpp src/dashboard_terminal.cpp third_party/sha3.c)
 target_include_directories(sniper_core PUBLIC include ${Boost_INCLUDE_DIRS} ${NGHTTP2_INCLUDE_DIR} ${SECP256K1_INCLUDE_DIR} PRIVATE third_party)
 target_compile_definitions(sniper_core PUBLIC BOOST_ERROR_CODE_HEADER_ONLY BOOST_SYSTEM_NO_DEPRECATED)
@@ -76,7 +76,8 @@ if(SNIPER_TESTS)
     tests/audit_strategy_tests.cpp tests/audit_ledger_crypto_tests.cpp
     tests/audit_market_tests.cpp tests/audit_runtime_tests.cpp
     tests/audit_network_tests.cpp tests/edge_report_tests.cpp
-    tests/miss_report_tests.cpp tests/latency_crypto_tests.cpp)
+    tests/miss_report_tests.cpp tests/latency_crypto_tests.cpp
+    tests/rest_tests.cpp)
   target_include_directories(sniper-tests PRIVATE tools/report)
   target_link_libraries(sniper-tests PRIVATE sniper_core GTest::gtest_main)
   set_target_properties(sniper-tests PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")

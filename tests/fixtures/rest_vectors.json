@@ -1,0 +1,11877 @@
+{
+ "sdk": "polymarket-client 0.13.0",
+ "note": "generated offline by the real SDK; nothing was sent",
+ "signing_vector": 0,
+ "post_path": "/order",
+ "gtc_post_only_body": "{\"deferExec\":false,\"order\":{\"builder\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"expiration\":\"0\",\"maker\":\"0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf\",\"makerAmount\":\"5100000\",\"metadata\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"salt\":42,\"side\":\"BUY\",\"signature\":\"0x50993418175d014121efda1a2c9b21cf21edc085d05f11e6225e6d3f2133484f753779fb891343e1eb393742af61e90a7d9ce53d2d258faa68aae08fe5e905f51c\",\"signatureType\":0,\"signer\":\"0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf\",\"takerAmount\":\"10000000\",\"timestamp\":\"1900000000123\",\"tokenId\":\"123\"},\"orderType\":\"GTC\",\"owner\":\"offline-key\",\"postOnly\":true}",
+ "gtc_body": "{\"deferExec\":false,\"order\":{\"builder\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"expiration\":\"0\",\"maker\":\"0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf\",\"makerAmount\":\"5100000\",\"metadata\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"salt\":42,\"side\":\"BUY\",\"signature\":\"0x50993418175d014121efda1a2c9b21cf21edc085d05f11e6225e6d3f2133484f753779fb891343e1eb393742af61e90a7d9ce53d2d258faa68aae08fe5e905f51c\",\"signatureType\":0,\"signer\":\"0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf\",\"takerAmount\":\"10000000\",\"timestamp\":\"1900000000123\",\"tokenId\":\"123\"},\"orderType\":\"GTC\",\"owner\":\"offline-key\"}",
+ "cancel": {
+  "method": "DELETE",
+  "path": "/order",
+  "order_id": "0x5523d2a8739a225fb47f9b6d0d171be92b9557567891433462bf1fc0240f17d4",
+  "body": "{\"orderID\":\"0x5523d2a8739a225fb47f9b6d0d171be92b9557567891433462bf1fc0240f17d4\"}",
+  "hmac_secret": "c2VjcmV0LWZvci1vZmZsaW5lLXRlc3RzLW9ubHk=",
+  "timestamp": 1900000000,
+  "hmac_signature": "eEXZwFvcxmsRWenZDZwNvrsuGKThunuTFip-SFM3gKc="
+ },
+ "limit_amounts": [
+  {
+   "tick": "0.01",
+   "price": "0.01",
+   "shares": 5,
+   "maker": 50000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.01",
+   "shares": 6,
+   "maker": 60000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.01",
+   "shares": 7,
+   "maker": 70000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.01",
+   "shares": 10,
+   "maker": 100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.01",
+   "shares": 13,
+   "maker": 130000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.01",
+   "shares": 25,
+   "maker": 250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.01",
+   "shares": 100,
+   "maker": 1000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.02",
+   "shares": 5,
+   "maker": 100000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.02",
+   "shares": 6,
+   "maker": 120000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.02",
+   "shares": 7,
+   "maker": 140000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.02",
+   "shares": 10,
+   "maker": 200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.02",
+   "shares": 13,
+   "maker": 260000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.02",
+   "shares": 25,
+   "maker": 500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.02",
+   "shares": 100,
+   "maker": 2000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.03",
+   "shares": 5,
+   "maker": 150000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.03",
+   "shares": 6,
+   "maker": 180000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.03",
+   "shares": 7,
+   "maker": 210000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.03",
+   "shares": 10,
+   "maker": 300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.03",
+   "shares": 13,
+   "maker": 390000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.03",
+   "shares": 25,
+   "maker": 750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.03",
+   "shares": 100,
+   "maker": 3000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.04",
+   "shares": 5,
+   "maker": 200000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.04",
+   "shares": 6,
+   "maker": 240000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.04",
+   "shares": 7,
+   "maker": 280000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.04",
+   "shares": 10,
+   "maker": 400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.04",
+   "shares": 13,
+   "maker": 520000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.04",
+   "shares": 25,
+   "maker": 1000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.04",
+   "shares": 100,
+   "maker": 4000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.05",
+   "shares": 5,
+   "maker": 250000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.05",
+   "shares": 6,
+   "maker": 300000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.05",
+   "shares": 7,
+   "maker": 350000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.05",
+   "shares": 10,
+   "maker": 500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.05",
+   "shares": 13,
+   "maker": 650000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.05",
+   "shares": 25,
+   "maker": 1250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.05",
+   "shares": 100,
+   "maker": 5000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.06",
+   "shares": 5,
+   "maker": 300000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.06",
+   "shares": 6,
+   "maker": 360000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.06",
+   "shares": 7,
+   "maker": 420000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.06",
+   "shares": 10,
+   "maker": 600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.06",
+   "shares": 13,
+   "maker": 780000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.06",
+   "shares": 25,
+   "maker": 1500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.06",
+   "shares": 100,
+   "maker": 6000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.07",
+   "shares": 5,
+   "maker": 350000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.07",
+   "shares": 6,
+   "maker": 420000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.07",
+   "shares": 7,
+   "maker": 490000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.07",
+   "shares": 10,
+   "maker": 700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.07",
+   "shares": 13,
+   "maker": 910000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.07",
+   "shares": 25,
+   "maker": 1750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.07",
+   "shares": 100,
+   "maker": 7000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.08",
+   "shares": 5,
+   "maker": 400000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.08",
+   "shares": 6,
+   "maker": 480000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.08",
+   "shares": 7,
+   "maker": 560000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.08",
+   "shares": 10,
+   "maker": 800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.08",
+   "shares": 13,
+   "maker": 1040000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.08",
+   "shares": 25,
+   "maker": 2000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.08",
+   "shares": 100,
+   "maker": 8000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.09",
+   "shares": 5,
+   "maker": 450000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.09",
+   "shares": 6,
+   "maker": 540000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.09",
+   "shares": 7,
+   "maker": 630000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.09",
+   "shares": 10,
+   "maker": 900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.09",
+   "shares": 13,
+   "maker": 1170000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.09",
+   "shares": 25,
+   "maker": 2250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.09",
+   "shares": 100,
+   "maker": 9000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.10",
+   "shares": 5,
+   "maker": 500000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.10",
+   "shares": 6,
+   "maker": 600000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.10",
+   "shares": 7,
+   "maker": 700000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.10",
+   "shares": 10,
+   "maker": 1000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.10",
+   "shares": 13,
+   "maker": 1300000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.10",
+   "shares": 25,
+   "maker": 2500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.10",
+   "shares": 100,
+   "maker": 10000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.11",
+   "shares": 5,
+   "maker": 550000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.11",
+   "shares": 6,
+   "maker": 660000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.11",
+   "shares": 7,
+   "maker": 770000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.11",
+   "shares": 10,
+   "maker": 1100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.11",
+   "shares": 13,
+   "maker": 1430000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.11",
+   "shares": 25,
+   "maker": 2750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.11",
+   "shares": 100,
+   "maker": 11000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.12",
+   "shares": 5,
+   "maker": 600000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.12",
+   "shares": 6,
+   "maker": 720000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.12",
+   "shares": 7,
+   "maker": 840000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.12",
+   "shares": 10,
+   "maker": 1200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.12",
+   "shares": 13,
+   "maker": 1560000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.12",
+   "shares": 25,
+   "maker": 3000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.12",
+   "shares": 100,
+   "maker": 12000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.13",
+   "shares": 5,
+   "maker": 650000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.13",
+   "shares": 6,
+   "maker": 780000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.13",
+   "shares": 7,
+   "maker": 910000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.13",
+   "shares": 10,
+   "maker": 1300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.13",
+   "shares": 13,
+   "maker": 1690000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.13",
+   "shares": 25,
+   "maker": 3250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.13",
+   "shares": 100,
+   "maker": 13000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.14",
+   "shares": 5,
+   "maker": 700000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.14",
+   "shares": 6,
+   "maker": 840000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.14",
+   "shares": 7,
+   "maker": 980000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.14",
+   "shares": 10,
+   "maker": 1400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.14",
+   "shares": 13,
+   "maker": 1820000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.14",
+   "shares": 25,
+   "maker": 3500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.14",
+   "shares": 100,
+   "maker": 14000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.15",
+   "shares": 5,
+   "maker": 750000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.15",
+   "shares": 6,
+   "maker": 900000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.15",
+   "shares": 7,
+   "maker": 1050000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.15",
+   "shares": 10,
+   "maker": 1500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.15",
+   "shares": 13,
+   "maker": 1950000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.15",
+   "shares": 25,
+   "maker": 3750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.15",
+   "shares": 100,
+   "maker": 15000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.16",
+   "shares": 5,
+   "maker": 800000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.16",
+   "shares": 6,
+   "maker": 960000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.16",
+   "shares": 7,
+   "maker": 1120000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.16",
+   "shares": 10,
+   "maker": 1600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.16",
+   "shares": 13,
+   "maker": 2080000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.16",
+   "shares": 25,
+   "maker": 4000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.16",
+   "shares": 100,
+   "maker": 16000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.17",
+   "shares": 5,
+   "maker": 850000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.17",
+   "shares": 6,
+   "maker": 1020000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.17",
+   "shares": 7,
+   "maker": 1190000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.17",
+   "shares": 10,
+   "maker": 1700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.17",
+   "shares": 13,
+   "maker": 2210000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.17",
+   "shares": 25,
+   "maker": 4250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.17",
+   "shares": 100,
+   "maker": 17000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.18",
+   "shares": 5,
+   "maker": 900000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.18",
+   "shares": 6,
+   "maker": 1080000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.18",
+   "shares": 7,
+   "maker": 1260000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.18",
+   "shares": 10,
+   "maker": 1800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.18",
+   "shares": 13,
+   "maker": 2340000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.18",
+   "shares": 25,
+   "maker": 4500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.18",
+   "shares": 100,
+   "maker": 18000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.19",
+   "shares": 5,
+   "maker": 950000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.19",
+   "shares": 6,
+   "maker": 1140000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.19",
+   "shares": 7,
+   "maker": 1330000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.19",
+   "shares": 10,
+   "maker": 1900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.19",
+   "shares": 13,
+   "maker": 2470000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.19",
+   "shares": 25,
+   "maker": 4750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.19",
+   "shares": 100,
+   "maker": 19000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.20",
+   "shares": 5,
+   "maker": 1000000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.20",
+   "shares": 6,
+   "maker": 1200000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.20",
+   "shares": 7,
+   "maker": 1400000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.20",
+   "shares": 10,
+   "maker": 2000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.20",
+   "shares": 13,
+   "maker": 2600000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.20",
+   "shares": 25,
+   "maker": 5000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.20",
+   "shares": 100,
+   "maker": 20000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.21",
+   "shares": 5,
+   "maker": 1050000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.21",
+   "shares": 6,
+   "maker": 1260000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.21",
+   "shares": 7,
+   "maker": 1470000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.21",
+   "shares": 10,
+   "maker": 2100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.21",
+   "shares": 13,
+   "maker": 2730000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.21",
+   "shares": 25,
+   "maker": 5250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.21",
+   "shares": 100,
+   "maker": 21000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.22",
+   "shares": 5,
+   "maker": 1100000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.22",
+   "shares": 6,
+   "maker": 1320000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.22",
+   "shares": 7,
+   "maker": 1540000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.22",
+   "shares": 10,
+   "maker": 2200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.22",
+   "shares": 13,
+   "maker": 2860000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.22",
+   "shares": 25,
+   "maker": 5500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.22",
+   "shares": 100,
+   "maker": 22000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.23",
+   "shares": 5,
+   "maker": 1150000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.23",
+   "shares": 6,
+   "maker": 1380000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.23",
+   "shares": 7,
+   "maker": 1610000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.23",
+   "shares": 10,
+   "maker": 2300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.23",
+   "shares": 13,
+   "maker": 2990000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.23",
+   "shares": 25,
+   "maker": 5750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.23",
+   "shares": 100,
+   "maker": 23000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.24",
+   "shares": 5,
+   "maker": 1200000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.24",
+   "shares": 6,
+   "maker": 1440000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.24",
+   "shares": 7,
+   "maker": 1680000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.24",
+   "shares": 10,
+   "maker": 2400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.24",
+   "shares": 13,
+   "maker": 3120000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.24",
+   "shares": 25,
+   "maker": 6000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.24",
+   "shares": 100,
+   "maker": 24000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.25",
+   "shares": 5,
+   "maker": 1250000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.25",
+   "shares": 6,
+   "maker": 1500000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.25",
+   "shares": 7,
+   "maker": 1750000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.25",
+   "shares": 10,
+   "maker": 2500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.25",
+   "shares": 13,
+   "maker": 3250000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.25",
+   "shares": 25,
+   "maker": 6250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.25",
+   "shares": 100,
+   "maker": 25000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.26",
+   "shares": 5,
+   "maker": 1300000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.26",
+   "shares": 6,
+   "maker": 1560000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.26",
+   "shares": 7,
+   "maker": 1820000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.26",
+   "shares": 10,
+   "maker": 2600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.26",
+   "shares": 13,
+   "maker": 3380000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.26",
+   "shares": 25,
+   "maker": 6500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.26",
+   "shares": 100,
+   "maker": 26000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.27",
+   "shares": 5,
+   "maker": 1350000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.27",
+   "shares": 6,
+   "maker": 1620000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.27",
+   "shares": 7,
+   "maker": 1890000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.27",
+   "shares": 10,
+   "maker": 2700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.27",
+   "shares": 13,
+   "maker": 3510000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.27",
+   "shares": 25,
+   "maker": 6750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.27",
+   "shares": 100,
+   "maker": 27000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.28",
+   "shares": 5,
+   "maker": 1400000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.28",
+   "shares": 6,
+   "maker": 1680000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.28",
+   "shares": 7,
+   "maker": 1960000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.28",
+   "shares": 10,
+   "maker": 2800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.28",
+   "shares": 13,
+   "maker": 3640000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.28",
+   "shares": 25,
+   "maker": 7000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.28",
+   "shares": 100,
+   "maker": 28000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.29",
+   "shares": 5,
+   "maker": 1450000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.29",
+   "shares": 6,
+   "maker": 1740000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.29",
+   "shares": 7,
+   "maker": 2030000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.29",
+   "shares": 10,
+   "maker": 2900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.29",
+   "shares": 13,
+   "maker": 3770000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.29",
+   "shares": 25,
+   "maker": 7250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.29",
+   "shares": 100,
+   "maker": 29000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.30",
+   "shares": 5,
+   "maker": 1500000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.30",
+   "shares": 6,
+   "maker": 1800000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.30",
+   "shares": 7,
+   "maker": 2100000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.30",
+   "shares": 10,
+   "maker": 3000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.30",
+   "shares": 13,
+   "maker": 3900000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.30",
+   "shares": 25,
+   "maker": 7500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.30",
+   "shares": 100,
+   "maker": 30000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.31",
+   "shares": 5,
+   "maker": 1550000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.31",
+   "shares": 6,
+   "maker": 1860000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.31",
+   "shares": 7,
+   "maker": 2170000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.31",
+   "shares": 10,
+   "maker": 3100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.31",
+   "shares": 13,
+   "maker": 4030000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.31",
+   "shares": 25,
+   "maker": 7750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.31",
+   "shares": 100,
+   "maker": 31000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.32",
+   "shares": 5,
+   "maker": 1600000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.32",
+   "shares": 6,
+   "maker": 1920000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.32",
+   "shares": 7,
+   "maker": 2240000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.32",
+   "shares": 10,
+   "maker": 3200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.32",
+   "shares": 13,
+   "maker": 4160000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.32",
+   "shares": 25,
+   "maker": 8000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.32",
+   "shares": 100,
+   "maker": 32000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.33",
+   "shares": 5,
+   "maker": 1650000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.33",
+   "shares": 6,
+   "maker": 1980000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.33",
+   "shares": 7,
+   "maker": 2310000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.33",
+   "shares": 10,
+   "maker": 3300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.33",
+   "shares": 13,
+   "maker": 4290000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.33",
+   "shares": 25,
+   "maker": 8250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.33",
+   "shares": 100,
+   "maker": 33000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.34",
+   "shares": 5,
+   "maker": 1700000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.34",
+   "shares": 6,
+   "maker": 2040000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.34",
+   "shares": 7,
+   "maker": 2380000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.34",
+   "shares": 10,
+   "maker": 3400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.34",
+   "shares": 13,
+   "maker": 4420000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.34",
+   "shares": 25,
+   "maker": 8500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.34",
+   "shares": 100,
+   "maker": 34000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.35",
+   "shares": 5,
+   "maker": 1750000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.35",
+   "shares": 6,
+   "maker": 2100000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.35",
+   "shares": 7,
+   "maker": 2450000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.35",
+   "shares": 10,
+   "maker": 3500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.35",
+   "shares": 13,
+   "maker": 4550000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.35",
+   "shares": 25,
+   "maker": 8750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.35",
+   "shares": 100,
+   "maker": 35000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.36",
+   "shares": 5,
+   "maker": 1800000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.36",
+   "shares": 6,
+   "maker": 2160000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.36",
+   "shares": 7,
+   "maker": 2520000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.36",
+   "shares": 10,
+   "maker": 3600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.36",
+   "shares": 13,
+   "maker": 4680000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.36",
+   "shares": 25,
+   "maker": 9000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.36",
+   "shares": 100,
+   "maker": 36000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.37",
+   "shares": 5,
+   "maker": 1850000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.37",
+   "shares": 6,
+   "maker": 2220000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.37",
+   "shares": 7,
+   "maker": 2590000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.37",
+   "shares": 10,
+   "maker": 3700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.37",
+   "shares": 13,
+   "maker": 4810000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.37",
+   "shares": 25,
+   "maker": 9250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.37",
+   "shares": 100,
+   "maker": 37000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.38",
+   "shares": 5,
+   "maker": 1900000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.38",
+   "shares": 6,
+   "maker": 2280000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.38",
+   "shares": 7,
+   "maker": 2660000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.38",
+   "shares": 10,
+   "maker": 3800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.38",
+   "shares": 13,
+   "maker": 4940000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.38",
+   "shares": 25,
+   "maker": 9500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.38",
+   "shares": 100,
+   "maker": 38000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.39",
+   "shares": 5,
+   "maker": 1950000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.39",
+   "shares": 6,
+   "maker": 2340000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.39",
+   "shares": 7,
+   "maker": 2730000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.39",
+   "shares": 10,
+   "maker": 3900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.39",
+   "shares": 13,
+   "maker": 5070000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.39",
+   "shares": 25,
+   "maker": 9750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.39",
+   "shares": 100,
+   "maker": 39000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.40",
+   "shares": 5,
+   "maker": 2000000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.40",
+   "shares": 6,
+   "maker": 2400000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.40",
+   "shares": 7,
+   "maker": 2800000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.40",
+   "shares": 10,
+   "maker": 4000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.40",
+   "shares": 13,
+   "maker": 5200000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.40",
+   "shares": 25,
+   "maker": 10000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.40",
+   "shares": 100,
+   "maker": 40000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.41",
+   "shares": 5,
+   "maker": 2050000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.41",
+   "shares": 6,
+   "maker": 2460000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.41",
+   "shares": 7,
+   "maker": 2870000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.41",
+   "shares": 10,
+   "maker": 4100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.41",
+   "shares": 13,
+   "maker": 5330000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.41",
+   "shares": 25,
+   "maker": 10250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.41",
+   "shares": 100,
+   "maker": 41000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.42",
+   "shares": 5,
+   "maker": 2100000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.42",
+   "shares": 6,
+   "maker": 2520000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.42",
+   "shares": 7,
+   "maker": 2940000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.42",
+   "shares": 10,
+   "maker": 4200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.42",
+   "shares": 13,
+   "maker": 5460000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.42",
+   "shares": 25,
+   "maker": 10500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.42",
+   "shares": 100,
+   "maker": 42000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.43",
+   "shares": 5,
+   "maker": 2150000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.43",
+   "shares": 6,
+   "maker": 2580000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.43",
+   "shares": 7,
+   "maker": 3010000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.43",
+   "shares": 10,
+   "maker": 4300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.43",
+   "shares": 13,
+   "maker": 5590000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.43",
+   "shares": 25,
+   "maker": 10750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.43",
+   "shares": 100,
+   "maker": 43000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.44",
+   "shares": 5,
+   "maker": 2200000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.44",
+   "shares": 6,
+   "maker": 2640000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.44",
+   "shares": 7,
+   "maker": 3080000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.44",
+   "shares": 10,
+   "maker": 4400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.44",
+   "shares": 13,
+   "maker": 5720000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.44",
+   "shares": 25,
+   "maker": 11000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.44",
+   "shares": 100,
+   "maker": 44000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.45",
+   "shares": 5,
+   "maker": 2250000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.45",
+   "shares": 6,
+   "maker": 2700000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.45",
+   "shares": 7,
+   "maker": 3150000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.45",
+   "shares": 10,
+   "maker": 4500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.45",
+   "shares": 13,
+   "maker": 5850000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.45",
+   "shares": 25,
+   "maker": 11250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.45",
+   "shares": 100,
+   "maker": 45000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.46",
+   "shares": 5,
+   "maker": 2300000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.46",
+   "shares": 6,
+   "maker": 2760000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.46",
+   "shares": 7,
+   "maker": 3220000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.46",
+   "shares": 10,
+   "maker": 4600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.46",
+   "shares": 13,
+   "maker": 5980000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.46",
+   "shares": 25,
+   "maker": 11500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.46",
+   "shares": 100,
+   "maker": 46000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.47",
+   "shares": 5,
+   "maker": 2350000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.47",
+   "shares": 6,
+   "maker": 2820000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.47",
+   "shares": 7,
+   "maker": 3290000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.47",
+   "shares": 10,
+   "maker": 4700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.47",
+   "shares": 13,
+   "maker": 6110000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.47",
+   "shares": 25,
+   "maker": 11750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.47",
+   "shares": 100,
+   "maker": 47000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.48",
+   "shares": 5,
+   "maker": 2400000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.48",
+   "shares": 6,
+   "maker": 2880000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.48",
+   "shares": 7,
+   "maker": 3360000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.48",
+   "shares": 10,
+   "maker": 4800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.48",
+   "shares": 13,
+   "maker": 6240000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.48",
+   "shares": 25,
+   "maker": 12000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.48",
+   "shares": 100,
+   "maker": 48000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.49",
+   "shares": 5,
+   "maker": 2450000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.49",
+   "shares": 6,
+   "maker": 2940000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.49",
+   "shares": 7,
+   "maker": 3430000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.49",
+   "shares": 10,
+   "maker": 4900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.49",
+   "shares": 13,
+   "maker": 6370000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.49",
+   "shares": 25,
+   "maker": 12250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.49",
+   "shares": 100,
+   "maker": 49000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.50",
+   "shares": 5,
+   "maker": 2500000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.50",
+   "shares": 6,
+   "maker": 3000000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.50",
+   "shares": 7,
+   "maker": 3500000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.50",
+   "shares": 10,
+   "maker": 5000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.50",
+   "shares": 13,
+   "maker": 6500000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.50",
+   "shares": 25,
+   "maker": 12500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.50",
+   "shares": 100,
+   "maker": 50000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.51",
+   "shares": 5,
+   "maker": 2550000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.51",
+   "shares": 6,
+   "maker": 3060000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.51",
+   "shares": 7,
+   "maker": 3570000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.51",
+   "shares": 10,
+   "maker": 5100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.51",
+   "shares": 13,
+   "maker": 6630000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.51",
+   "shares": 25,
+   "maker": 12750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.51",
+   "shares": 100,
+   "maker": 51000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.52",
+   "shares": 5,
+   "maker": 2600000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.52",
+   "shares": 6,
+   "maker": 3120000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.52",
+   "shares": 7,
+   "maker": 3640000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.52",
+   "shares": 10,
+   "maker": 5200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.52",
+   "shares": 13,
+   "maker": 6760000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.52",
+   "shares": 25,
+   "maker": 13000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.52",
+   "shares": 100,
+   "maker": 52000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.53",
+   "shares": 5,
+   "maker": 2650000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.53",
+   "shares": 6,
+   "maker": 3180000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.53",
+   "shares": 7,
+   "maker": 3710000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.53",
+   "shares": 10,
+   "maker": 5300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.53",
+   "shares": 13,
+   "maker": 6890000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.53",
+   "shares": 25,
+   "maker": 13250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.53",
+   "shares": 100,
+   "maker": 53000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.54",
+   "shares": 5,
+   "maker": 2700000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.54",
+   "shares": 6,
+   "maker": 3240000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.54",
+   "shares": 7,
+   "maker": 3780000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.54",
+   "shares": 10,
+   "maker": 5400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.54",
+   "shares": 13,
+   "maker": 7020000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.54",
+   "shares": 25,
+   "maker": 13500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.54",
+   "shares": 100,
+   "maker": 54000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.55",
+   "shares": 5,
+   "maker": 2750000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.55",
+   "shares": 6,
+   "maker": 3300000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.55",
+   "shares": 7,
+   "maker": 3850000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.55",
+   "shares": 10,
+   "maker": 5500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.55",
+   "shares": 13,
+   "maker": 7150000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.55",
+   "shares": 25,
+   "maker": 13750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.55",
+   "shares": 100,
+   "maker": 55000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.56",
+   "shares": 5,
+   "maker": 2800000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.56",
+   "shares": 6,
+   "maker": 3360000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.56",
+   "shares": 7,
+   "maker": 3920000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.56",
+   "shares": 10,
+   "maker": 5600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.56",
+   "shares": 13,
+   "maker": 7280000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.56",
+   "shares": 25,
+   "maker": 14000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.56",
+   "shares": 100,
+   "maker": 56000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.57",
+   "shares": 5,
+   "maker": 2850000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.57",
+   "shares": 6,
+   "maker": 3420000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.57",
+   "shares": 7,
+   "maker": 3990000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.57",
+   "shares": 10,
+   "maker": 5700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.57",
+   "shares": 13,
+   "maker": 7410000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.57",
+   "shares": 25,
+   "maker": 14250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.57",
+   "shares": 100,
+   "maker": 57000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.58",
+   "shares": 5,
+   "maker": 2900000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.58",
+   "shares": 6,
+   "maker": 3480000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.58",
+   "shares": 7,
+   "maker": 4060000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.58",
+   "shares": 10,
+   "maker": 5800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.58",
+   "shares": 13,
+   "maker": 7540000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.58",
+   "shares": 25,
+   "maker": 14500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.58",
+   "shares": 100,
+   "maker": 58000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.59",
+   "shares": 5,
+   "maker": 2950000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.59",
+   "shares": 6,
+   "maker": 3540000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.59",
+   "shares": 7,
+   "maker": 4130000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.59",
+   "shares": 10,
+   "maker": 5900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.59",
+   "shares": 13,
+   "maker": 7670000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.59",
+   "shares": 25,
+   "maker": 14750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.59",
+   "shares": 100,
+   "maker": 59000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.60",
+   "shares": 5,
+   "maker": 3000000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.60",
+   "shares": 6,
+   "maker": 3600000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.60",
+   "shares": 7,
+   "maker": 4200000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.60",
+   "shares": 10,
+   "maker": 6000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.60",
+   "shares": 13,
+   "maker": 7800000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.60",
+   "shares": 25,
+   "maker": 15000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.60",
+   "shares": 100,
+   "maker": 60000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.61",
+   "shares": 5,
+   "maker": 3050000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.61",
+   "shares": 6,
+   "maker": 3660000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.61",
+   "shares": 7,
+   "maker": 4270000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.61",
+   "shares": 10,
+   "maker": 6100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.61",
+   "shares": 13,
+   "maker": 7930000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.61",
+   "shares": 25,
+   "maker": 15250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.61",
+   "shares": 100,
+   "maker": 61000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.62",
+   "shares": 5,
+   "maker": 3100000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.62",
+   "shares": 6,
+   "maker": 3720000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.62",
+   "shares": 7,
+   "maker": 4340000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.62",
+   "shares": 10,
+   "maker": 6200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.62",
+   "shares": 13,
+   "maker": 8060000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.62",
+   "shares": 25,
+   "maker": 15500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.62",
+   "shares": 100,
+   "maker": 62000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.63",
+   "shares": 5,
+   "maker": 3150000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.63",
+   "shares": 6,
+   "maker": 3780000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.63",
+   "shares": 7,
+   "maker": 4410000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.63",
+   "shares": 10,
+   "maker": 6300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.63",
+   "shares": 13,
+   "maker": 8190000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.63",
+   "shares": 25,
+   "maker": 15750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.63",
+   "shares": 100,
+   "maker": 63000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.64",
+   "shares": 5,
+   "maker": 3200000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.64",
+   "shares": 6,
+   "maker": 3840000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.64",
+   "shares": 7,
+   "maker": 4480000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.64",
+   "shares": 10,
+   "maker": 6400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.64",
+   "shares": 13,
+   "maker": 8320000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.64",
+   "shares": 25,
+   "maker": 16000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.64",
+   "shares": 100,
+   "maker": 64000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.65",
+   "shares": 5,
+   "maker": 3250000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.65",
+   "shares": 6,
+   "maker": 3900000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.65",
+   "shares": 7,
+   "maker": 4550000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.65",
+   "shares": 10,
+   "maker": 6500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.65",
+   "shares": 13,
+   "maker": 8450000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.65",
+   "shares": 25,
+   "maker": 16250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.65",
+   "shares": 100,
+   "maker": 65000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.66",
+   "shares": 5,
+   "maker": 3300000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.66",
+   "shares": 6,
+   "maker": 3960000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.66",
+   "shares": 7,
+   "maker": 4620000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.66",
+   "shares": 10,
+   "maker": 6600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.66",
+   "shares": 13,
+   "maker": 8580000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.66",
+   "shares": 25,
+   "maker": 16500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.66",
+   "shares": 100,
+   "maker": 66000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.67",
+   "shares": 5,
+   "maker": 3350000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.67",
+   "shares": 6,
+   "maker": 4020000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.67",
+   "shares": 7,
+   "maker": 4690000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.67",
+   "shares": 10,
+   "maker": 6700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.67",
+   "shares": 13,
+   "maker": 8710000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.67",
+   "shares": 25,
+   "maker": 16750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.67",
+   "shares": 100,
+   "maker": 67000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.68",
+   "shares": 5,
+   "maker": 3400000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.68",
+   "shares": 6,
+   "maker": 4080000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.68",
+   "shares": 7,
+   "maker": 4760000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.68",
+   "shares": 10,
+   "maker": 6800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.68",
+   "shares": 13,
+   "maker": 8840000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.68",
+   "shares": 25,
+   "maker": 17000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.68",
+   "shares": 100,
+   "maker": 68000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.69",
+   "shares": 5,
+   "maker": 3450000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.69",
+   "shares": 6,
+   "maker": 4140000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.69",
+   "shares": 7,
+   "maker": 4830000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.69",
+   "shares": 10,
+   "maker": 6900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.69",
+   "shares": 13,
+   "maker": 8970000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.69",
+   "shares": 25,
+   "maker": 17250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.69",
+   "shares": 100,
+   "maker": 69000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.70",
+   "shares": 5,
+   "maker": 3500000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.70",
+   "shares": 6,
+   "maker": 4200000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.70",
+   "shares": 7,
+   "maker": 4900000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.70",
+   "shares": 10,
+   "maker": 7000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.70",
+   "shares": 13,
+   "maker": 9100000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.70",
+   "shares": 25,
+   "maker": 17500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.70",
+   "shares": 100,
+   "maker": 70000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.71",
+   "shares": 5,
+   "maker": 3550000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.71",
+   "shares": 6,
+   "maker": 4260000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.71",
+   "shares": 7,
+   "maker": 4970000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.71",
+   "shares": 10,
+   "maker": 7100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.71",
+   "shares": 13,
+   "maker": 9230000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.71",
+   "shares": 25,
+   "maker": 17750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.71",
+   "shares": 100,
+   "maker": 71000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.72",
+   "shares": 5,
+   "maker": 3600000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.72",
+   "shares": 6,
+   "maker": 4320000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.72",
+   "shares": 7,
+   "maker": 5040000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.72",
+   "shares": 10,
+   "maker": 7200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.72",
+   "shares": 13,
+   "maker": 9360000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.72",
+   "shares": 25,
+   "maker": 18000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.72",
+   "shares": 100,
+   "maker": 72000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.73",
+   "shares": 5,
+   "maker": 3650000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.73",
+   "shares": 6,
+   "maker": 4380000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.73",
+   "shares": 7,
+   "maker": 5110000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.73",
+   "shares": 10,
+   "maker": 7300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.73",
+   "shares": 13,
+   "maker": 9490000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.73",
+   "shares": 25,
+   "maker": 18250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.73",
+   "shares": 100,
+   "maker": 73000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.74",
+   "shares": 5,
+   "maker": 3700000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.74",
+   "shares": 6,
+   "maker": 4440000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.74",
+   "shares": 7,
+   "maker": 5180000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.74",
+   "shares": 10,
+   "maker": 7400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.74",
+   "shares": 13,
+   "maker": 9620000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.74",
+   "shares": 25,
+   "maker": 18500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.74",
+   "shares": 100,
+   "maker": 74000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.75",
+   "shares": 5,
+   "maker": 3750000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.75",
+   "shares": 6,
+   "maker": 4500000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.75",
+   "shares": 7,
+   "maker": 5250000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.75",
+   "shares": 10,
+   "maker": 7500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.75",
+   "shares": 13,
+   "maker": 9750000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.75",
+   "shares": 25,
+   "maker": 18750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.75",
+   "shares": 100,
+   "maker": 75000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.76",
+   "shares": 5,
+   "maker": 3800000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.76",
+   "shares": 6,
+   "maker": 4560000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.76",
+   "shares": 7,
+   "maker": 5320000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.76",
+   "shares": 10,
+   "maker": 7600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.76",
+   "shares": 13,
+   "maker": 9880000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.76",
+   "shares": 25,
+   "maker": 19000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.76",
+   "shares": 100,
+   "maker": 76000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.77",
+   "shares": 5,
+   "maker": 3850000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.77",
+   "shares": 6,
+   "maker": 4620000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.77",
+   "shares": 7,
+   "maker": 5390000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.77",
+   "shares": 10,
+   "maker": 7700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.77",
+   "shares": 13,
+   "maker": 10010000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.77",
+   "shares": 25,
+   "maker": 19250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.77",
+   "shares": 100,
+   "maker": 77000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.78",
+   "shares": 5,
+   "maker": 3900000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.78",
+   "shares": 6,
+   "maker": 4680000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.78",
+   "shares": 7,
+   "maker": 5460000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.78",
+   "shares": 10,
+   "maker": 7800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.78",
+   "shares": 13,
+   "maker": 10140000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.78",
+   "shares": 25,
+   "maker": 19500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.78",
+   "shares": 100,
+   "maker": 78000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.79",
+   "shares": 5,
+   "maker": 3950000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.79",
+   "shares": 6,
+   "maker": 4740000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.79",
+   "shares": 7,
+   "maker": 5530000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.79",
+   "shares": 10,
+   "maker": 7900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.79",
+   "shares": 13,
+   "maker": 10270000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.79",
+   "shares": 25,
+   "maker": 19750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.79",
+   "shares": 100,
+   "maker": 79000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.80",
+   "shares": 5,
+   "maker": 4000000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.80",
+   "shares": 6,
+   "maker": 4800000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.80",
+   "shares": 7,
+   "maker": 5600000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.80",
+   "shares": 10,
+   "maker": 8000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.80",
+   "shares": 13,
+   "maker": 10400000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.80",
+   "shares": 25,
+   "maker": 20000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.80",
+   "shares": 100,
+   "maker": 80000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.81",
+   "shares": 5,
+   "maker": 4050000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.81",
+   "shares": 6,
+   "maker": 4860000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.81",
+   "shares": 7,
+   "maker": 5670000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.81",
+   "shares": 10,
+   "maker": 8100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.81",
+   "shares": 13,
+   "maker": 10530000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.81",
+   "shares": 25,
+   "maker": 20250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.81",
+   "shares": 100,
+   "maker": 81000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.82",
+   "shares": 5,
+   "maker": 4100000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.82",
+   "shares": 6,
+   "maker": 4920000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.82",
+   "shares": 7,
+   "maker": 5740000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.82",
+   "shares": 10,
+   "maker": 8200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.82",
+   "shares": 13,
+   "maker": 10660000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.82",
+   "shares": 25,
+   "maker": 20500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.82",
+   "shares": 100,
+   "maker": 82000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.83",
+   "shares": 5,
+   "maker": 4150000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.83",
+   "shares": 6,
+   "maker": 4980000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.83",
+   "shares": 7,
+   "maker": 5810000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.83",
+   "shares": 10,
+   "maker": 8300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.83",
+   "shares": 13,
+   "maker": 10790000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.83",
+   "shares": 25,
+   "maker": 20750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.83",
+   "shares": 100,
+   "maker": 83000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.84",
+   "shares": 5,
+   "maker": 4200000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.84",
+   "shares": 6,
+   "maker": 5040000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.84",
+   "shares": 7,
+   "maker": 5880000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.84",
+   "shares": 10,
+   "maker": 8400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.84",
+   "shares": 13,
+   "maker": 10920000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.84",
+   "shares": 25,
+   "maker": 21000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.84",
+   "shares": 100,
+   "maker": 84000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.85",
+   "shares": 5,
+   "maker": 4250000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.85",
+   "shares": 6,
+   "maker": 5100000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.85",
+   "shares": 7,
+   "maker": 5950000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.85",
+   "shares": 10,
+   "maker": 8500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.85",
+   "shares": 13,
+   "maker": 11050000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.85",
+   "shares": 25,
+   "maker": 21250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.85",
+   "shares": 100,
+   "maker": 85000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.86",
+   "shares": 5,
+   "maker": 4300000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.86",
+   "shares": 6,
+   "maker": 5160000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.86",
+   "shares": 7,
+   "maker": 6020000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.86",
+   "shares": 10,
+   "maker": 8600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.86",
+   "shares": 13,
+   "maker": 11180000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.86",
+   "shares": 25,
+   "maker": 21500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.86",
+   "shares": 100,
+   "maker": 86000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.87",
+   "shares": 5,
+   "maker": 4350000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.87",
+   "shares": 6,
+   "maker": 5220000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.87",
+   "shares": 7,
+   "maker": 6090000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.87",
+   "shares": 10,
+   "maker": 8700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.87",
+   "shares": 13,
+   "maker": 11310000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.87",
+   "shares": 25,
+   "maker": 21750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.87",
+   "shares": 100,
+   "maker": 87000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.88",
+   "shares": 5,
+   "maker": 4400000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.88",
+   "shares": 6,
+   "maker": 5280000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.88",
+   "shares": 7,
+   "maker": 6160000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.88",
+   "shares": 10,
+   "maker": 8800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.88",
+   "shares": 13,
+   "maker": 11440000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.88",
+   "shares": 25,
+   "maker": 22000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.88",
+   "shares": 100,
+   "maker": 88000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.89",
+   "shares": 5,
+   "maker": 4450000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.89",
+   "shares": 6,
+   "maker": 5340000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.89",
+   "shares": 7,
+   "maker": 6230000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.89",
+   "shares": 10,
+   "maker": 8900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.89",
+   "shares": 13,
+   "maker": 11570000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.89",
+   "shares": 25,
+   "maker": 22250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.89",
+   "shares": 100,
+   "maker": 89000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.90",
+   "shares": 5,
+   "maker": 4500000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.90",
+   "shares": 6,
+   "maker": 5400000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.90",
+   "shares": 7,
+   "maker": 6300000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.90",
+   "shares": 10,
+   "maker": 9000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.90",
+   "shares": 13,
+   "maker": 11700000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.90",
+   "shares": 25,
+   "maker": 22500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.90",
+   "shares": 100,
+   "maker": 90000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.91",
+   "shares": 5,
+   "maker": 4550000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.91",
+   "shares": 6,
+   "maker": 5460000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.91",
+   "shares": 7,
+   "maker": 6370000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.91",
+   "shares": 10,
+   "maker": 9100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.91",
+   "shares": 13,
+   "maker": 11830000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.91",
+   "shares": 25,
+   "maker": 22750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.91",
+   "shares": 100,
+   "maker": 91000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.92",
+   "shares": 5,
+   "maker": 4600000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.92",
+   "shares": 6,
+   "maker": 5520000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.92",
+   "shares": 7,
+   "maker": 6440000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.92",
+   "shares": 10,
+   "maker": 9200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.92",
+   "shares": 13,
+   "maker": 11960000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.92",
+   "shares": 25,
+   "maker": 23000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.92",
+   "shares": 100,
+   "maker": 92000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.93",
+   "shares": 5,
+   "maker": 4650000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.93",
+   "shares": 6,
+   "maker": 5580000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.93",
+   "shares": 7,
+   "maker": 6510000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.93",
+   "shares": 10,
+   "maker": 9300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.93",
+   "shares": 13,
+   "maker": 12090000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.93",
+   "shares": 25,
+   "maker": 23250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.93",
+   "shares": 100,
+   "maker": 93000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.94",
+   "shares": 5,
+   "maker": 4700000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.94",
+   "shares": 6,
+   "maker": 5640000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.94",
+   "shares": 7,
+   "maker": 6580000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.94",
+   "shares": 10,
+   "maker": 9400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.94",
+   "shares": 13,
+   "maker": 12220000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.94",
+   "shares": 25,
+   "maker": 23500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.94",
+   "shares": 100,
+   "maker": 94000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.95",
+   "shares": 5,
+   "maker": 4750000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.95",
+   "shares": 6,
+   "maker": 5700000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.95",
+   "shares": 7,
+   "maker": 6650000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.95",
+   "shares": 10,
+   "maker": 9500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.95",
+   "shares": 13,
+   "maker": 12350000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.95",
+   "shares": 25,
+   "maker": 23750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.95",
+   "shares": 100,
+   "maker": 95000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.96",
+   "shares": 5,
+   "maker": 4800000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.96",
+   "shares": 6,
+   "maker": 5760000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.96",
+   "shares": 7,
+   "maker": 6720000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.96",
+   "shares": 10,
+   "maker": 9600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.96",
+   "shares": 13,
+   "maker": 12480000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.96",
+   "shares": 25,
+   "maker": 24000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.96",
+   "shares": 100,
+   "maker": 96000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.97",
+   "shares": 5,
+   "maker": 4850000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.97",
+   "shares": 6,
+   "maker": 5820000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.97",
+   "shares": 7,
+   "maker": 6790000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.97",
+   "shares": 10,
+   "maker": 9700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.97",
+   "shares": 13,
+   "maker": 12610000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.97",
+   "shares": 25,
+   "maker": 24250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.97",
+   "shares": 100,
+   "maker": 97000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.98",
+   "shares": 5,
+   "maker": 4900000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.98",
+   "shares": 6,
+   "maker": 5880000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.98",
+   "shares": 7,
+   "maker": 6860000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.98",
+   "shares": 10,
+   "maker": 9800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.98",
+   "shares": 13,
+   "maker": 12740000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.98",
+   "shares": 25,
+   "maker": 24500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.98",
+   "shares": 100,
+   "maker": 98000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.99",
+   "shares": 5,
+   "maker": 4950000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.99",
+   "shares": 6,
+   "maker": 5940000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.99",
+   "shares": 7,
+   "maker": 6930000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.99",
+   "shares": 10,
+   "maker": 9900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.99",
+   "shares": 13,
+   "maker": 12870000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.99",
+   "shares": 25,
+   "maker": 24750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.01",
+   "price": "0.99",
+   "shares": 100,
+   "maker": 99000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.001",
+   "shares": 5,
+   "maker": 5000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.001",
+   "shares": 6,
+   "maker": 6000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.001",
+   "shares": 7,
+   "maker": 7000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.001",
+   "shares": 10,
+   "maker": 10000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.001",
+   "shares": 13,
+   "maker": 13000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.001",
+   "shares": 25,
+   "maker": 25000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.001",
+   "shares": 100,
+   "maker": 100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.008",
+   "shares": 5,
+   "maker": 40000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.008",
+   "shares": 6,
+   "maker": 48000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.008",
+   "shares": 7,
+   "maker": 56000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.008",
+   "shares": 10,
+   "maker": 80000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.008",
+   "shares": 13,
+   "maker": 104000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.008",
+   "shares": 25,
+   "maker": 200000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.008",
+   "shares": 100,
+   "maker": 800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.015",
+   "shares": 5,
+   "maker": 75000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.015",
+   "shares": 6,
+   "maker": 90000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.015",
+   "shares": 7,
+   "maker": 105000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.015",
+   "shares": 10,
+   "maker": 150000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.015",
+   "shares": 13,
+   "maker": 195000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.015",
+   "shares": 25,
+   "maker": 375000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.015",
+   "shares": 100,
+   "maker": 1500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.022",
+   "shares": 5,
+   "maker": 110000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.022",
+   "shares": 6,
+   "maker": 132000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.022",
+   "shares": 7,
+   "maker": 154000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.022",
+   "shares": 10,
+   "maker": 220000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.022",
+   "shares": 13,
+   "maker": 286000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.022",
+   "shares": 25,
+   "maker": 550000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.022",
+   "shares": 100,
+   "maker": 2200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.029",
+   "shares": 5,
+   "maker": 145000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.029",
+   "shares": 6,
+   "maker": 174000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.029",
+   "shares": 7,
+   "maker": 203000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.029",
+   "shares": 10,
+   "maker": 290000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.029",
+   "shares": 13,
+   "maker": 377000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.029",
+   "shares": 25,
+   "maker": 725000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.029",
+   "shares": 100,
+   "maker": 2900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.036",
+   "shares": 5,
+   "maker": 180000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.036",
+   "shares": 6,
+   "maker": 216000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.036",
+   "shares": 7,
+   "maker": 252000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.036",
+   "shares": 10,
+   "maker": 360000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.036",
+   "shares": 13,
+   "maker": 468000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.036",
+   "shares": 25,
+   "maker": 900000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.036",
+   "shares": 100,
+   "maker": 3600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.043",
+   "shares": 5,
+   "maker": 215000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.043",
+   "shares": 6,
+   "maker": 258000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.043",
+   "shares": 7,
+   "maker": 301000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.043",
+   "shares": 10,
+   "maker": 430000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.043",
+   "shares": 13,
+   "maker": 559000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.043",
+   "shares": 25,
+   "maker": 1075000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.043",
+   "shares": 100,
+   "maker": 4300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.050",
+   "shares": 5,
+   "maker": 250000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.050",
+   "shares": 6,
+   "maker": 300000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.050",
+   "shares": 7,
+   "maker": 350000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.050",
+   "shares": 10,
+   "maker": 500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.050",
+   "shares": 13,
+   "maker": 650000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.050",
+   "shares": 25,
+   "maker": 1250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.050",
+   "shares": 100,
+   "maker": 5000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.057",
+   "shares": 5,
+   "maker": 285000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.057",
+   "shares": 6,
+   "maker": 342000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.057",
+   "shares": 7,
+   "maker": 399000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.057",
+   "shares": 10,
+   "maker": 570000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.057",
+   "shares": 13,
+   "maker": 741000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.057",
+   "shares": 25,
+   "maker": 1425000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.057",
+   "shares": 100,
+   "maker": 5700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.064",
+   "shares": 5,
+   "maker": 320000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.064",
+   "shares": 6,
+   "maker": 384000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.064",
+   "shares": 7,
+   "maker": 448000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.064",
+   "shares": 10,
+   "maker": 640000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.064",
+   "shares": 13,
+   "maker": 832000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.064",
+   "shares": 25,
+   "maker": 1600000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.064",
+   "shares": 100,
+   "maker": 6400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.071",
+   "shares": 5,
+   "maker": 355000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.071",
+   "shares": 6,
+   "maker": 426000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.071",
+   "shares": 7,
+   "maker": 497000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.071",
+   "shares": 10,
+   "maker": 710000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.071",
+   "shares": 13,
+   "maker": 923000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.071",
+   "shares": 25,
+   "maker": 1775000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.071",
+   "shares": 100,
+   "maker": 7100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.078",
+   "shares": 5,
+   "maker": 390000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.078",
+   "shares": 6,
+   "maker": 468000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.078",
+   "shares": 7,
+   "maker": 546000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.078",
+   "shares": 10,
+   "maker": 780000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.078",
+   "shares": 13,
+   "maker": 1014000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.078",
+   "shares": 25,
+   "maker": 1950000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.078",
+   "shares": 100,
+   "maker": 7800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.085",
+   "shares": 5,
+   "maker": 425000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.085",
+   "shares": 6,
+   "maker": 510000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.085",
+   "shares": 7,
+   "maker": 595000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.085",
+   "shares": 10,
+   "maker": 850000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.085",
+   "shares": 13,
+   "maker": 1105000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.085",
+   "shares": 25,
+   "maker": 2125000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.085",
+   "shares": 100,
+   "maker": 8500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.092",
+   "shares": 5,
+   "maker": 460000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.092",
+   "shares": 6,
+   "maker": 552000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.092",
+   "shares": 7,
+   "maker": 644000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.092",
+   "shares": 10,
+   "maker": 920000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.092",
+   "shares": 13,
+   "maker": 1196000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.092",
+   "shares": 25,
+   "maker": 2300000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.092",
+   "shares": 100,
+   "maker": 9200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.099",
+   "shares": 5,
+   "maker": 495000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.099",
+   "shares": 6,
+   "maker": 594000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.099",
+   "shares": 7,
+   "maker": 693000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.099",
+   "shares": 10,
+   "maker": 990000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.099",
+   "shares": 13,
+   "maker": 1287000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.099",
+   "shares": 25,
+   "maker": 2475000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.099",
+   "shares": 100,
+   "maker": 9900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.106",
+   "shares": 5,
+   "maker": 530000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.106",
+   "shares": 6,
+   "maker": 636000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.106",
+   "shares": 7,
+   "maker": 742000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.106",
+   "shares": 10,
+   "maker": 1060000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.106",
+   "shares": 13,
+   "maker": 1378000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.106",
+   "shares": 25,
+   "maker": 2650000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.106",
+   "shares": 100,
+   "maker": 10600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.113",
+   "shares": 5,
+   "maker": 565000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.113",
+   "shares": 6,
+   "maker": 678000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.113",
+   "shares": 7,
+   "maker": 791000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.113",
+   "shares": 10,
+   "maker": 1130000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.113",
+   "shares": 13,
+   "maker": 1469000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.113",
+   "shares": 25,
+   "maker": 2825000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.113",
+   "shares": 100,
+   "maker": 11300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.120",
+   "shares": 5,
+   "maker": 600000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.120",
+   "shares": 6,
+   "maker": 720000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.120",
+   "shares": 7,
+   "maker": 840000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.120",
+   "shares": 10,
+   "maker": 1200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.120",
+   "shares": 13,
+   "maker": 1560000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.120",
+   "shares": 25,
+   "maker": 3000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.120",
+   "shares": 100,
+   "maker": 12000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.127",
+   "shares": 5,
+   "maker": 635000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.127",
+   "shares": 6,
+   "maker": 762000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.127",
+   "shares": 7,
+   "maker": 889000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.127",
+   "shares": 10,
+   "maker": 1270000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.127",
+   "shares": 13,
+   "maker": 1651000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.127",
+   "shares": 25,
+   "maker": 3175000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.127",
+   "shares": 100,
+   "maker": 12700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.134",
+   "shares": 5,
+   "maker": 670000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.134",
+   "shares": 6,
+   "maker": 804000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.134",
+   "shares": 7,
+   "maker": 938000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.134",
+   "shares": 10,
+   "maker": 1340000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.134",
+   "shares": 13,
+   "maker": 1742000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.134",
+   "shares": 25,
+   "maker": 3350000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.134",
+   "shares": 100,
+   "maker": 13400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.141",
+   "shares": 5,
+   "maker": 705000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.141",
+   "shares": 6,
+   "maker": 846000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.141",
+   "shares": 7,
+   "maker": 987000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.141",
+   "shares": 10,
+   "maker": 1410000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.141",
+   "shares": 13,
+   "maker": 1833000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.141",
+   "shares": 25,
+   "maker": 3525000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.141",
+   "shares": 100,
+   "maker": 14100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.148",
+   "shares": 5,
+   "maker": 740000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.148",
+   "shares": 6,
+   "maker": 888000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.148",
+   "shares": 7,
+   "maker": 1036000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.148",
+   "shares": 10,
+   "maker": 1480000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.148",
+   "shares": 13,
+   "maker": 1924000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.148",
+   "shares": 25,
+   "maker": 3700000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.148",
+   "shares": 100,
+   "maker": 14800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.155",
+   "shares": 5,
+   "maker": 775000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.155",
+   "shares": 6,
+   "maker": 930000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.155",
+   "shares": 7,
+   "maker": 1085000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.155",
+   "shares": 10,
+   "maker": 1550000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.155",
+   "shares": 13,
+   "maker": 2015000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.155",
+   "shares": 25,
+   "maker": 3875000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.155",
+   "shares": 100,
+   "maker": 15500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.162",
+   "shares": 5,
+   "maker": 810000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.162",
+   "shares": 6,
+   "maker": 972000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.162",
+   "shares": 7,
+   "maker": 1134000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.162",
+   "shares": 10,
+   "maker": 1620000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.162",
+   "shares": 13,
+   "maker": 2106000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.162",
+   "shares": 25,
+   "maker": 4050000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.162",
+   "shares": 100,
+   "maker": 16200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.169",
+   "shares": 5,
+   "maker": 845000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.169",
+   "shares": 6,
+   "maker": 1014000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.169",
+   "shares": 7,
+   "maker": 1183000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.169",
+   "shares": 10,
+   "maker": 1690000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.169",
+   "shares": 13,
+   "maker": 2197000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.169",
+   "shares": 25,
+   "maker": 4225000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.169",
+   "shares": 100,
+   "maker": 16900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.176",
+   "shares": 5,
+   "maker": 880000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.176",
+   "shares": 6,
+   "maker": 1056000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.176",
+   "shares": 7,
+   "maker": 1232000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.176",
+   "shares": 10,
+   "maker": 1760000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.176",
+   "shares": 13,
+   "maker": 2288000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.176",
+   "shares": 25,
+   "maker": 4400000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.176",
+   "shares": 100,
+   "maker": 17600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.183",
+   "shares": 5,
+   "maker": 915000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.183",
+   "shares": 6,
+   "maker": 1098000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.183",
+   "shares": 7,
+   "maker": 1281000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.183",
+   "shares": 10,
+   "maker": 1830000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.183",
+   "shares": 13,
+   "maker": 2379000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.183",
+   "shares": 25,
+   "maker": 4575000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.183",
+   "shares": 100,
+   "maker": 18300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.190",
+   "shares": 5,
+   "maker": 950000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.190",
+   "shares": 6,
+   "maker": 1140000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.190",
+   "shares": 7,
+   "maker": 1330000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.190",
+   "shares": 10,
+   "maker": 1900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.190",
+   "shares": 13,
+   "maker": 2470000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.190",
+   "shares": 25,
+   "maker": 4750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.190",
+   "shares": 100,
+   "maker": 19000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.197",
+   "shares": 5,
+   "maker": 985000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.197",
+   "shares": 6,
+   "maker": 1182000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.197",
+   "shares": 7,
+   "maker": 1379000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.197",
+   "shares": 10,
+   "maker": 1970000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.197",
+   "shares": 13,
+   "maker": 2561000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.197",
+   "shares": 25,
+   "maker": 4925000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.197",
+   "shares": 100,
+   "maker": 19700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.204",
+   "shares": 5,
+   "maker": 1020000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.204",
+   "shares": 6,
+   "maker": 1224000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.204",
+   "shares": 7,
+   "maker": 1428000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.204",
+   "shares": 10,
+   "maker": 2040000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.204",
+   "shares": 13,
+   "maker": 2652000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.204",
+   "shares": 25,
+   "maker": 5100000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.204",
+   "shares": 100,
+   "maker": 20400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.211",
+   "shares": 5,
+   "maker": 1055000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.211",
+   "shares": 6,
+   "maker": 1266000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.211",
+   "shares": 7,
+   "maker": 1477000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.211",
+   "shares": 10,
+   "maker": 2110000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.211",
+   "shares": 13,
+   "maker": 2743000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.211",
+   "shares": 25,
+   "maker": 5275000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.211",
+   "shares": 100,
+   "maker": 21100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.218",
+   "shares": 5,
+   "maker": 1090000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.218",
+   "shares": 6,
+   "maker": 1308000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.218",
+   "shares": 7,
+   "maker": 1526000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.218",
+   "shares": 10,
+   "maker": 2180000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.218",
+   "shares": 13,
+   "maker": 2834000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.218",
+   "shares": 25,
+   "maker": 5450000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.218",
+   "shares": 100,
+   "maker": 21800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.225",
+   "shares": 5,
+   "maker": 1125000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.225",
+   "shares": 6,
+   "maker": 1350000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.225",
+   "shares": 7,
+   "maker": 1575000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.225",
+   "shares": 10,
+   "maker": 2250000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.225",
+   "shares": 13,
+   "maker": 2925000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.225",
+   "shares": 25,
+   "maker": 5625000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.225",
+   "shares": 100,
+   "maker": 22500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.232",
+   "shares": 5,
+   "maker": 1160000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.232",
+   "shares": 6,
+   "maker": 1392000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.232",
+   "shares": 7,
+   "maker": 1624000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.232",
+   "shares": 10,
+   "maker": 2320000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.232",
+   "shares": 13,
+   "maker": 3016000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.232",
+   "shares": 25,
+   "maker": 5800000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.232",
+   "shares": 100,
+   "maker": 23200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.239",
+   "shares": 5,
+   "maker": 1195000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.239",
+   "shares": 6,
+   "maker": 1434000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.239",
+   "shares": 7,
+   "maker": 1673000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.239",
+   "shares": 10,
+   "maker": 2390000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.239",
+   "shares": 13,
+   "maker": 3107000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.239",
+   "shares": 25,
+   "maker": 5975000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.239",
+   "shares": 100,
+   "maker": 23900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.246",
+   "shares": 5,
+   "maker": 1230000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.246",
+   "shares": 6,
+   "maker": 1476000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.246",
+   "shares": 7,
+   "maker": 1722000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.246",
+   "shares": 10,
+   "maker": 2460000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.246",
+   "shares": 13,
+   "maker": 3198000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.246",
+   "shares": 25,
+   "maker": 6150000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.246",
+   "shares": 100,
+   "maker": 24600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.253",
+   "shares": 5,
+   "maker": 1265000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.253",
+   "shares": 6,
+   "maker": 1518000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.253",
+   "shares": 7,
+   "maker": 1771000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.253",
+   "shares": 10,
+   "maker": 2530000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.253",
+   "shares": 13,
+   "maker": 3289000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.253",
+   "shares": 25,
+   "maker": 6325000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.253",
+   "shares": 100,
+   "maker": 25300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.260",
+   "shares": 5,
+   "maker": 1300000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.260",
+   "shares": 6,
+   "maker": 1560000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.260",
+   "shares": 7,
+   "maker": 1820000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.260",
+   "shares": 10,
+   "maker": 2600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.260",
+   "shares": 13,
+   "maker": 3380000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.260",
+   "shares": 25,
+   "maker": 6500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.260",
+   "shares": 100,
+   "maker": 26000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.267",
+   "shares": 5,
+   "maker": 1335000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.267",
+   "shares": 6,
+   "maker": 1602000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.267",
+   "shares": 7,
+   "maker": 1869000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.267",
+   "shares": 10,
+   "maker": 2670000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.267",
+   "shares": 13,
+   "maker": 3471000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.267",
+   "shares": 25,
+   "maker": 6675000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.267",
+   "shares": 100,
+   "maker": 26700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.274",
+   "shares": 5,
+   "maker": 1370000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.274",
+   "shares": 6,
+   "maker": 1644000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.274",
+   "shares": 7,
+   "maker": 1918000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.274",
+   "shares": 10,
+   "maker": 2740000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.274",
+   "shares": 13,
+   "maker": 3562000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.274",
+   "shares": 25,
+   "maker": 6850000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.274",
+   "shares": 100,
+   "maker": 27400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.281",
+   "shares": 5,
+   "maker": 1405000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.281",
+   "shares": 6,
+   "maker": 1686000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.281",
+   "shares": 7,
+   "maker": 1967000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.281",
+   "shares": 10,
+   "maker": 2810000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.281",
+   "shares": 13,
+   "maker": 3653000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.281",
+   "shares": 25,
+   "maker": 7025000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.281",
+   "shares": 100,
+   "maker": 28100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.288",
+   "shares": 5,
+   "maker": 1440000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.288",
+   "shares": 6,
+   "maker": 1728000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.288",
+   "shares": 7,
+   "maker": 2016000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.288",
+   "shares": 10,
+   "maker": 2880000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.288",
+   "shares": 13,
+   "maker": 3744000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.288",
+   "shares": 25,
+   "maker": 7200000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.288",
+   "shares": 100,
+   "maker": 28800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.295",
+   "shares": 5,
+   "maker": 1475000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.295",
+   "shares": 6,
+   "maker": 1770000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.295",
+   "shares": 7,
+   "maker": 2065000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.295",
+   "shares": 10,
+   "maker": 2950000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.295",
+   "shares": 13,
+   "maker": 3835000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.295",
+   "shares": 25,
+   "maker": 7375000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.295",
+   "shares": 100,
+   "maker": 29500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.302",
+   "shares": 5,
+   "maker": 1510000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.302",
+   "shares": 6,
+   "maker": 1812000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.302",
+   "shares": 7,
+   "maker": 2114000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.302",
+   "shares": 10,
+   "maker": 3020000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.302",
+   "shares": 13,
+   "maker": 3926000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.302",
+   "shares": 25,
+   "maker": 7550000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.302",
+   "shares": 100,
+   "maker": 30200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.309",
+   "shares": 5,
+   "maker": 1545000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.309",
+   "shares": 6,
+   "maker": 1854000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.309",
+   "shares": 7,
+   "maker": 2163000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.309",
+   "shares": 10,
+   "maker": 3090000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.309",
+   "shares": 13,
+   "maker": 4017000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.309",
+   "shares": 25,
+   "maker": 7725000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.309",
+   "shares": 100,
+   "maker": 30900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.316",
+   "shares": 5,
+   "maker": 1580000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.316",
+   "shares": 6,
+   "maker": 1896000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.316",
+   "shares": 7,
+   "maker": 2212000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.316",
+   "shares": 10,
+   "maker": 3160000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.316",
+   "shares": 13,
+   "maker": 4108000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.316",
+   "shares": 25,
+   "maker": 7900000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.316",
+   "shares": 100,
+   "maker": 31600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.323",
+   "shares": 5,
+   "maker": 1615000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.323",
+   "shares": 6,
+   "maker": 1938000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.323",
+   "shares": 7,
+   "maker": 2261000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.323",
+   "shares": 10,
+   "maker": 3230000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.323",
+   "shares": 13,
+   "maker": 4199000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.323",
+   "shares": 25,
+   "maker": 8075000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.323",
+   "shares": 100,
+   "maker": 32300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.330",
+   "shares": 5,
+   "maker": 1650000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.330",
+   "shares": 6,
+   "maker": 1980000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.330",
+   "shares": 7,
+   "maker": 2310000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.330",
+   "shares": 10,
+   "maker": 3300000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.330",
+   "shares": 13,
+   "maker": 4290000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.330",
+   "shares": 25,
+   "maker": 8250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.330",
+   "shares": 100,
+   "maker": 33000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.337",
+   "shares": 5,
+   "maker": 1685000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.337",
+   "shares": 6,
+   "maker": 2022000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.337",
+   "shares": 7,
+   "maker": 2359000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.337",
+   "shares": 10,
+   "maker": 3370000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.337",
+   "shares": 13,
+   "maker": 4381000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.337",
+   "shares": 25,
+   "maker": 8425000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.337",
+   "shares": 100,
+   "maker": 33700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.344",
+   "shares": 5,
+   "maker": 1720000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.344",
+   "shares": 6,
+   "maker": 2064000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.344",
+   "shares": 7,
+   "maker": 2408000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.344",
+   "shares": 10,
+   "maker": 3440000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.344",
+   "shares": 13,
+   "maker": 4472000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.344",
+   "shares": 25,
+   "maker": 8600000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.344",
+   "shares": 100,
+   "maker": 34400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.351",
+   "shares": 5,
+   "maker": 1755000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.351",
+   "shares": 6,
+   "maker": 2106000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.351",
+   "shares": 7,
+   "maker": 2457000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.351",
+   "shares": 10,
+   "maker": 3510000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.351",
+   "shares": 13,
+   "maker": 4563000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.351",
+   "shares": 25,
+   "maker": 8775000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.351",
+   "shares": 100,
+   "maker": 35100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.358",
+   "shares": 5,
+   "maker": 1790000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.358",
+   "shares": 6,
+   "maker": 2148000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.358",
+   "shares": 7,
+   "maker": 2506000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.358",
+   "shares": 10,
+   "maker": 3580000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.358",
+   "shares": 13,
+   "maker": 4654000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.358",
+   "shares": 25,
+   "maker": 8950000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.358",
+   "shares": 100,
+   "maker": 35800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.365",
+   "shares": 5,
+   "maker": 1825000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.365",
+   "shares": 6,
+   "maker": 2190000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.365",
+   "shares": 7,
+   "maker": 2555000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.365",
+   "shares": 10,
+   "maker": 3650000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.365",
+   "shares": 13,
+   "maker": 4745000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.365",
+   "shares": 25,
+   "maker": 9125000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.365",
+   "shares": 100,
+   "maker": 36500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.372",
+   "shares": 5,
+   "maker": 1860000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.372",
+   "shares": 6,
+   "maker": 2232000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.372",
+   "shares": 7,
+   "maker": 2604000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.372",
+   "shares": 10,
+   "maker": 3720000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.372",
+   "shares": 13,
+   "maker": 4836000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.372",
+   "shares": 25,
+   "maker": 9300000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.372",
+   "shares": 100,
+   "maker": 37200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.379",
+   "shares": 5,
+   "maker": 1895000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.379",
+   "shares": 6,
+   "maker": 2274000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.379",
+   "shares": 7,
+   "maker": 2653000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.379",
+   "shares": 10,
+   "maker": 3790000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.379",
+   "shares": 13,
+   "maker": 4927000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.379",
+   "shares": 25,
+   "maker": 9475000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.379",
+   "shares": 100,
+   "maker": 37900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.386",
+   "shares": 5,
+   "maker": 1930000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.386",
+   "shares": 6,
+   "maker": 2316000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.386",
+   "shares": 7,
+   "maker": 2702000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.386",
+   "shares": 10,
+   "maker": 3860000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.386",
+   "shares": 13,
+   "maker": 5018000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.386",
+   "shares": 25,
+   "maker": 9650000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.386",
+   "shares": 100,
+   "maker": 38600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.393",
+   "shares": 5,
+   "maker": 1965000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.393",
+   "shares": 6,
+   "maker": 2358000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.393",
+   "shares": 7,
+   "maker": 2751000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.393",
+   "shares": 10,
+   "maker": 3930000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.393",
+   "shares": 13,
+   "maker": 5109000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.393",
+   "shares": 25,
+   "maker": 9825000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.393",
+   "shares": 100,
+   "maker": 39300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.400",
+   "shares": 5,
+   "maker": 2000000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.400",
+   "shares": 6,
+   "maker": 2400000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.400",
+   "shares": 7,
+   "maker": 2800000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.400",
+   "shares": 10,
+   "maker": 4000000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.400",
+   "shares": 13,
+   "maker": 5200000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.400",
+   "shares": 25,
+   "maker": 10000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.400",
+   "shares": 100,
+   "maker": 40000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.407",
+   "shares": 5,
+   "maker": 2035000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.407",
+   "shares": 6,
+   "maker": 2442000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.407",
+   "shares": 7,
+   "maker": 2849000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.407",
+   "shares": 10,
+   "maker": 4070000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.407",
+   "shares": 13,
+   "maker": 5291000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.407",
+   "shares": 25,
+   "maker": 10175000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.407",
+   "shares": 100,
+   "maker": 40700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.414",
+   "shares": 5,
+   "maker": 2070000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.414",
+   "shares": 6,
+   "maker": 2484000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.414",
+   "shares": 7,
+   "maker": 2898000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.414",
+   "shares": 10,
+   "maker": 4140000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.414",
+   "shares": 13,
+   "maker": 5382000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.414",
+   "shares": 25,
+   "maker": 10350000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.414",
+   "shares": 100,
+   "maker": 41400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.421",
+   "shares": 5,
+   "maker": 2105000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.421",
+   "shares": 6,
+   "maker": 2526000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.421",
+   "shares": 7,
+   "maker": 2947000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.421",
+   "shares": 10,
+   "maker": 4210000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.421",
+   "shares": 13,
+   "maker": 5473000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.421",
+   "shares": 25,
+   "maker": 10525000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.421",
+   "shares": 100,
+   "maker": 42100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.428",
+   "shares": 5,
+   "maker": 2140000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.428",
+   "shares": 6,
+   "maker": 2568000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.428",
+   "shares": 7,
+   "maker": 2996000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.428",
+   "shares": 10,
+   "maker": 4280000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.428",
+   "shares": 13,
+   "maker": 5564000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.428",
+   "shares": 25,
+   "maker": 10700000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.428",
+   "shares": 100,
+   "maker": 42800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.435",
+   "shares": 5,
+   "maker": 2175000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.435",
+   "shares": 6,
+   "maker": 2610000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.435",
+   "shares": 7,
+   "maker": 3045000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.435",
+   "shares": 10,
+   "maker": 4350000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.435",
+   "shares": 13,
+   "maker": 5655000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.435",
+   "shares": 25,
+   "maker": 10875000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.435",
+   "shares": 100,
+   "maker": 43500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.442",
+   "shares": 5,
+   "maker": 2210000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.442",
+   "shares": 6,
+   "maker": 2652000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.442",
+   "shares": 7,
+   "maker": 3094000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.442",
+   "shares": 10,
+   "maker": 4420000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.442",
+   "shares": 13,
+   "maker": 5746000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.442",
+   "shares": 25,
+   "maker": 11050000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.442",
+   "shares": 100,
+   "maker": 44200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.449",
+   "shares": 5,
+   "maker": 2245000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.449",
+   "shares": 6,
+   "maker": 2694000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.449",
+   "shares": 7,
+   "maker": 3143000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.449",
+   "shares": 10,
+   "maker": 4490000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.449",
+   "shares": 13,
+   "maker": 5837000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.449",
+   "shares": 25,
+   "maker": 11225000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.449",
+   "shares": 100,
+   "maker": 44900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.456",
+   "shares": 5,
+   "maker": 2280000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.456",
+   "shares": 6,
+   "maker": 2736000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.456",
+   "shares": 7,
+   "maker": 3192000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.456",
+   "shares": 10,
+   "maker": 4560000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.456",
+   "shares": 13,
+   "maker": 5928000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.456",
+   "shares": 25,
+   "maker": 11400000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.456",
+   "shares": 100,
+   "maker": 45600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.463",
+   "shares": 5,
+   "maker": 2315000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.463",
+   "shares": 6,
+   "maker": 2778000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.463",
+   "shares": 7,
+   "maker": 3241000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.463",
+   "shares": 10,
+   "maker": 4630000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.463",
+   "shares": 13,
+   "maker": 6019000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.463",
+   "shares": 25,
+   "maker": 11575000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.463",
+   "shares": 100,
+   "maker": 46300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.470",
+   "shares": 5,
+   "maker": 2350000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.470",
+   "shares": 6,
+   "maker": 2820000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.470",
+   "shares": 7,
+   "maker": 3290000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.470",
+   "shares": 10,
+   "maker": 4700000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.470",
+   "shares": 13,
+   "maker": 6110000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.470",
+   "shares": 25,
+   "maker": 11750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.470",
+   "shares": 100,
+   "maker": 47000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.477",
+   "shares": 5,
+   "maker": 2385000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.477",
+   "shares": 6,
+   "maker": 2862000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.477",
+   "shares": 7,
+   "maker": 3339000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.477",
+   "shares": 10,
+   "maker": 4770000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.477",
+   "shares": 13,
+   "maker": 6201000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.477",
+   "shares": 25,
+   "maker": 11925000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.477",
+   "shares": 100,
+   "maker": 47700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.484",
+   "shares": 5,
+   "maker": 2420000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.484",
+   "shares": 6,
+   "maker": 2904000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.484",
+   "shares": 7,
+   "maker": 3388000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.484",
+   "shares": 10,
+   "maker": 4840000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.484",
+   "shares": 13,
+   "maker": 6292000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.484",
+   "shares": 25,
+   "maker": 12100000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.484",
+   "shares": 100,
+   "maker": 48400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.491",
+   "shares": 5,
+   "maker": 2455000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.491",
+   "shares": 6,
+   "maker": 2946000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.491",
+   "shares": 7,
+   "maker": 3437000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.491",
+   "shares": 10,
+   "maker": 4910000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.491",
+   "shares": 13,
+   "maker": 6383000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.491",
+   "shares": 25,
+   "maker": 12275000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.491",
+   "shares": 100,
+   "maker": 49100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.498",
+   "shares": 5,
+   "maker": 2490000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.498",
+   "shares": 6,
+   "maker": 2988000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.498",
+   "shares": 7,
+   "maker": 3486000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.498",
+   "shares": 10,
+   "maker": 4980000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.498",
+   "shares": 13,
+   "maker": 6474000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.498",
+   "shares": 25,
+   "maker": 12450000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.498",
+   "shares": 100,
+   "maker": 49800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.505",
+   "shares": 5,
+   "maker": 2525000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.505",
+   "shares": 6,
+   "maker": 3030000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.505",
+   "shares": 7,
+   "maker": 3535000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.505",
+   "shares": 10,
+   "maker": 5050000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.505",
+   "shares": 13,
+   "maker": 6565000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.505",
+   "shares": 25,
+   "maker": 12625000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.505",
+   "shares": 100,
+   "maker": 50500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.512",
+   "shares": 5,
+   "maker": 2560000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.512",
+   "shares": 6,
+   "maker": 3072000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.512",
+   "shares": 7,
+   "maker": 3584000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.512",
+   "shares": 10,
+   "maker": 5120000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.512",
+   "shares": 13,
+   "maker": 6656000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.512",
+   "shares": 25,
+   "maker": 12800000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.512",
+   "shares": 100,
+   "maker": 51200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.519",
+   "shares": 5,
+   "maker": 2595000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.519",
+   "shares": 6,
+   "maker": 3114000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.519",
+   "shares": 7,
+   "maker": 3633000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.519",
+   "shares": 10,
+   "maker": 5190000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.519",
+   "shares": 13,
+   "maker": 6747000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.519",
+   "shares": 25,
+   "maker": 12975000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.519",
+   "shares": 100,
+   "maker": 51900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.526",
+   "shares": 5,
+   "maker": 2630000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.526",
+   "shares": 6,
+   "maker": 3156000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.526",
+   "shares": 7,
+   "maker": 3682000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.526",
+   "shares": 10,
+   "maker": 5260000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.526",
+   "shares": 13,
+   "maker": 6838000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.526",
+   "shares": 25,
+   "maker": 13150000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.526",
+   "shares": 100,
+   "maker": 52600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.533",
+   "shares": 5,
+   "maker": 2665000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.533",
+   "shares": 6,
+   "maker": 3198000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.533",
+   "shares": 7,
+   "maker": 3731000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.533",
+   "shares": 10,
+   "maker": 5330000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.533",
+   "shares": 13,
+   "maker": 6929000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.533",
+   "shares": 25,
+   "maker": 13325000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.533",
+   "shares": 100,
+   "maker": 53300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.540",
+   "shares": 5,
+   "maker": 2700000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.540",
+   "shares": 6,
+   "maker": 3240000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.540",
+   "shares": 7,
+   "maker": 3780000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.540",
+   "shares": 10,
+   "maker": 5400000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.540",
+   "shares": 13,
+   "maker": 7020000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.540",
+   "shares": 25,
+   "maker": 13500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.540",
+   "shares": 100,
+   "maker": 54000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.547",
+   "shares": 5,
+   "maker": 2735000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.547",
+   "shares": 6,
+   "maker": 3282000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.547",
+   "shares": 7,
+   "maker": 3829000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.547",
+   "shares": 10,
+   "maker": 5470000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.547",
+   "shares": 13,
+   "maker": 7111000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.547",
+   "shares": 25,
+   "maker": 13675000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.547",
+   "shares": 100,
+   "maker": 54700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.554",
+   "shares": 5,
+   "maker": 2770000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.554",
+   "shares": 6,
+   "maker": 3324000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.554",
+   "shares": 7,
+   "maker": 3878000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.554",
+   "shares": 10,
+   "maker": 5540000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.554",
+   "shares": 13,
+   "maker": 7202000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.554",
+   "shares": 25,
+   "maker": 13850000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.554",
+   "shares": 100,
+   "maker": 55400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.561",
+   "shares": 5,
+   "maker": 2805000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.561",
+   "shares": 6,
+   "maker": 3366000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.561",
+   "shares": 7,
+   "maker": 3927000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.561",
+   "shares": 10,
+   "maker": 5610000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.561",
+   "shares": 13,
+   "maker": 7293000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.561",
+   "shares": 25,
+   "maker": 14025000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.561",
+   "shares": 100,
+   "maker": 56100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.568",
+   "shares": 5,
+   "maker": 2840000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.568",
+   "shares": 6,
+   "maker": 3408000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.568",
+   "shares": 7,
+   "maker": 3976000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.568",
+   "shares": 10,
+   "maker": 5680000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.568",
+   "shares": 13,
+   "maker": 7384000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.568",
+   "shares": 25,
+   "maker": 14200000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.568",
+   "shares": 100,
+   "maker": 56800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.575",
+   "shares": 5,
+   "maker": 2875000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.575",
+   "shares": 6,
+   "maker": 3450000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.575",
+   "shares": 7,
+   "maker": 4025000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.575",
+   "shares": 10,
+   "maker": 5750000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.575",
+   "shares": 13,
+   "maker": 7475000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.575",
+   "shares": 25,
+   "maker": 14375000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.575",
+   "shares": 100,
+   "maker": 57500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.582",
+   "shares": 5,
+   "maker": 2910000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.582",
+   "shares": 6,
+   "maker": 3492000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.582",
+   "shares": 7,
+   "maker": 4074000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.582",
+   "shares": 10,
+   "maker": 5820000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.582",
+   "shares": 13,
+   "maker": 7566000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.582",
+   "shares": 25,
+   "maker": 14550000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.582",
+   "shares": 100,
+   "maker": 58200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.589",
+   "shares": 5,
+   "maker": 2945000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.589",
+   "shares": 6,
+   "maker": 3534000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.589",
+   "shares": 7,
+   "maker": 4123000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.589",
+   "shares": 10,
+   "maker": 5890000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.589",
+   "shares": 13,
+   "maker": 7657000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.589",
+   "shares": 25,
+   "maker": 14725000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.589",
+   "shares": 100,
+   "maker": 58900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.596",
+   "shares": 5,
+   "maker": 2980000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.596",
+   "shares": 6,
+   "maker": 3576000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.596",
+   "shares": 7,
+   "maker": 4172000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.596",
+   "shares": 10,
+   "maker": 5960000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.596",
+   "shares": 13,
+   "maker": 7748000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.596",
+   "shares": 25,
+   "maker": 14900000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.596",
+   "shares": 100,
+   "maker": 59600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.603",
+   "shares": 5,
+   "maker": 3015000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.603",
+   "shares": 6,
+   "maker": 3618000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.603",
+   "shares": 7,
+   "maker": 4221000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.603",
+   "shares": 10,
+   "maker": 6030000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.603",
+   "shares": 13,
+   "maker": 7839000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.603",
+   "shares": 25,
+   "maker": 15075000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.603",
+   "shares": 100,
+   "maker": 60300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.610",
+   "shares": 5,
+   "maker": 3050000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.610",
+   "shares": 6,
+   "maker": 3660000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.610",
+   "shares": 7,
+   "maker": 4270000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.610",
+   "shares": 10,
+   "maker": 6100000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.610",
+   "shares": 13,
+   "maker": 7930000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.610",
+   "shares": 25,
+   "maker": 15250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.610",
+   "shares": 100,
+   "maker": 61000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.617",
+   "shares": 5,
+   "maker": 3085000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.617",
+   "shares": 6,
+   "maker": 3702000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.617",
+   "shares": 7,
+   "maker": 4319000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.617",
+   "shares": 10,
+   "maker": 6170000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.617",
+   "shares": 13,
+   "maker": 8021000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.617",
+   "shares": 25,
+   "maker": 15425000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.617",
+   "shares": 100,
+   "maker": 61700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.624",
+   "shares": 5,
+   "maker": 3120000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.624",
+   "shares": 6,
+   "maker": 3744000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.624",
+   "shares": 7,
+   "maker": 4368000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.624",
+   "shares": 10,
+   "maker": 6240000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.624",
+   "shares": 13,
+   "maker": 8112000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.624",
+   "shares": 25,
+   "maker": 15600000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.624",
+   "shares": 100,
+   "maker": 62400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.631",
+   "shares": 5,
+   "maker": 3155000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.631",
+   "shares": 6,
+   "maker": 3786000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.631",
+   "shares": 7,
+   "maker": 4417000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.631",
+   "shares": 10,
+   "maker": 6310000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.631",
+   "shares": 13,
+   "maker": 8203000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.631",
+   "shares": 25,
+   "maker": 15775000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.631",
+   "shares": 100,
+   "maker": 63100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.638",
+   "shares": 5,
+   "maker": 3190000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.638",
+   "shares": 6,
+   "maker": 3828000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.638",
+   "shares": 7,
+   "maker": 4466000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.638",
+   "shares": 10,
+   "maker": 6380000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.638",
+   "shares": 13,
+   "maker": 8294000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.638",
+   "shares": 25,
+   "maker": 15950000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.638",
+   "shares": 100,
+   "maker": 63800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.645",
+   "shares": 5,
+   "maker": 3225000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.645",
+   "shares": 6,
+   "maker": 3870000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.645",
+   "shares": 7,
+   "maker": 4515000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.645",
+   "shares": 10,
+   "maker": 6450000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.645",
+   "shares": 13,
+   "maker": 8385000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.645",
+   "shares": 25,
+   "maker": 16125000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.645",
+   "shares": 100,
+   "maker": 64500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.652",
+   "shares": 5,
+   "maker": 3260000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.652",
+   "shares": 6,
+   "maker": 3912000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.652",
+   "shares": 7,
+   "maker": 4564000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.652",
+   "shares": 10,
+   "maker": 6520000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.652",
+   "shares": 13,
+   "maker": 8476000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.652",
+   "shares": 25,
+   "maker": 16300000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.652",
+   "shares": 100,
+   "maker": 65200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.659",
+   "shares": 5,
+   "maker": 3295000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.659",
+   "shares": 6,
+   "maker": 3954000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.659",
+   "shares": 7,
+   "maker": 4613000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.659",
+   "shares": 10,
+   "maker": 6590000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.659",
+   "shares": 13,
+   "maker": 8567000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.659",
+   "shares": 25,
+   "maker": 16475000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.659",
+   "shares": 100,
+   "maker": 65900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.666",
+   "shares": 5,
+   "maker": 3330000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.666",
+   "shares": 6,
+   "maker": 3996000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.666",
+   "shares": 7,
+   "maker": 4662000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.666",
+   "shares": 10,
+   "maker": 6660000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.666",
+   "shares": 13,
+   "maker": 8658000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.666",
+   "shares": 25,
+   "maker": 16650000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.666",
+   "shares": 100,
+   "maker": 66600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.673",
+   "shares": 5,
+   "maker": 3365000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.673",
+   "shares": 6,
+   "maker": 4038000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.673",
+   "shares": 7,
+   "maker": 4711000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.673",
+   "shares": 10,
+   "maker": 6730000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.673",
+   "shares": 13,
+   "maker": 8749000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.673",
+   "shares": 25,
+   "maker": 16825000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.673",
+   "shares": 100,
+   "maker": 67300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.680",
+   "shares": 5,
+   "maker": 3400000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.680",
+   "shares": 6,
+   "maker": 4080000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.680",
+   "shares": 7,
+   "maker": 4760000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.680",
+   "shares": 10,
+   "maker": 6800000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.680",
+   "shares": 13,
+   "maker": 8840000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.680",
+   "shares": 25,
+   "maker": 17000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.680",
+   "shares": 100,
+   "maker": 68000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.687",
+   "shares": 5,
+   "maker": 3435000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.687",
+   "shares": 6,
+   "maker": 4122000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.687",
+   "shares": 7,
+   "maker": 4809000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.687",
+   "shares": 10,
+   "maker": 6870000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.687",
+   "shares": 13,
+   "maker": 8931000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.687",
+   "shares": 25,
+   "maker": 17175000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.687",
+   "shares": 100,
+   "maker": 68700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.694",
+   "shares": 5,
+   "maker": 3470000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.694",
+   "shares": 6,
+   "maker": 4164000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.694",
+   "shares": 7,
+   "maker": 4858000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.694",
+   "shares": 10,
+   "maker": 6940000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.694",
+   "shares": 13,
+   "maker": 9022000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.694",
+   "shares": 25,
+   "maker": 17350000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.694",
+   "shares": 100,
+   "maker": 69400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.701",
+   "shares": 5,
+   "maker": 3505000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.701",
+   "shares": 6,
+   "maker": 4206000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.701",
+   "shares": 7,
+   "maker": 4907000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.701",
+   "shares": 10,
+   "maker": 7010000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.701",
+   "shares": 13,
+   "maker": 9113000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.701",
+   "shares": 25,
+   "maker": 17525000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.701",
+   "shares": 100,
+   "maker": 70100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.708",
+   "shares": 5,
+   "maker": 3540000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.708",
+   "shares": 6,
+   "maker": 4248000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.708",
+   "shares": 7,
+   "maker": 4956000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.708",
+   "shares": 10,
+   "maker": 7080000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.708",
+   "shares": 13,
+   "maker": 9204000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.708",
+   "shares": 25,
+   "maker": 17700000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.708",
+   "shares": 100,
+   "maker": 70800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.715",
+   "shares": 5,
+   "maker": 3575000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.715",
+   "shares": 6,
+   "maker": 4290000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.715",
+   "shares": 7,
+   "maker": 5005000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.715",
+   "shares": 10,
+   "maker": 7150000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.715",
+   "shares": 13,
+   "maker": 9295000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.715",
+   "shares": 25,
+   "maker": 17875000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.715",
+   "shares": 100,
+   "maker": 71500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.722",
+   "shares": 5,
+   "maker": 3610000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.722",
+   "shares": 6,
+   "maker": 4332000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.722",
+   "shares": 7,
+   "maker": 5054000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.722",
+   "shares": 10,
+   "maker": 7220000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.722",
+   "shares": 13,
+   "maker": 9386000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.722",
+   "shares": 25,
+   "maker": 18050000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.722",
+   "shares": 100,
+   "maker": 72200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.729",
+   "shares": 5,
+   "maker": 3645000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.729",
+   "shares": 6,
+   "maker": 4374000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.729",
+   "shares": 7,
+   "maker": 5103000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.729",
+   "shares": 10,
+   "maker": 7290000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.729",
+   "shares": 13,
+   "maker": 9477000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.729",
+   "shares": 25,
+   "maker": 18225000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.729",
+   "shares": 100,
+   "maker": 72900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.736",
+   "shares": 5,
+   "maker": 3680000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.736",
+   "shares": 6,
+   "maker": 4416000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.736",
+   "shares": 7,
+   "maker": 5152000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.736",
+   "shares": 10,
+   "maker": 7360000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.736",
+   "shares": 13,
+   "maker": 9568000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.736",
+   "shares": 25,
+   "maker": 18400000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.736",
+   "shares": 100,
+   "maker": 73600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.743",
+   "shares": 5,
+   "maker": 3715000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.743",
+   "shares": 6,
+   "maker": 4458000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.743",
+   "shares": 7,
+   "maker": 5201000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.743",
+   "shares": 10,
+   "maker": 7430000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.743",
+   "shares": 13,
+   "maker": 9659000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.743",
+   "shares": 25,
+   "maker": 18575000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.743",
+   "shares": 100,
+   "maker": 74300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.750",
+   "shares": 5,
+   "maker": 3750000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.750",
+   "shares": 6,
+   "maker": 4500000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.750",
+   "shares": 7,
+   "maker": 5250000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.750",
+   "shares": 10,
+   "maker": 7500000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.750",
+   "shares": 13,
+   "maker": 9750000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.750",
+   "shares": 25,
+   "maker": 18750000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.750",
+   "shares": 100,
+   "maker": 75000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.757",
+   "shares": 5,
+   "maker": 3785000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.757",
+   "shares": 6,
+   "maker": 4542000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.757",
+   "shares": 7,
+   "maker": 5299000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.757",
+   "shares": 10,
+   "maker": 7570000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.757",
+   "shares": 13,
+   "maker": 9841000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.757",
+   "shares": 25,
+   "maker": 18925000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.757",
+   "shares": 100,
+   "maker": 75700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.764",
+   "shares": 5,
+   "maker": 3820000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.764",
+   "shares": 6,
+   "maker": 4584000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.764",
+   "shares": 7,
+   "maker": 5348000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.764",
+   "shares": 10,
+   "maker": 7640000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.764",
+   "shares": 13,
+   "maker": 9932000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.764",
+   "shares": 25,
+   "maker": 19100000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.764",
+   "shares": 100,
+   "maker": 76400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.771",
+   "shares": 5,
+   "maker": 3855000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.771",
+   "shares": 6,
+   "maker": 4626000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.771",
+   "shares": 7,
+   "maker": 5397000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.771",
+   "shares": 10,
+   "maker": 7710000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.771",
+   "shares": 13,
+   "maker": 10023000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.771",
+   "shares": 25,
+   "maker": 19275000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.771",
+   "shares": 100,
+   "maker": 77100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.778",
+   "shares": 5,
+   "maker": 3890000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.778",
+   "shares": 6,
+   "maker": 4668000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.778",
+   "shares": 7,
+   "maker": 5446000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.778",
+   "shares": 10,
+   "maker": 7780000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.778",
+   "shares": 13,
+   "maker": 10114000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.778",
+   "shares": 25,
+   "maker": 19450000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.778",
+   "shares": 100,
+   "maker": 77800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.785",
+   "shares": 5,
+   "maker": 3925000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.785",
+   "shares": 6,
+   "maker": 4710000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.785",
+   "shares": 7,
+   "maker": 5495000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.785",
+   "shares": 10,
+   "maker": 7850000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.785",
+   "shares": 13,
+   "maker": 10205000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.785",
+   "shares": 25,
+   "maker": 19625000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.785",
+   "shares": 100,
+   "maker": 78500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.792",
+   "shares": 5,
+   "maker": 3960000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.792",
+   "shares": 6,
+   "maker": 4752000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.792",
+   "shares": 7,
+   "maker": 5544000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.792",
+   "shares": 10,
+   "maker": 7920000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.792",
+   "shares": 13,
+   "maker": 10296000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.792",
+   "shares": 25,
+   "maker": 19800000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.792",
+   "shares": 100,
+   "maker": 79200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.799",
+   "shares": 5,
+   "maker": 3995000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.799",
+   "shares": 6,
+   "maker": 4794000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.799",
+   "shares": 7,
+   "maker": 5593000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.799",
+   "shares": 10,
+   "maker": 7990000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.799",
+   "shares": 13,
+   "maker": 10387000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.799",
+   "shares": 25,
+   "maker": 19975000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.799",
+   "shares": 100,
+   "maker": 79900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.806",
+   "shares": 5,
+   "maker": 4030000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.806",
+   "shares": 6,
+   "maker": 4836000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.806",
+   "shares": 7,
+   "maker": 5642000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.806",
+   "shares": 10,
+   "maker": 8060000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.806",
+   "shares": 13,
+   "maker": 10478000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.806",
+   "shares": 25,
+   "maker": 20150000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.806",
+   "shares": 100,
+   "maker": 80600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.813",
+   "shares": 5,
+   "maker": 4065000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.813",
+   "shares": 6,
+   "maker": 4878000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.813",
+   "shares": 7,
+   "maker": 5691000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.813",
+   "shares": 10,
+   "maker": 8130000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.813",
+   "shares": 13,
+   "maker": 10569000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.813",
+   "shares": 25,
+   "maker": 20325000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.813",
+   "shares": 100,
+   "maker": 81300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.820",
+   "shares": 5,
+   "maker": 4100000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.820",
+   "shares": 6,
+   "maker": 4920000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.820",
+   "shares": 7,
+   "maker": 5740000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.820",
+   "shares": 10,
+   "maker": 8200000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.820",
+   "shares": 13,
+   "maker": 10660000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.820",
+   "shares": 25,
+   "maker": 20500000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.820",
+   "shares": 100,
+   "maker": 82000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.827",
+   "shares": 5,
+   "maker": 4135000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.827",
+   "shares": 6,
+   "maker": 4962000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.827",
+   "shares": 7,
+   "maker": 5789000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.827",
+   "shares": 10,
+   "maker": 8270000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.827",
+   "shares": 13,
+   "maker": 10751000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.827",
+   "shares": 25,
+   "maker": 20675000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.827",
+   "shares": 100,
+   "maker": 82700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.834",
+   "shares": 5,
+   "maker": 4170000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.834",
+   "shares": 6,
+   "maker": 5004000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.834",
+   "shares": 7,
+   "maker": 5838000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.834",
+   "shares": 10,
+   "maker": 8340000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.834",
+   "shares": 13,
+   "maker": 10842000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.834",
+   "shares": 25,
+   "maker": 20850000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.834",
+   "shares": 100,
+   "maker": 83400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.841",
+   "shares": 5,
+   "maker": 4205000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.841",
+   "shares": 6,
+   "maker": 5046000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.841",
+   "shares": 7,
+   "maker": 5887000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.841",
+   "shares": 10,
+   "maker": 8410000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.841",
+   "shares": 13,
+   "maker": 10933000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.841",
+   "shares": 25,
+   "maker": 21025000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.841",
+   "shares": 100,
+   "maker": 84100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.848",
+   "shares": 5,
+   "maker": 4240000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.848",
+   "shares": 6,
+   "maker": 5088000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.848",
+   "shares": 7,
+   "maker": 5936000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.848",
+   "shares": 10,
+   "maker": 8480000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.848",
+   "shares": 13,
+   "maker": 11024000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.848",
+   "shares": 25,
+   "maker": 21200000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.848",
+   "shares": 100,
+   "maker": 84800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.855",
+   "shares": 5,
+   "maker": 4275000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.855",
+   "shares": 6,
+   "maker": 5130000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.855",
+   "shares": 7,
+   "maker": 5985000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.855",
+   "shares": 10,
+   "maker": 8550000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.855",
+   "shares": 13,
+   "maker": 11115000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.855",
+   "shares": 25,
+   "maker": 21375000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.855",
+   "shares": 100,
+   "maker": 85500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.862",
+   "shares": 5,
+   "maker": 4310000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.862",
+   "shares": 6,
+   "maker": 5172000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.862",
+   "shares": 7,
+   "maker": 6034000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.862",
+   "shares": 10,
+   "maker": 8620000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.862",
+   "shares": 13,
+   "maker": 11206000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.862",
+   "shares": 25,
+   "maker": 21550000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.862",
+   "shares": 100,
+   "maker": 86200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.869",
+   "shares": 5,
+   "maker": 4345000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.869",
+   "shares": 6,
+   "maker": 5214000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.869",
+   "shares": 7,
+   "maker": 6083000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.869",
+   "shares": 10,
+   "maker": 8690000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.869",
+   "shares": 13,
+   "maker": 11297000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.869",
+   "shares": 25,
+   "maker": 21725000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.869",
+   "shares": 100,
+   "maker": 86900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.876",
+   "shares": 5,
+   "maker": 4380000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.876",
+   "shares": 6,
+   "maker": 5256000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.876",
+   "shares": 7,
+   "maker": 6132000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.876",
+   "shares": 10,
+   "maker": 8760000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.876",
+   "shares": 13,
+   "maker": 11388000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.876",
+   "shares": 25,
+   "maker": 21900000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.876",
+   "shares": 100,
+   "maker": 87600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.883",
+   "shares": 5,
+   "maker": 4415000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.883",
+   "shares": 6,
+   "maker": 5298000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.883",
+   "shares": 7,
+   "maker": 6181000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.883",
+   "shares": 10,
+   "maker": 8830000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.883",
+   "shares": 13,
+   "maker": 11479000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.883",
+   "shares": 25,
+   "maker": 22075000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.883",
+   "shares": 100,
+   "maker": 88300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.890",
+   "shares": 5,
+   "maker": 4450000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.890",
+   "shares": 6,
+   "maker": 5340000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.890",
+   "shares": 7,
+   "maker": 6230000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.890",
+   "shares": 10,
+   "maker": 8900000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.890",
+   "shares": 13,
+   "maker": 11570000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.890",
+   "shares": 25,
+   "maker": 22250000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.890",
+   "shares": 100,
+   "maker": 89000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.897",
+   "shares": 5,
+   "maker": 4485000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.897",
+   "shares": 6,
+   "maker": 5382000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.897",
+   "shares": 7,
+   "maker": 6279000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.897",
+   "shares": 10,
+   "maker": 8970000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.897",
+   "shares": 13,
+   "maker": 11661000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.897",
+   "shares": 25,
+   "maker": 22425000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.897",
+   "shares": 100,
+   "maker": 89700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.904",
+   "shares": 5,
+   "maker": 4520000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.904",
+   "shares": 6,
+   "maker": 5424000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.904",
+   "shares": 7,
+   "maker": 6328000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.904",
+   "shares": 10,
+   "maker": 9040000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.904",
+   "shares": 13,
+   "maker": 11752000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.904",
+   "shares": 25,
+   "maker": 22600000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.904",
+   "shares": 100,
+   "maker": 90400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.911",
+   "shares": 5,
+   "maker": 4555000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.911",
+   "shares": 6,
+   "maker": 5466000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.911",
+   "shares": 7,
+   "maker": 6377000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.911",
+   "shares": 10,
+   "maker": 9110000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.911",
+   "shares": 13,
+   "maker": 11843000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.911",
+   "shares": 25,
+   "maker": 22775000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.911",
+   "shares": 100,
+   "maker": 91100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.918",
+   "shares": 5,
+   "maker": 4590000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.918",
+   "shares": 6,
+   "maker": 5508000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.918",
+   "shares": 7,
+   "maker": 6426000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.918",
+   "shares": 10,
+   "maker": 9180000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.918",
+   "shares": 13,
+   "maker": 11934000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.918",
+   "shares": 25,
+   "maker": 22950000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.918",
+   "shares": 100,
+   "maker": 91800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.925",
+   "shares": 5,
+   "maker": 4625000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.925",
+   "shares": 6,
+   "maker": 5550000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.925",
+   "shares": 7,
+   "maker": 6475000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.925",
+   "shares": 10,
+   "maker": 9250000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.925",
+   "shares": 13,
+   "maker": 12025000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.925",
+   "shares": 25,
+   "maker": 23125000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.925",
+   "shares": 100,
+   "maker": 92500000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.932",
+   "shares": 5,
+   "maker": 4660000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.932",
+   "shares": 6,
+   "maker": 5592000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.932",
+   "shares": 7,
+   "maker": 6524000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.932",
+   "shares": 10,
+   "maker": 9320000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.932",
+   "shares": 13,
+   "maker": 12116000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.932",
+   "shares": 25,
+   "maker": 23300000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.932",
+   "shares": 100,
+   "maker": 93200000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.939",
+   "shares": 5,
+   "maker": 4695000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.939",
+   "shares": 6,
+   "maker": 5634000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.939",
+   "shares": 7,
+   "maker": 6573000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.939",
+   "shares": 10,
+   "maker": 9390000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.939",
+   "shares": 13,
+   "maker": 12207000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.939",
+   "shares": 25,
+   "maker": 23475000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.939",
+   "shares": 100,
+   "maker": 93900000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.946",
+   "shares": 5,
+   "maker": 4730000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.946",
+   "shares": 6,
+   "maker": 5676000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.946",
+   "shares": 7,
+   "maker": 6622000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.946",
+   "shares": 10,
+   "maker": 9460000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.946",
+   "shares": 13,
+   "maker": 12298000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.946",
+   "shares": 25,
+   "maker": 23650000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.946",
+   "shares": 100,
+   "maker": 94600000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.953",
+   "shares": 5,
+   "maker": 4765000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.953",
+   "shares": 6,
+   "maker": 5718000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.953",
+   "shares": 7,
+   "maker": 6671000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.953",
+   "shares": 10,
+   "maker": 9530000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.953",
+   "shares": 13,
+   "maker": 12389000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.953",
+   "shares": 25,
+   "maker": 23825000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.953",
+   "shares": 100,
+   "maker": 95300000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.960",
+   "shares": 5,
+   "maker": 4800000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.960",
+   "shares": 6,
+   "maker": 5760000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.960",
+   "shares": 7,
+   "maker": 6720000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.960",
+   "shares": 10,
+   "maker": 9600000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.960",
+   "shares": 13,
+   "maker": 12480000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.960",
+   "shares": 25,
+   "maker": 24000000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.960",
+   "shares": 100,
+   "maker": 96000000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.967",
+   "shares": 5,
+   "maker": 4835000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.967",
+   "shares": 6,
+   "maker": 5802000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.967",
+   "shares": 7,
+   "maker": 6769000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.967",
+   "shares": 10,
+   "maker": 9670000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.967",
+   "shares": 13,
+   "maker": 12571000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.967",
+   "shares": 25,
+   "maker": 24175000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.967",
+   "shares": 100,
+   "maker": 96700000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.974",
+   "shares": 5,
+   "maker": 4870000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.974",
+   "shares": 6,
+   "maker": 5844000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.974",
+   "shares": 7,
+   "maker": 6818000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.974",
+   "shares": 10,
+   "maker": 9740000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.974",
+   "shares": 13,
+   "maker": 12662000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.974",
+   "shares": 25,
+   "maker": 24350000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.974",
+   "shares": 100,
+   "maker": 97400000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.981",
+   "shares": 5,
+   "maker": 4905000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.981",
+   "shares": 6,
+   "maker": 5886000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.981",
+   "shares": 7,
+   "maker": 6867000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.981",
+   "shares": 10,
+   "maker": 9810000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.981",
+   "shares": 13,
+   "maker": 12753000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.981",
+   "shares": 25,
+   "maker": 24525000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.981",
+   "shares": 100,
+   "maker": 98100000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.988",
+   "shares": 5,
+   "maker": 4940000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.988",
+   "shares": 6,
+   "maker": 5928000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.988",
+   "shares": 7,
+   "maker": 6916000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.988",
+   "shares": 10,
+   "maker": 9880000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.988",
+   "shares": 13,
+   "maker": 12844000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.988",
+   "shares": 25,
+   "maker": 24700000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.988",
+   "shares": 100,
+   "maker": 98800000,
+   "taker": 100000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.995",
+   "shares": 5,
+   "maker": 4975000,
+   "taker": 5000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.995",
+   "shares": 6,
+   "maker": 5970000,
+   "taker": 6000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.995",
+   "shares": 7,
+   "maker": 6965000,
+   "taker": 7000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.995",
+   "shares": 10,
+   "maker": 9950000,
+   "taker": 10000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.995",
+   "shares": 13,
+   "maker": 12935000,
+   "taker": 13000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.995",
+   "shares": 25,
+   "maker": 24875000,
+   "taker": 25000000
+  },
+  {
+   "tick": "0.001",
+   "price": "0.995",
+   "shares": 100,
+   "maker": 99500000,
+   "taker": 100000000
+  }
+ ]
+}

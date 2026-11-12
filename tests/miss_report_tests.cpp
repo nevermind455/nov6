@@ -216,6 +216,42 @@ TEST(MissReport, DisruptionsBeforeAMissAreSuspectedNotConfirmed) {
   EXPECT_EQ(out["suspected_causes"]["missed_without_disruption"], 1);
 }
 
+// Every venue or trigger socket that comes up or goes down is journalled. A
+// live socket going down is a disruption; a standby going is not, because
+// the feed never stopped.
+TEST(MissReport, SocketDropsAreCountedAndOnlyALostFeedIsADisruption) {
+  Report r;
+  r.add(Json{{"result", "ws"}, {"socket", "market"}, {"n", 1}, {"up", true}, {"role", "live"}, {"wall", 50.0}});
+  r.add(Json{{"result", "ws"}, {"socket", "market"}, {"n", 2}, {"up", true}, {"role", "standby"}, {"wall", 50.1}});
+  // the standby drops: no data was lost
+  r.add(Json{{"result", "ws"}, {"socket", "market"}, {"n", 2}, {"up", false}, {"role", "standby"},
+             {"reason", "closed by the venue"}, {"wall", 90.0}});
+  r.add(Json{{"result", "skipped"}, {"reason", "book not live"}, {"wall", 95.0}});
+  // the live one drops and the standby takes over
+  r.add(Json{{"result", "ws"}, {"socket", "market"}, {"n", 1}, {"up", false},
+             {"role", "live: the standby took over"}, {"reason", "silent for 25 s"},
+             {"left_s", 6.8}, {"wall", 300.0}});
+  r.add(Json{{"result", "skipped"}, {"reason", "book not live"}, {"wall", 301.0}});
+  r.add(Json{{"result", "ws"}, {"socket", "user"}, {"n", 1}, {"up", false}, {"role", "private"},
+             {"reason", "read: stream truncated"}, {"wall", 400.0}});
+  auto out = r.json();
+  EXPECT_EQ(out["sockets"]["events"]["market up"], 2);
+  EXPECT_EQ(out["sockets"]["events"]["market standby down"], 1);
+  EXPECT_EQ(out["sockets"]["events"]["market down"], 1);
+  EXPECT_EQ(out["sockets"]["events"]["user down"], 1);
+  EXPECT_EQ(out["sockets"]["down_reasons"]["market: silent for 25 s"], 1);
+  EXPECT_EQ(out["sockets"]["down_reasons"]["user: read: stream truncated"], 1);
+  EXPECT_FALSE(out["sockets"]["down_reasons"].contains("market: closed by the venue"));
+  // the miss after the standby's drop has no disruption near it; the one
+  // after the live socket's drop has
+  EXPECT_EQ(out["suspected_causes"]["missed_with_disruption_within_30s"], 1);
+  EXPECT_EQ(out["suspected_causes"]["missed_without_disruption"], 1);
+  // socket rows are not orders or decisions
+  EXPECT_EQ(out["orders"]["submitted"], 0);
+  // a journal without socket rows has no such section
+  EXPECT_FALSE(run(R"({"result":"start","wall":1})" "\n").contains("sockets"));
+}
+
 TEST(MissReport, MalformedLinesAreCounted) {
   Report r;
   std::istringstream in("{\"result\":\"start\"}\nnot json\n\n[1,2]\n");

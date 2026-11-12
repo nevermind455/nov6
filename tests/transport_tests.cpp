@@ -33,6 +33,7 @@ struct FakeClob {
   std::atomic<bool> fixture_finished{false};
   std::mutex upload_mutex;
   std::condition_variable upload_wake;
+  std::string method, path; // of the last request
   std::string received,
       response =
           R"({"success":true,"makingAmount":"1","takingAmount":"2","orderID":"offline-order"})";
@@ -96,6 +97,19 @@ struct FakeClob {
     if (state->offset == body.size())
       *flags |= NGHTTP2_DATA_FLAG_EOF;
     return n;
+  }
+  static int request_header(nghttp2_session *, const nghttp2_frame *,
+                            const uint8_t *name, size_t namelen,
+                            const uint8_t *value, size_t valuelen, uint8_t,
+                            void *user) {
+    auto *state = static_cast<Session *>(user);
+    std::string_view key(reinterpret_cast<const char *>(name), namelen),
+        text(reinterpret_cast<const char *>(value), valuelen);
+    if (key == ":method")
+      state->server->method = text;
+    else if (key == ":path")
+      state->server->path = text;
+    return 0;
   }
   static int data(nghttp2_session *, uint8_t, int32_t, const uint8_t *bytes,
                   size_t len, void *user) {
@@ -164,6 +178,8 @@ struct FakeClob {
         nghttp2_session_callbacks *callbacks = nullptr;
         nghttp2_session_callbacks_new(&callbacks);
         nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, frame);
+        nghttp2_session_callbacks_set_on_header_callback(callbacks,
+                                                         request_header);
         nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks,
                                                                   data);
         nghttp2_session *session = nullptr;
@@ -298,6 +314,8 @@ void exercise(bool drop, int status, bool goaway = false,
   ASSERT_TRUE(submitted);
   EXPECT_TRUE(written);
   EXPECT_EQ(fake.received, R"({"offline":true})");
+  EXPECT_EQ(fake.method, "POST");
+  EXPECT_EQ(fake.path, "/order");
   EXPECT_EQ(fake.requests, 1);
   EXPECT_EQ(blocked, 0);
   if (drop || goaway) {
@@ -386,6 +404,72 @@ void exercise_flow_control(bool early_response) {
   EXPECT_EQ(blocked, 0);
 }
 } // namespace
+// SNIPER_REST_LIVE: a cancel is a DELETE of the order path on the same warm
+// connection, answered under its own id.
+TEST(NativeHttp2, CancelIsADeleteOfTheOrderPath) {
+  net::io_context io;
+  net::ssl::context tls(net::ssl::context::tls_client);
+  FakeClob fake(tls, false, 200);
+  fake.response = R"({"canceled":["0xabc"],"not_canceled":{}})";
+  auto port = std::to_string(fake.acceptor.local_endpoint().port());
+  fake.start();
+  std::atomic<std::uint64_t> blocked{0};
+  bool submitted = false, replied = false, unknown = false;
+  HttpResult response;
+  H2Callbacks callbacks;
+  callbacks.reply = [&](auto id, const HttpResult &result) {
+    EXPECT_EQ(id, "cancel:0xabc");
+    response = result;
+    replied = true;
+    io.stop();
+  };
+  callbacks.unknown = [&](auto, auto) {
+    unknown = true;
+    io.stop();
+  };
+  H2Client client(io, tls, true, blocked, std::move(callbacks), 2, "127.0.0.1",
+                  port);
+  net::steady_timer poll(io);
+  std::function<void()> ready = [&] {
+    poll.expires_after(std::chrono::milliseconds(10));
+    poll.async_wait([&](auto ec) {
+      if (ec)
+        return;
+      if (client.ready())
+        submitted = client.cancel("cancel:0xabc", R"({"orderID":"0xabc"})",
+                                  {{"POLY_TIMESTAMP", "1900000000"}});
+      else
+        ready();
+    });
+  };
+  client.start();
+  ready();
+  io.run_for(std::chrono::seconds(5));
+  client.stop();
+  io.restart();
+  io.poll();
+  fake.join();
+  ASSERT_TRUE(submitted);
+  EXPECT_TRUE(replied);
+  EXPECT_FALSE(unknown);
+  EXPECT_EQ(fake.method, "DELETE");
+  EXPECT_EQ(fake.path, "/order");
+  EXPECT_EQ(fake.received, R"({"orderID":"0xabc"})");
+  EXPECT_EQ(fake.requests, 1);
+  EXPECT_EQ(response.status, 200);
+  EXPECT_EQ(response.body, fake.response);
+  EXPECT_EQ(blocked, 0);
+}
+TEST(NativeHttp2, PaperCanNeitherPlaceNorCancel) {
+  net::io_context io;
+  net::ssl::context tls(net::ssl::context::tls_client);
+  std::atomic<std::uint64_t> blocked{0};
+  H2Client client(io, tls, false, blocked, {}, 2, "127.0.0.1", "1");
+  EXPECT_THROW(client.cancel("cancel:0xabc", R"({"orderID":"0xabc"})", {}),
+               std::runtime_error);
+  EXPECT_THROW(client.post("0xabc", "{}", {}), std::runtime_error);
+  EXPECT_EQ(blocked, 2u);
+}
 TEST(NativeHttp2, LocalTlsMatchedReply) { exercise(false, 200); }
 TEST(NativeHttp2, LocalTlsHttp400Reply) { exercise(false, 400); }
 TEST(NativeHttp2, UncertainWriteIsNeverRetried) { exercise(true, 200); }

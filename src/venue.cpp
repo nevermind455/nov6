@@ -234,6 +234,71 @@ bool is_foreign_trade(const Json &j, const std::map<std::string, Intent> &intent
   auto it = j.find("taker_order_id");
   return it != j.end() && it->is_string() && !intents.count(it->get<std::string>());
 }
+std::vector<ParsedTrade>
+parse_maker_fills(const Json &j, const std::map<std::string, Intent> &intents) {
+  std::vector<ParsedTrade> out;
+  auto legs = j.find("maker_orders");
+  if (legs == j.end() || !legs->is_array())
+    return out;
+  for (auto &leg : *legs) {
+    // Only a leg that names one of our orders is ours to judge; anything
+    // else is left to the handling of a stranger's trade.
+    if (!leg.is_object())
+      continue;
+    auto oid = leg.find("order_id");
+    if (oid == leg.end() || !oid->is_string())
+      continue;
+    auto it = intents.find(oid->get<std::string>());
+    if (it == intents.end())
+      continue;
+    const Intent &i = it->second;
+    if (!i.rest)
+      throw std::runtime_error(
+          "maker fill on an order that was not placed to rest");
+    const std::string trade = j.at("id");
+    if (trade.empty())
+      throw std::runtime_error("private fill omitted its trade id");
+    if (leg.at("asset_id") != i.token || j.at("market") != i.condition ||
+        (leg.contains("side") && leg.at("side").is_string() &&
+         leg.at("side") != "BUY"))
+      throw std::runtime_error("fill identity disagrees with authorized order");
+    auto price = venue_units(leg.at("price")),
+         shares = venue_units(leg.at("matched_amount"));
+    if (shares <= 0 || price <= 0 || price >= U)
+      throw std::runtime_error("invalid maker leg");
+    if (price > i.limit)
+      throw std::runtime_error("maker fill above the resting order's price");
+    auto cost = multiply(shares, price);
+    auto same = std::find_if(out.begin(), out.end(), [&](const ParsedTrade &t) {
+      return t.order == i.id;
+    });
+    if (same == out.end()) {
+      ParsedTrade t;
+      t.id = trade + ":" + i.id;
+      t.order = i.id;
+      t.token = i.token;
+      t.condition = i.condition;
+      t.status = j.at("status");
+      out.push_back(std::move(t));
+      same = std::prev(out.end());
+    }
+    if (same->shares > std::numeric_limits<Units>::max() - shares ||
+        same->cost > std::numeric_limits<Units>::max() - cost)
+      throw std::runtime_error("private maker-leg total overflow");
+    same->shares += shares;
+    same->cost += cost;
+  }
+  // The same rounding allowance as a taker fill: at most a micro-unit a leg.
+  for (auto &t : out) {
+    const Intent &i = intents.at(t.order);
+    const auto room = static_cast<__int128>(i.stake) - i.booked_cost;
+    const Units allowed = static_cast<Units>(legs->size()) + t.shares / U + 1;
+    if (i.stake > 0 && room >= 0 && t.cost > room &&
+        static_cast<__int128>(t.cost) - room <= allowed)
+      t.cost = static_cast<Units>(room);
+  }
+  return out;
+}
 ParsedTrade parse_trade(const Json &j,
                         const std::map<std::string, Intent> &intents) {
   ParsedTrade t;

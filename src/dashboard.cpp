@@ -312,8 +312,10 @@ Style result_style(const std::string &r) {
     return GREEN_B;
   if (r == "missed" || r == "refused")
     return AMBER;
-  if (r == "pending")
+  if (r == "pending" || r == "resting")
     return BLUE_B;
+  if (r == "no fill")
+    return DIM;
   if (r == "error" || r == "rejected")
     return RED_B;
   if (r == "unknown")
@@ -525,6 +527,47 @@ std::vector<Row> trigger_body(const Json &t, int w) {
   return rows;
 }
 
+// SNIPER_REST_LIVE: our own order on this market's book and the time it has
+// left there, redrawn with every frame.
+Row resting_row(const Json &r, int w) {
+  std::vector<Run> parts{{fit("resting", 9), DIM}, {" ", PAPER}};
+  const Json &o = get(r, "order");
+  if (!o.is_object()) {
+    bool on = truthy(get(r, "on"));
+    parts.push_back({on ? "no order on the book" : text(get(r, "off"), "off"),
+                     on ? FAINT : AMBER});
+    return runs(std::move(parts), w);
+  }
+  auto side = upper(text(get(o, "side")));
+  auto sh = num(get(o, "shares")), matched = num(get(o, "matched")),
+       left = num(get(o, "left_s")), life = num(get(o, "life_s"));
+  auto state = lower(text(get(o, "state"), ""));
+  parts.push_back({side, side == "UP" ? GREEN_B : RED_B});
+  std::string size = !sh                         ? " " + MISSING
+                     : matched && *matched > 0   ? sf(" %g/%g", *matched, *sh)
+                                                 : sf(" %g", *sh);
+  parts.push_back({size + "@" + price(get(o, "price")), INK_B});
+  if (state == "resting") {
+    double t = left ? std::max(0.0, *left) : 0.0;
+    bool soon = left && t < 2.0;
+    parts.push_back({left ? sf(" %4.1fs ", t) : " " + MISSING + " ", soon ? AMBER_B : INK_B});
+    int used = 0;
+    for (auto &run : parts)
+      used += static_cast<int>(cells(run.text));
+    int bar_w = w - used;
+    if (bar_w >= 3 && left && life && *life > 0)
+      for (auto &b : bar(t / *life, bar_w, soon ? AMBER : S(Color::blue)))
+        parts.push_back(b);
+  } else {
+    std::string label = state == "placing"      ? "placing"
+                        : state == "cancelling" ? "cancelling"
+                        : state == "cancelled"  ? "off the book"
+                                                : take(state, 16);
+    parts.push_back({" " + label, state == "cancelling" ? AMBER_B : DIM});
+  }
+  return runs(std::move(parts), w);
+}
+
 std::vector<Row> market_body(const Json &m, int w) {
   auto left = num(get(m, "seconds_left")), until = num(get(m, "trade_until_s"));
   int bar_w = std::max(3, w - 18);
@@ -548,16 +591,21 @@ std::vector<Row> market_body(const Json &m, int w) {
   };
   auto up_sh = num(get(m, "round_up_sh")), dn_sh = num(get(m, "round_down_sh"));
   auto max_sh = num(get(m, "max_side_shares"));
-  return {line("round", text(get(m, "slug"), "waiting for discovery"), w, INK_B),
-          runs(std::move(left_parts), w),
-          runs({{std::string(10, ' '), PAPER},
-                {fit("UP", cw), GREEN_B},
-                {fit("DOWN", cw), RED_B}},
-               w),
-          pair("best bid", up[0], dn[0]),
-          pair("best ask", up[1], dn[1], INK_B, INK_B),
-          pair("book", up[2] + " " + up[3], dn[2] + " " + dn[3], state_fg(up[2]),
-               state_fg(dn[2])),
+  std::vector<Row> rows{
+      line("round", text(get(m, "slug"), "waiting for discovery"), w, INK_B),
+      runs(std::move(left_parts), w),
+      runs({{std::string(10, ' '), PAPER},
+            {fit("UP", cw), GREEN_B},
+            {fit("DOWN", cw), RED_B}},
+           w),
+      pair("best bid", up[0], dn[0]),
+      pair("best ask", up[1], dn[1], INK_B, INK_B),
+      pair("book", up[2] + " " + up[3], dn[2] + " " + dn[3], state_fg(up[2]),
+           state_fg(dn[2]))};
+  // our own resting order sits between the book and the round's totals
+  if (get(m, "resting").is_object())
+    rows.push_back(resting_row(get(m, "resting"), w));
+  rows.push_back(
           runs({{fit("this rnd", 9), DIM},
                 {" ", PAPER},
                 {"fills ", DIM},
@@ -567,7 +615,8 @@ std::vector<Row> market_body(const Json &m, int w) {
                 {"  DN ", DIM},
                 {dn_sh ? sf("%.0f", *dn_sh) : MISSING, INK},
                 {max_sh ? sf(" /%.0fsh", *max_sh) : "", FAINT}},
-               w)};
+               w));
+  return rows;
 }
 
 std::vector<Row> account_body(const Json &a, int w) {

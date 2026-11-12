@@ -78,6 +78,10 @@ struct Intent {
   int fee_exponent = 1;
   std::vector<std::string> trades;
   bool fill_slot = false, min_entry = false;
+  // SNIPER_REST_LIVE: a post-only order resting on the book (a maker: no fee),
+  // placed after a FAK that matched nothing. It stays "pending" until the
+  // venue's record of it, or its cancellation, gives its final size.
+  bool rest = false;
   bool canary_slot_owned = false;
   bool canary_spend_released = false;
   double canary_session = 0;
@@ -113,6 +117,9 @@ public:
   std::map<std::string, Intent> orders;
   std::set<std::string> trade_ids, settled_conditions, minimum_attempts;
   Units cash = 0, realized = 0, fees = 0, reference_cash = 0, high_water = 0;
+  // Settled profit and loss of the resting orders' own fills, all time; the
+  // SNIPER_REST_LIVE loss stop reads its change since the test began.
+  Units rest_realized = 0;
   double risk_epoch = 0, dd_pause_until = 0;
   CanaryState canary;
   std::uint64_t entries = 0;

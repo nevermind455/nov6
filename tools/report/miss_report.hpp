@@ -106,6 +106,7 @@ inline const std::vector<Rule> &rules() {
       {"hybrid drawdown stop", "RISK_DRAWDOWN_STOP", Kind::RiskControl, "drawdown stop reached; review P&L before resuming"},
       {"previous order in flight", "RISK_ORDER_IN_FLIGHT", Kind::RiskControl, "one order per side at a time; no action"},
       {"awaiting FAK fill size", "RISK_AWAITING_FILL", Kind::RiskControl, "previous FAK result not known yet; no action"},
+      {"our resting order is in this market", "RISK_RESTING_ORDER", Kind::RiskControl, "SNIPER_REST_LIVE: a missed order rests in this market for a few seconds; no action"},
       {"live halted", "RISK_LIVE_HALTED", Kind::RiskControl, "a pause, budget or stop file held new orders; see detail"},
       {"STOP_LIVE present", "RISK_STOP_FILE", Kind::RiskControl, "stop file present; delete it to allow new orders"},
       {"kill switch stopped", "RISK_KILL_SWITCH", Kind::RiskControl, "bot stopping; no action"},
@@ -145,6 +146,7 @@ inline const std::vector<Rule> &rules() {
       {"book became stale", "LATE_BOOK_STALE", Kind::LateOrStale, "book aged during checks or durable write; measure T4-T2"},
       {"outside the original decision window", "LATE_WINDOW", Kind::LateOrStale, "dispatch passed the decision window; measure T4-T0"},
       {"inside the matching-delay/expiry window", "LATE_EXPIRY", Kind::LateOrStale, "too close to round end at dispatch; no action"},
+      {"too late in the round to rest", "LATE_REST", Kind::LateOrStale, "SNIPER_REST_LIVE: too close to round end to rest a missed order; no action"},
       {"market changed before dispatch", "LATE_ROUND_CHANGED", Kind::LateOrStale, "round switched between decision and dispatch; correct refusal"},
       {"fee rules changed after the fair-value decision", "LATE_RULES_CHANGED", Kind::LateOrStale, "fee rules refreshed mid-decision; correct refusal"},
       {"hybrid allocation tightened before dispatch", "LATE_HYBRID_TIGHTENED", Kind::LateOrStale, "risk room shrank before dispatch; correct refusal"},
@@ -291,9 +293,45 @@ public:
     else if (result == "guard" || result == "coinbase_reconnect" ||
              result == "discovery_refused")
       disruptions_.push_back({num(row, "wall").value_or(NAN), result + ": " + text(row, "reason")});
+    else if (result == "ws") {
+      // A venue or trigger socket came up or went down. A standby going is
+      // not a loss of data; anything else that goes down is a disruption.
+      auto socket = text(row, "socket");
+      bool up = flag(row, "up", true), standby = text(row, "role") == "standby";
+      ++sockets_[socket + (up ? " up" : standby ? " standby down" : " down")];
+      if (!up && !standby) {
+        ++socket_down_reasons_[socket + ": " + text(row, "reason")];
+        disruptions_.push_back({num(row, "wall").value_or(NAN),
+                                socket + " websocket down: " + text(row, "reason")});
+      }
+      return;
+    }
     if (result == "skipped" || result == "refused" || result == "filled" ||
         result == "pending")
       ++decisions_[result];
+    // SNIPER_REST_LIVE: missed orders rested on the book. They are counted
+    // here on their own and never among the FAK orders below.
+    if (result == "rest_order") {
+      auto outcome = text(row, "outcome");
+      ++rest_outcomes_[outcome.empty() ? "unknown" : outcome];
+      if (outcome != "resting" && outcome != "matched")
+        ++rest_not_placed_[text(row, "reason")];
+      return;
+    }
+    if (result == "rest_done") {
+      bool filled = flag(row, "filled", false);
+      ++rest_ended_[filled ? "filled" : "unfilled"];
+      if (filled)
+        rest_filled_shares_ += num(row, "shares").value_or(0);
+      auto why = text(row, "cancel_why");
+      ++rest_cancel_why_[why.empty() ? "not cancelled by the bot" : why];
+      return;
+    }
+    if (result == "rest_live_off")
+      rest_off_ = text(row, "reason");
+    if (result == "rest_cancel" || result == "rest_cancel_reply" ||
+        result == "rest_live" || result == "rest_live_off")
+      return;
     // Paper broker rows always carry the broker's `outcome`; live rows never do.
     bool paper = row.contains("outcome");
     if (result == "filled" || result == "refused" || (result == "pending" && !row.contains("acknowledged"))) {
@@ -409,6 +447,22 @@ public:
     o["paper_orders"] = paper_orders_;
     o["orphan_fill_rows"] = orphan_fills_;
     out["orders"] = o;
+    if (!sockets_.empty())
+      out["sockets"] = Json{{"events", sockets_}, {"down_reasons", socket_down_reasons_}};
+    if (!rest_outcomes_.empty() || !rest_ended_.empty() || !rest_off_.empty()) {
+      std::uint64_t considered = 0;
+      for (auto &[outcome, n] : rest_outcomes_)
+        considered += n;
+      Json r{{"missed_orders_considered", considered},
+             {"outcomes", rest_outcomes_},
+             {"not_placed_reasons", rest_not_placed_},
+             {"ended", rest_ended_},
+             {"filled_shares", rest_filled_shares_},
+             {"cancel_reasons", rest_cancel_why_}};
+      if (!rest_off_.empty())
+        r["test_off"] = rest_off_;
+      out["resting_orders"] = r;
+    }
     Json lat;
     for (auto &[k, s] : stage_)
       lat[k] = s.json();
@@ -439,6 +493,11 @@ private:
   double signals_ = 0;
   std::uint64_t legacy_dispatch_fallbacks_ = 0, missing_check_boundaries_ = 0;
   std::map<std::string, std::uint64_t> decisions_, skip_counts_, live_refusals_, unclassified_;
+  std::map<std::string, std::uint64_t> rest_outcomes_, rest_not_placed_, rest_ended_,
+      rest_cancel_why_;
+  double rest_filled_shares_ = 0;
+  std::string rest_off_;
+  std::map<std::string, std::uint64_t> sockets_, socket_down_reasons_;
   std::map<std::string, std::pair<Reason, std::uint64_t>> outcomes_;
   std::map<std::string, Order> orders_;
   std::map<std::string, Stats> stage_;

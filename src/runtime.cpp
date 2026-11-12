@@ -1,6 +1,7 @@
 #include "sniper/runtime.hpp"
 #include "sniper/dashboard.hpp"
 #include "sniper/paper.hpp"
+#include "sniper/rest.hpp"
 #include "sniper/sniper.hpp"
 #include <mutex>
 #include "sniper/strategy.hpp"
@@ -147,7 +148,18 @@ struct Runtime::Impl {
   std::unique_ptr<FileLock> wallet_lock;
   std::unique_ptr<H2Client> sender;
   std::vector<std::unique_ptr<WebSocket>> coinbase;
-  std::unique_ptr<WebSocket> market, user;
+  // Two connections to the venue's market feed. One is live: its frames
+  // build the books. The other is a warm standby, subscribed to the same
+  // tokens and otherwise ignored. When the live one drops the standby takes
+  // over at once (no reconnect to wait for) and the lost one reconnects
+  // behind it. With SNIPER_MARKET_STANDBY=0 there is only the first.
+  std::array<std::unique_ptr<WebSocket>, 2> market;
+  int market_live = -1;                // the live one, -1 while none is up
+  std::uint64_t market_failovers = 0, market_outages = 0;
+  double market_feed_since = 0;        // monotonic: the feed up without a gap
+  std::string market_fault_text;
+  double market_fault_at = -1e30;
+  std::unique_ptr<WebSocket> user;
   BookState book{8.0, 30.0, nullptr, nullptr, [this] { return venue_wall(); }};
   ServerClock clock;
   // the reference's decision engine, paper broker and hub state
@@ -271,6 +283,22 @@ struct Runtime::Impl {
   std::vector<std::string> dash_faults;
   std::uint64_t dry_orders = 0;
 
+  // SNIPER_REST_LIVE: orders of ours that may be on the book, the signal each
+  // side's last order came from, and the test's own record (the loss stop).
+  rest::Book rest_book;
+  std::optional<rest::Test> rest_test;
+  struct RestSignal {
+    std::string id;
+    double t_ms = 0;
+    std::optional<double> ref_mid;
+  };
+  RestSignal rest_signal[2];
+  std::map<std::string, double> rest_final_at; // id -> monotonic seconds
+  std::string rest_fault_text;
+  double rest_fault_at = -1e30;
+  double user_heard = -1e30; // monotonic time of the private channel's last message
+  std::atomic<bool> reconcile_asap{false};
+
   explicit Impl(Config cfg)
       : c(std::move(cfg)), ledger(c.ledger, c.live ? 0 : c.start_cash, c.live),
         journal(c.journal) {
@@ -360,6 +388,10 @@ struct Runtime::Impl {
           else
             ledger.status(id, "cancelled");
         }
+        // A resting order from an earlier run may still be on the book: it is
+        // cancelled first thing, whatever this run's settings say.
+        if (c.live && i.rest && i.unresolved())
+          rest_adopt(i, "left by an earlier run");
       }
     }
     H2Callbacks cb;
@@ -376,41 +408,11 @@ struct Runtime::Impl {
     cb.unknown = [this](auto id, auto why) { on_unknown(id, why); };
     sender = std::make_unique<H2Client>(io, tls, c.live, blocked, std::move(cb),
                                         c.send_timeout_s);
-    market = std::make_unique<WebSocket>(
-        io, tls, "wss://ws-subscriptions-clob.polymarket.com/ws/market",
-        [this](auto raw, int) {
-          if (raw == "PONG")
-            return;
-          rec_frame("mkt", raw);
-          int refused = 0;
-          try {
-            refused = handle_market_frame(book, raw);
-          } catch (...) {
-            ++errors;
-          }
-          if (refused) // poly_market._request_resync
-            for (auto &t : book.needs_resync())
-              resync_wanted.insert(t);
-          paper_poll();
-        },
-        [this](bool up) {
-          rec(Json{{"k", "mconn"}, {"up", up}});
-          dash_event("market", up ? "connected" : "disconnected", up ? "good" : "warn");
-          book.connected = up;
-          book.desync_all(up ? "connect" : "disconnect");
-          if (up) {
-            for (auto &t : book.needs_resync())
-              resync_wanted.insert(t);
-            if (!subscribed.empty()) {
-              Json sub{{"assets_ids", std::vector<std::string>(
-                                          subscribed.begin(), subscribed.end())},
-                       {"type", "market"},
-                       {"custom_feature_enabled", true}};
-              market->send(sub.dump());
-            }
-          }
-        },
-        25, true);
+    for (int k = 0; k < (c.market_standby ? 2 : 1); ++k)
+      market[k] = std::make_unique<WebSocket>(
+          io, tls, "wss://ws-subscriptions-clob.polymarket.com/ws/market",
+          [this, k](auto raw, int) { on_market(k, raw); },
+          [this, k](bool up) { on_market_state(k, up); }, 25, true);
     for (int n = 0; n < c.conns; ++n)
       coinbase.push_back(std::make_unique<WebSocket>(
           io, tls, "wss://ws-feed.exchange.coinbase.com",
@@ -425,6 +427,11 @@ struct Runtime::Impl {
                        "socket " + std::to_string(n + 1) +
                            (up ? " connected" : " disconnected"),
                        up ? "good" : "warn");
+            ws_row("coinbase", n, up,
+                   n < static_cast<int>(coinbase.size()) && coinbase[n]
+                       ? coinbase[n]->last_failure()
+                       : std::string(),
+                   "trigger");
             if (up) {
               if (!any) { // the first socket up restarts the rule
                 rec(Json{{"k", "cbconn"}, {"up", true}});
@@ -445,6 +452,8 @@ struct Runtime::Impl {
           [this](auto raw, int) { on_user(raw); },
           [this](bool up) {
             user_pong = -1;
+            ws_row("user", 0, up, user ? user->last_failure() : std::string(),
+                   "private");
             if (up) {
               Json sub{
                   {"auth",
@@ -482,8 +491,9 @@ struct Runtime::Impl {
       sender->stop();
     for (auto &ws : coinbase)
       ws->stop();
-    if (market)
-      market->stop();
+    for (auto &m : market)
+      if (m)
+        m->stop();
     if (user)
       user->stop();
   }
@@ -605,6 +615,58 @@ struct Runtime::Impl {
     }
     return false;
   }
+  // SNIPER_REST_LIVE in the ORDERS table: one line for each order that got
+  // onto the book, RESTING until its end is known. It is not one of the FAK
+  // orders the execution figures count.
+  void dash_rest_row(const Json &row, const std::string &result,
+                     const std::string &side, double wall) {
+    auto id = dash_str(row, "order_id");
+    if (id.empty())
+      return;
+    auto known = std::find_if(dash_orders.begin(), dash_orders.end(), [&](const Json &o) {
+      return dash_str(o, "order_id") == id;
+    });
+    if (result == "rest_order") {
+      if (dash_str(row, "outcome") != "resting" || known != dash_orders.end())
+        return;
+      dash_orders.push_back(Json{
+          {"time", dash::et_time(wall)},
+          {"side", side},
+          {"bp", dash_field(row, "move_bp")},
+          {"ask", dash_field(row, "ask")},
+          {"cap", dash_field(row, "price")},
+          {"result", "resting"},
+          {"shares", nullptr},
+          {"price", nullptr},
+          {"order_id", id},
+          {"detail", "on the book for up to " +
+                         py::fmt_g(dash_number(row, "life_s", 0)) + "s"},
+          {"round_end", dash_field(row, "round_end")}});
+      while (dash_orders.size() > 40)
+        dash_orders.pop_front();
+      return;
+    }
+    if (known == dash_orders.end())
+      return;
+    auto why = dash_str(row, "cancel_why");
+    if (row.value("filled", false)) {
+      double shares = dash_number(row, "shares", 0);
+      (*known)["result"] = "filled";
+      (*known)["shares"] = shares;
+      (*known)["price"] = dash_field(row, "price");
+      (*known)["detail"] =
+          (shares + 1e-9 < dash_number(row, "of_shares", shares)
+               ? std::string("resting order, part filled")
+               : std::string("resting order")) +
+          (why.empty() ? "" : "; then cancelled: " + why).substr(0, 90);
+    } else {
+      (*known)["result"] = "no fill";
+      (*known)["detail"] =
+          (why.empty() ? std::string("rested; nothing matched")
+                       : "rested; cancelled: " + why)
+              .substr(0, 120);
+    }
+  }
   void dash_take(const Json &row) {
     auto result = dash_str(row, "result"), reason = dash_str(row, "reason"),
          side = dash_str(row, "side");
@@ -642,6 +704,25 @@ struct Runtime::Impl {
       dash_event("hybrid", "drawdown pause over: risk rebased", "warn");
     else if (result == "refused" && side.empty() && !row.contains("order_id"))
       dash_event("bot", reason, "bad");
+    else if (result == "rest_order" && dash_str(row, "outcome") == "resting")
+      dash_event("rest",
+                 "RESTING " + side + " " +
+                     py::fmt_g(dash_number(row, "shares", 0)) + " @ " +
+                     py::fixed(dash_number(row, "price", 0), 2) + " for up to " +
+                     py::fmt_g(dash_number(row, "life_s", 0)) + "s");
+    else if (result == "rest_done")
+      dash_event("rest",
+                 row.value("filled", false)
+                     ? "resting order FILLED " +
+                           py::fmt_g(dash_number(row, "shares", 0)) + " shares"
+                     : "resting order cancelled, nothing matched",
+                 row.value("filled", false) ? "good" : "info");
+    else if (result == "rest_live_off")
+      dash_event("rest", "resting test OFF: " + reason, "bad");
+    if (result == "rest_order" || result == "rest_done") {
+      dash_rest_row(row, result, side, wall);
+      return;
+    }
     if (result != "filled" && result != "refused" && result != "pending" &&
         result != "error" && result != "live_fill_update" && result != "live_fill")
       return;
@@ -949,6 +1030,34 @@ struct Runtime::Impl {
     }
     market["max_fills"] = c.s.max_fills_round;
     market["max_side_shares"] = c.s.max_side_shares;
+    // SNIPER_REST_LIVE: our own order on the book and the time it has left
+    // there. Built anew for every frame, so the time counts down live.
+    if (c.live && c.s.rest_live) {
+      Json resting{{"on", rest_test && !rest_test->off}};
+      if (rest_test && rest_test->off)
+        resting["off"] = "off: " + rest_test->reason;
+      for (auto &[id, o] : rest_book.orders()) {
+        auto it = ledger.orders.find(id);
+        if (it == ledger.orders.end())
+          continue;
+        resting["order"] = Json{
+            {"side", o.side},
+            {"shares", dollars(it->second.target)},
+            {"matched", dollars(it->second.matched_shares)},
+            {"price", dollars(it->second.limit)},
+            {"state", o.off_book ? "cancelled"
+                      : o.wanted ? "cancelling"
+                      : o.posted ? "resting"
+                                 : "placing"},
+            {"left_s", std::max(0.0, o.deadline_mono - now)},
+            {"life_s", o.deadline_mono - o.placed_mono},
+            {"rested_s", now - o.placed_mono},
+            {"why", o.why}};
+        if (!o.off_book)
+          break; // one that is still on the book comes first
+      }
+      market["resting"] = std::move(resting);
+    }
     snap["market"] = std::move(market);
     // ---- orders in this market only: the table clears when a new one starts
     Json orders = Json::array();
@@ -1122,6 +1231,32 @@ struct Runtime::Impl {
       book_state = a == LIVE && b == LIVE ? std::string(LIVE) : a == LIVE ? b : a;
     }
     add("POLY BOOK", book_state, "resync waiting " + std::to_string(resync_wanted.size()));
+    {
+      // The connections themselves, apart from how fresh the books are.
+      int total = 0, up_n = 0;
+      std::uint64_t drops = 0;
+      for (auto &m : this->market) // (a local above is called market too)
+        if (m) {
+          ++total;
+          up_n += m->connected();
+          drops += m->drops();
+        }
+      auto held = [](double s) {
+        long long t = static_cast<long long>(std::max(0.0, s));
+        return t >= 3600   ? std::to_string(t / 3600) + "h" + std::to_string(t % 3600 / 60) + "m"
+               : t >= 60   ? std::to_string(t / 60) + "m" + std::to_string(t % 60) + "s"
+                           : std::to_string(t) + "s";
+      };
+      std::string detail = std::to_string(up_n) + "/" + std::to_string(total) + " up";
+      if (market_live >= 0)
+        detail += " held " + held(now - market_feed_since);
+      detail += " drops " + std::to_string(drops);
+      if (market_failovers)
+        detail += " switches " + std::to_string(market_failovers);
+      if (market_outages)
+        detail += " outages " + std::to_string(market_outages);
+      add("POLY WS", market_live < 0 ? "DOWN" : up_n == total ? "OK" : "WARN", detail);
+    }
     add("CLOB H2", sender->ready() ? "OK" : "WAIT", "");
     if (c.live)
       add("USER WS", user && user->connected() ? "OK" : "DOWN", "");
@@ -1244,6 +1379,9 @@ struct Runtime::Impl {
     bool awaiting_fak(const std::string &, const std::string &,
                       const std::string &token) override {
       return r.c.live && r.ledger.awaiting(token);
+    }
+    bool resting_in(const std::string &cond) override {
+      return r.c.live && r.rest_book.in_market(cond);
     }
     double trade_window_seconds() override { return r.c.trade_last; }
     double min_seconds_to_expiry() override { return r.c.min_expiry; }
@@ -1458,6 +1596,124 @@ struct Runtime::Impl {
                 {"taker_delay_ms", m.taker_delay_ms.value_or(0.0)},
                 {"taker_delay_flagged", m.taker_delay_flagged}};
   }
+  // ------------------------------------------------------------ venue sockets
+  // One journal row for every socket that comes up or goes down, with why
+  // it went and where in the round it happened.
+  void ws_row(const char *socket, int n, bool up, const std::string &reason,
+              const char *role) {
+    Json row{{"result", "ws"}, {"socket", socket}, {"n", n + 1},
+             {"up", up},       {"role", role}};
+    if (!up && !reason.empty())
+      row["reason"] = reason.substr(0, 160);
+    if (hub_window >= 0)
+      row["left_s"] = py::round(static_cast<double>(hub_window + 300) - wall_s(), 1);
+    try {
+      audit(std::move(row));
+    } catch (...) {
+      ++errors;
+    }
+  }
+  void market_send_all(const std::string &text) {
+    for (auto &m : market)
+      if (m && m->connected())
+        m->send(text);
+  }
+  // A frame from market connection k. Only the live one builds the books;
+  // the standby is read and dropped, which is what keeps it warm.
+  void on_market(int k, std::string_view raw) {
+    if (raw == "PONG" || k != market_live)
+      return;
+    try {
+      rec_frame("mkt", raw);
+      int refused = 0;
+      try {
+        refused = handle_market_frame(book, raw);
+      } catch (...) {
+        ++errors;
+      }
+      if (refused) // poly_market._request_resync
+        for (auto &t : book.needs_resync())
+          resync_wanted.insert(t);
+      paper_poll();
+    } catch (const std::exception &e) {
+      // A fault of ours must never cost the connection: it is reported
+      // (once in ten seconds) and the socket stays up.
+      const double mono = mono_s();
+      if (market_fault_text == e.what() && mono - market_fault_at < 10)
+        return;
+      market_fault_text = e.what();
+      market_fault_at = mono;
+      try {
+        handler_fault("market feed handler", e.what());
+      } catch (...) {
+        ++errors;
+      }
+    }
+  }
+  // The feed as the books see it: up while any connection is live.
+  void market_feed(bool up) {
+    rec(Json{{"k", "mconn"}, {"up", up}});
+    dash_event("market", up ? "connected" : "disconnected", up ? "good" : "warn");
+    book.connected = up;
+    book.desync_all(up ? "connect" : "disconnect");
+    if (up) {
+      market_feed_since = mono_s();
+      for (auto &t : book.needs_resync())
+        resync_wanted.insert(t);
+    } else
+      ++market_outages;
+  }
+  void on_market_state(int k, bool up) {
+    const std::string why = market[k] ? market[k]->last_failure() : std::string();
+    if (up) {
+      // subscribe first: this is what makes a standby ready to take over
+      if (!subscribed.empty())
+        market[k]->send(Json{{"assets_ids", std::vector<std::string>(
+                                                subscribed.begin(), subscribed.end())},
+                             {"type", "market"},
+                             {"custom_feature_enabled", true}}
+                            .dump());
+      if (market_live < 0) {
+        market_live = k;
+        ws_row("market", k, true, why, "live");
+        market_feed(true);
+      } else {
+        ws_row("market", k, true, why, "standby");
+        dash_event("market", "standby connected", "good");
+      }
+      return;
+    }
+    if (k != market_live) {
+      ws_row("market", k, false, why, "standby");
+      dash_event("market", "standby lost: reconnecting", "warn");
+      return;
+    }
+    const int other = 1 - k;
+    if (market[other] && market[other]->connected()) {
+      // The standby takes over. Its frames were not applied while it stood
+      // by, so every book starts again from a snapshot, asked for at once
+      // on the connection that is live now.
+      market_live = other;
+      ++market_failovers;
+      ws_row("market", k, false, why, "live: the standby took over");
+      dash_event("market", "socket lost: the standby took over", "warn");
+      // In a recording a takeover is a disconnect and a connect with nothing
+      // between them: the same two steps the books take here, so a replay
+      // rebuilds them exactly.
+      rec(Json{{"k", "mconn"}, {"up", false}});
+      book.desync_all("disconnect");
+      rec(Json{{"k", "mconn"}, {"up", true}});
+      book.desync_all("connect");
+      for (auto &t : subscribed) {
+        resync_wanted.insert(t);
+        request_ws_snapshot(t, book.view(t));
+      }
+      return;
+    }
+    market_live = -1;
+    ws_row("market", k, false, why, "live: no standby to take over");
+    market_feed(false);
+  }
   // ------------------------------------------------------------ the hub
   bool activate_rules(const Round &r) {
     return execution::cache_round_rules(market_rules, r, wall_s());
@@ -1530,16 +1786,15 @@ struct Runtime::Impl {
           drop.push_back(t);
       subscribed = want;
       book.set_active(std::vector<std::string>(want.begin(), want.end()));
-      if (market->connected()) {
-        if (!add.empty())
-          market->send(Json{{"assets_ids", add},
-                            {"operation", "subscribe"},
-                            {"custom_feature_enabled", true}}
-                           .dump());
-        if (!drop.empty())
-          market->send(
-              Json{{"assets_ids", drop}, {"operation", "unsubscribe"}}.dump());
-      }
+      // every connection follows the same tokens, the standby too
+      if (!add.empty())
+        market_send_all(Json{{"assets_ids", add},
+                             {"operation", "subscribe"},
+                             {"custom_feature_enabled", true}}
+                            .dump());
+      if (!drop.empty())
+        market_send_all(
+            Json{{"assets_ids", drop}, {"operation", "unsubscribe"}}.dump());
     }
     sync_user_markets();
   }
@@ -1576,18 +1831,19 @@ struct Runtime::Impl {
         (prior != next_ws_snapshot.end() &&
          prior->second.first == view.generation && now < prior->second.second))
       return;
-    if (!market->connected() || !subscribed.count(token))
+    if (market_live < 0 || !subscribed.count(token))
       return;
-    market->send(
+    auto &live = *market[market_live];
+    live.send(
         Json{{"assets_ids", Json::array({token})}, {"operation", "unsubscribe"}}
             .dump());
     auto g = book.subscription_gap(token, view.generation);
     rec(Json{{"k", "ws_gap"}, {"token", token}, {"generation", view.generation}});
     if (g)
-      market->send(Json{{"assets_ids", Json::array({token})},
-                        {"operation", "subscribe"},
-                        {"custom_feature_enabled", true}}
-                       .dump());
+      live.send(Json{{"assets_ids", Json::array({token})},
+                     {"operation", "subscribe"},
+                     {"custom_feature_enabled", true}}
+                    .dump());
     next_ws_snapshot[token] = {view.generation, now + 1.5};
   }
   // feeds/hub._resync_loop: REST /book recovery and refresh of quiet books
@@ -1746,6 +2002,11 @@ struct Runtime::Impl {
       coinbase[n]->reconnect();
       return;
     }
+    // The trigger price just moved: a resting order it moved against is
+    // cancelled as soon as the engine has read this tick. (Outside the block
+    // above: a fault here is not a Coinbase fault.)
+    if (!rest_book.empty())
+      rest_watch(true);
     for (auto &plan : sniper->take_dispatched()) {
       ++orders_sent;
       if (paper)
@@ -1766,6 +2027,8 @@ struct Runtime::Impl {
     };
     if (!hub || hub->condition != p->cond)
       return refuse("market changed before dispatch");
+    if (rest_book.in_market(p->cond))
+      return refuse("our resting order is in this market", true);
     Round &r = *hub;
     int n = p->side == "UP" ? 0 : 1;
     auto &rule = r.rules[n];
@@ -1959,6 +2222,13 @@ struct Runtime::Impl {
     }
     ++orders_sent;
     inflight_id[n] = intent.id;
+    if (c.s.rest_live) {
+      auto ref = p->row.find("ref_mid");
+      rest_signal[n] = {intent.id, p->t_ms,
+                        ref != p->row.end() && ref->is_number()
+                            ? std::optional(ref->get<double>())
+                            : std::nullopt};
+    }
     row["order_id"] = intent.id;
     row["client_order_id"] = intent.id;
     row["result"] = "pending";
@@ -2056,6 +2326,613 @@ struct Runtime::Impl {
     }
     return fields;
   }
+  // ------------------------------------------------------------ SNIPER_REST_LIVE
+  // After a FAK that matched nothing, the same BUY - its shares at its limit -
+  // rests on the book as a post-only order (a maker: no fee) for at most
+  // SNIPER_REST_S seconds. It is cancelled early when the trigger price turns
+  // against it, and while it may be on the book its market takes no other
+  // order of ours. sniper/rest.hpp holds the rules; this is the I/O.
+  static constexpr std::string_view REST_CANCEL = "cancel:";
+  rest::Policy rest_policy() const {
+    rest::Policy p;
+    p.rest_s = c.s.rest_s;
+    p.direction = c.s.rest_dir;
+    p.end_margin_s = std::max({2.0, c.min_expiry, c.s.min_left_s});
+    return p;
+  }
+  rest::Now rest_now(const std::string &side, const std::string &token,
+                     double end, Units min_shares, bool with_direction,
+                     bool with_book = true) {
+    rest::Now now;
+    double mono = mono_s();
+    now.wall = wall_s();
+    now.mono_ms = mono * 1000.0;
+    now.mid = sniper->last_mid;
+    now.feed_fresh = sniper->cb_fresh.why_not(mono).empty();
+    now.min_shares = min_shares;
+    now.direction = with_direction ? sniper->direction_view(side, end)
+                                   : Json::object();
+    if (!with_book)
+      return now;
+    auto view = book.view(token);
+    if (view.status == LIVE && view.updated_mono && !view.asks.empty()) {
+      double age = (mono - *view.updated_mono) * 1000.0, ask = view.asks.front().first;
+      if (age >= 0 && age <= c.s.stale_ms && std::isfinite(ask) && ask > 0 && ask < 1)
+        now.best_ask = units(fixed6(ask));
+    }
+    return now;
+  }
+  // What the resting fills not settled yet paid, and what resting orders
+  // still open could pay: the most they can still lose.
+  Units rest_open_cost() const {
+    __int128 total = 0;
+    for (const auto &[id, o] : ledger.orders) {
+      (void)id;
+      if (!o.rest || ledger.settled_conditions.count(o.condition))
+        continue;
+      if (o.unresolved() || o.status == "matched")
+        total += std::max<Units>(o.reserve, o.booked_cost + o.booked_fee);
+      else
+        total += static_cast<__int128>(o.booked_cost) + o.booked_fee;
+    }
+    return total > std::numeric_limits<Units>::max()
+               ? std::numeric_limits<Units>::max()
+               : static_cast<Units>(total);
+  }
+  // The test is running: opted in, live, and the resting orders' own settled
+  // loss since it began still under SNIPER_REST_LIVE_STOP_USD. Its record
+  // beside the ledger keeps it off across restarts.
+  bool rest_test_on() {
+    if (!c.live || !c.s.rest_live || c.dry_run)
+      return false;
+    const auto path = c.state / "rest_live_test.json";
+    if (!rest_test) {
+      rest::Test t;
+      if (std::filesystem::exists(path)) {
+        try {
+          std::ifstream in(path);
+          Json j;
+          in >> j;
+          t = rest::Test::load(j);
+        } catch (const std::exception &e) {
+          // An unreadable record cannot bound the test: off, and the file is
+          // left as it is for the operator.
+          t = rest::Test{};
+          t.started_wall = t.off_wall = wall_s();
+          t.off = true;
+          t.reason = "rest_live_test.json is unreadable: fix or delete it";
+          audit({{"result", "rest_live_off"},
+                 {"reason", t.reason},
+                 {"detail", std::string(e.what()).substr(0, 160)}});
+        }
+      } else {
+        t.started_wall = wall_s();
+        t.baseline = ledger.rest_realized;
+        try {
+          atomic_file(path, t.json().dump());
+        } catch (const std::exception &e) {
+          t.off = true;
+          t.off_wall = wall_s();
+          t.reason = "rest_live_test.json could not be written";
+          audit({{"result", "rest_live_off"},
+                 {"reason", t.reason},
+                 {"detail", std::string(e.what()).substr(0, 160)}});
+        }
+      }
+      rest_test = t;
+    }
+    if (rest_test->off)
+      return false;
+    if (rest_test->look(ledger.rest_realized,
+                        units(fixed6(c.s.rest_stop_usd)), wall_s()))
+      return true;
+    try {
+      atomic_file(path, rest_test->json().dump());
+    } catch (const std::exception &) {
+      // Still off for this run; the next start reads the ledger again.
+    }
+    audit({{"result", "rest_live_off"},
+           {"reason", rest_test->reason},
+           {"realized", dollars(rest_test->realized)},
+           {"stop_usd", c.s.rest_stop_usd},
+           {"since", rest_test->started_wall}});
+    return false;
+  }
+  // An order of ours that should not be on the book but may be: watched, and
+  // cancelled at once.
+  void rest_adopt(const Intent &i, const std::string &why) {
+    if (rest_book.find(i.id))
+      return;
+    rest::Order o;
+    o.id = i.id;
+    o.side = i.side;
+    o.token = i.token;
+    o.condition = i.condition;
+    o.end = static_cast<double>(i.end);
+    o.placed_mono = o.deadline_mono = mono_s();
+    o.posted = true;
+    o.row = Json{{"result", "rest_order"}, {"side", i.side}};
+    rest_book.add(std::move(o));
+    rest_book.cancel(i.id, why, mono_s());
+  }
+  void rest_after_miss(const std::string &missed_id) {
+    auto found = ledger.orders.find(missed_id);
+    if (found == ledger.orders.end() || !sniper || !c.live || !c.s.rest_live)
+      return;
+    const Intent missed = found->second;
+    // only a FAK the venue confirmed matched nothing
+    if (missed.rest || missed.status != "no_match" || missed.matched_shares > 0 ||
+        missed.booked_shares > 0)
+      return;
+    const int n = missed.side == "UP" ? 0 : 1;
+    Json row{{"result", "rest_order"},
+             {"side", missed.side},
+             {"of_order_id", missed_id},
+             {"round_end", missed.end},
+             {"shares", dollars(missed.target)},
+             {"price", dollars(missed.limit)},
+             {"rest_s", c.s.rest_s}};
+    auto no = [&](const std::string &why, const char *outcome = "skipped") {
+      row["outcome"] = outcome;
+      row["reason"] = why.substr(0, 200);
+      ++sniper->n[std::string("rest ") + outcome];
+      audit(row);
+    };
+    if (!rest_test_on())
+      return no("the resting test is off" +
+                (rest_test && !rest_test->reason.empty()
+                     ? ": " + rest_test->reason
+                     : std::string()));
+    // The stop bounds the whole test: resting fills not settled yet could
+    // still lose all they paid, and so could this order.
+    if (!rest_test ||
+        !rest::fits_stop(rest_test->realized, rest_open_cost(), missed.stake,
+                         units(fixed6(c.s.rest_stop_usd))))
+      return no("resting positions still open could reach the loss stop");
+    if (!hub || hub->condition != missed.condition)
+      return no("the round changed");
+    Round &r = *hub;
+    auto &rule = r.rules[n];
+    if (rest_book.busy())
+      return no("another resting order is not off the book yet");
+    // Any other order of ours that can still trade in this market could be
+    // matched against the resting one (a buy of each outcome makes a pair).
+    if (!inflight_id[0].empty() || !inflight_id[1].empty())
+      return no("another order of ours is in flight in this market");
+    if (ledger.awaiting(r.up) || ledger.awaiting(r.down))
+      return no("an earlier order in this market still awaits its fill size");
+    const auto &signal = rest_signal[n];
+    if (signal.id != missed_id)
+      return no("the missed order's signal is unknown");
+    rest::Missed m;
+    m.side = missed.side;
+    m.end = static_cast<double>(missed.end);
+    m.limit = missed.limit;
+    m.shares = missed.target;
+    m.signal_ms = signal.t_ms;
+    m.ref_mid = signal.ref_mid;
+    const auto policy = rest_policy();
+    auto now = rest_now(missed.side, missed.token, m.end, rule.min_shares, true);
+    row["left_s"] = py::round(m.end - now.wall, 1);
+    row["signal_age_ms"] = py::round(now.mono_ms - m.signal_ms, 1);
+    if (auto move = rest::move_bp(m.side, m.ref_mid, now.mid))
+      row["move_bp"] = py::round(*move, 3);
+    for (const char *k : {"ptb_dist_bp", "ptb_margin_bp", "ptb_checks"})
+      if (now.direction.contains(k))
+        row[k] = now.direction.at(k);
+    if (now.best_ask)
+      row["ask"] = dollars(*now.best_ask);
+    auto why = rest::refusal(m, now, policy);
+    if (!why.empty())
+      return no(why);
+    // every gate a live order passes
+    auto ready = live_readiness(r);
+    if (!ready.empty())
+      return no(ready, "refused");
+    if (!rule.loaded || rule.tick <= 0 || missed.limit % rule.tick)
+      return no("market rules changed since the order", "refused");
+    if (dollars(missed.limit) < c.min_price - 1e-9 ||
+        dollars(missed.limit) > c.max_price + 1e-9)
+      return no("price outside the buy band", "refused");
+    if (ledger.round_fills(r.condition) >= c.max_fills)
+      return no("round cap: fills in this round", "refused");
+    if (dollars(ledger.risk_shares(missed.token)) + dollars(missed.target) >
+        c.max_side + 1e-9)
+      return no("round cap: shares on this side", "refused");
+    if (wall_s() - (mono_s() - balance_at) <
+        std::min(static_cast<double>(r.start), wall_s()) - 10.0)
+      return no("cash not read for this round yet", "refused");
+    // A maker pays no fee: the order can spend its stake and no more.
+    const Units stake = missed.stake, reserve = missed.stake;
+    if (stake <= 0)
+      return no("the missed order has no stake", "refused");
+    const Units free = effective_balance().value_or(0) - ledger.reserved();
+    if (stake > free)
+      return no("collateral $" + py::fixed(dollars(free), 2) +
+                    " is below the order $" + py::fixed(dollars(stake), 2),
+                "refused");
+    auto allow = allowances.find(
+        std::string(rule.neg ? NEG_EXCHANGE : STANDARD_EXCHANGE));
+    if (allow == allowances.end())
+      for (auto i = allowances.begin(); i != allowances.end(); ++i)
+        if (checksum_address(i->first) ==
+            checksum_address(rule.neg ? NEG_EXCHANGE : STANDARD_EXCHANGE)) {
+          allow = i;
+          break;
+        }
+    if (allow == allowances.end() || allow->second < reserve)
+      return no("collateral allowance insufficient", "refused");
+    SignedOrder signed_order;
+    try {
+      signed_order = build_order(*signer, c.funder, c.signature_type,
+                                 missed.token, stake, missed.limit, rule, creds,
+                                 "GTC", true);
+    } catch (const std::exception &e) {
+      return no(std::string("order not built: ") + e.what(), "refused");
+    }
+    if (signed_order.order.taker_amount != missed.target ||
+        signed_order.order.maker_amount != stake)
+      return no("the resting order would not be the missed order's shares "
+                "at its price",
+                "refused");
+    Intent intent;
+    intent.id = signed_order.id;
+    intent.condition = missed.condition;
+    intent.token = missed.token;
+    intent.side = missed.side;
+    intent.slug = missed.slug;
+    intent.up = missed.up;
+    intent.down = missed.down;
+    intent.start = missed.start;
+    intent.end = missed.end;
+    intent.stake = stake;
+    intent.reserve = reserve;
+    intent.target = missed.target;
+    intent.limit = missed.limit;
+    intent.fee_rate = missed.fee_rate;
+    intent.fee_exponent = missed.fee_exponent;
+    intent.sent_wall = wall_s();
+    intent.status = "sent";
+    intent.fill_slot = true;
+    intent.rest = true;
+    auto state = ledger.canary;
+    auto budget = canary_refusal(
+        c, state, missed.target / U, stake,
+        state.settled_loss + ledger.open_cost() + reserve, r.condition,
+        wall_s());
+    if (!budget.empty()) {
+      ledger.set_canary(state);
+      return no(budget, "refused");
+    }
+    auto unsent_state = state;
+    ++state.orders;
+    ++state.fills;
+    state.spend += stake;
+    state.rounds.insert(r.condition);
+    ledger.register_intent(intent, &signed_order, state); // fsynced intent
+    // The durable write can take time: nothing may have gone stale meanwhile.
+    const double mono = mono_s();
+    const double life = rest::lifetime_s(m.end, wall_s(), policy);
+    auto gate = live_readiness(r);
+    const auto spendable = effective_balance();
+    if (gate.empty() && (!spendable || ledger.reserved() > *spendable))
+      gate = "collateral fell below outstanding reservations";
+    if (gate.empty() && !(life >= policy.min_rest_s))
+      gate = "too late in the round to rest";
+    if (gate.empty()) {
+      try {
+        auto headers = l2_headers(*signer, creds, "POST", "/order",
+                                  signed_order.body, clock.now(mono));
+        if (!sender->post(intent.id, signed_order.body, headers))
+          gate = "native HTTP/2 sender not ready";
+      } catch (const std::exception &e) {
+        gate = e.what();
+      }
+    }
+    if (!gate.empty()) {
+      ledger.status(intent.id, "aborted");
+      ledger.set_canary(unsent_state);
+      return no(gate + " before dispatch", "refused");
+    }
+    sent_at[intent.id] = mono;
+    row["order_id"] = intent.id;
+    row["life_s"] = py::round(life, 1);
+    rest::Order o;
+    o.id = intent.id;
+    o.side = intent.side;
+    o.token = intent.token;
+    o.condition = intent.condition;
+    o.end = m.end;
+    o.ref_mid = m.ref_mid;
+    o.placed_mono = mono;
+    o.deadline_mono = mono + life;
+    o.signals_other = sniper->signals_by_side[1 - n];
+    o.row = row;
+    rest_book.add(std::move(o));
+    ++sniper->n["rest orders sent"];
+  }
+  // The venue answered the resting order's placement.
+  void on_rest_reply(const std::string &id, const HttpResult &reply) {
+    try {
+      rest_reply(id, reply);
+    } catch (const std::exception &e) {
+      // Whatever went wrong, the order may be on the book: fail closed.
+      on_unknown(id, std::string("resting order reply: ") + e.what());
+    }
+    rest_watch(false);
+  }
+  void rest_reply(const std::string &id, const HttpResult &reply) {
+    auto &intent = ledger.orders.at(id);
+    const double rtt =
+        sent_at.count(id) ? (mono_s() - sent_at.at(id)) * 1000 : 0;
+    sent_at.erase(id);
+    auto answer = rest::parse_post_reply(reply.status, reply.body, id);
+    auto *o = rest_book.find(id);
+    Json row = o ? o->row
+                 : Json{{"result", "rest_order"}, {"side", intent.side}};
+    row["order_id"] = id;
+    row["acknowledged"] = true;
+    row["reply_ms"] = py::round(rtt, 1);
+    row["http_status"] = reply.status;
+    if (!answer.venue_status.empty())
+      row["venue_order_status"] = answer.venue_status;
+    if (!answer.detail.empty())
+      row["reason"] = answer.detail;
+    // The private channel can be faster than this reply. If it already
+    // showed the order's end, the reply changes nothing in the ledger.
+    if (rest_final_at.count(id)) {
+      row["outcome"] = answer.kind == rest::Posted::Resting ? "resting" : "ended";
+      row["note"] = "its end was already known when the reply came";
+      audit(row);
+      return;
+    }
+    if (answer.kind == rest::Posted::Matched &&
+        (answer.making > intent.stake + 1 ||
+         answer.making > multiply(answer.taking, intent.limit) + 1)) {
+      answer.kind = rest::Posted::Unknown;
+      answer.detail = "matched totals exceed signed limits";
+      row["reason"] = answer.detail;
+    }
+    // An order the venue has, that is no longer being followed here, is
+    // followed again and cancelled: nothing of ours rests unwatched.
+    const bool on_venue = answer.kind == rest::Posted::Resting ||
+                          answer.kind == rest::Posted::Matched ||
+                          answer.kind == rest::Posted::Accepted;
+    if (on_venue && !o)
+      rest_adopt(intent, "its placement was answered after it stopped "
+                         "being followed");
+    switch (answer.kind) {
+    case rest::Posted::Resting:
+      // Only forward: evidence of a match that came first is kept.
+      if (intent.status == "sent" || intent.status == "unknown")
+        ledger.status(id, "pending", intent.matched_shares, intent.matched_cost);
+      rest_book.posted(id);
+      row["outcome"] = "resting";
+      ++sniper->n["rest orders resting"];
+      break;
+    case rest::Posted::Accepted:
+      // Taken, but not shown on the book (the venue may still be holding
+      // it): it is followed like a resting order and cancelled at once.
+      if (intent.status == "sent" || intent.status == "unknown")
+        ledger.status(id, "pending", intent.matched_shares, intent.matched_cost);
+      rest_book.posted(id);
+      rest_book.cancel(id, "the venue answered: " + answer.detail, mono_s());
+      row["outcome"] = "accepted";
+      break;
+    case rest::Posted::Crossed:
+      // The venue confirmed nothing rests and nothing traded.
+      ledger.status(id, "no_match");
+      ledger.release_missed_spend(id);
+      ledger.release_fill_slot(id);
+      rest_book.off(id);
+      row["outcome"] = "not resting";
+      ++sniper->n["rest not resting"];
+      break;
+    case rest::Posted::Refused:
+      ledger.status(id, "refused");
+      ledger.release_fill_slot(id);
+      rest_book.off(id);
+      row["outcome"] = "not resting";
+      ++sniper->n["rest not resting"];
+      break;
+    case rest::Posted::Matched:
+      if (answer.taking > 0 && answer.making > 0)
+        ledger.status(id, "matched", answer.taking, answer.making);
+      else if (intent.status == "sent" || intent.status == "unknown")
+        ledger.status(id, "pending", intent.matched_shares, intent.matched_cost);
+      rest_book.posted(id);
+      rest_book.cancel(id, "it matched at placement", mono_s());
+      row["outcome"] = "matched";
+      break;
+    case rest::Posted::Unknown:
+      row["outcome"] = "unknown";
+      audit(row);
+      on_unknown(id, answer.detail);
+      return;
+    }
+    audit(row);
+  }
+  // Decide which resting orders go, send the cancels that are due, and tell
+  // the operator about one that cannot be shown off the book. Called on every
+  // trigger tick and from the timer, also while stopping: a fault in here is
+  // reported and pauses new orders, and never reaches the caller.
+  void rest_watch(bool on_tick) {
+    if (rest_book.empty() || !sniper || !c.live)
+      return;
+    try {
+      rest_watch_orders(on_tick);
+    } catch (const std::exception &e) {
+      // This runs on every tick: the same fault is reported once in ten
+      // seconds, not twenty times a second.
+      const double mono = mono_s();
+      if (rest_fault_text == e.what() && mono - rest_fault_at < 10)
+        return;
+      rest_fault_text = e.what();
+      rest_fault_at = mono;
+      try {
+        handler_fault("resting order watch", e.what());
+      } catch (...) {
+        ++errors;
+      }
+    }
+  }
+  void rest_watch_orders(bool on_tick) {
+    const double mono = mono_s(), wall = wall_s();
+    std::string hold;
+    if (stopping)
+      hold = "shutdown";
+    else if (journal.failed())
+      hold = "audit or recorder failed";
+    else if (wall < pause_until)
+      hold = "new orders are paused: " + pause_reason;
+    else if (std::filesystem::exists(c.stop_file))
+      hold = "STOP_LIVE present";
+    // Fills and cancellations arrive on the private channel. Without it an
+    // order would rest with nobody seeing what happens to it. (Changing its
+    // subscriptions is not a loss: only a closed or silent channel is.)
+    else if (!user || !user->connected() || mono - user_heard >= 20)
+      hold = "private channel not ready";
+    auto policy = rest_policy();
+    // The price to beat is judged on a fresh trigger price only; the timer
+    // between ticks handles time, pauses and a silent feed.
+    if (!on_tick)
+      policy.direction = false;
+    for (auto &[id, o] : rest_book.orders()) {
+      if (o.wanted || o.off_book)
+        continue;
+      const int n = o.side == "UP" ? 0 : 1;
+      const bool opposite = sniper->signals_by_side[1 - n] != o.signals_other;
+      auto now = rest_now(o.side, o.token, o.end, 0, policy.direction, false);
+      auto why = rest::cancel_reason(o, now, policy, opposite, hold);
+      if (!why.empty())
+        rest_book.cancel(id, why, mono);
+    }
+    if (sender && sender->ready())
+      for (auto &id : rest_book.due(mono))
+        rest_send_cancel(id, mono);
+    for (auto &id : rest_book.unproven_to_report(mono)) {
+      ++errors;
+      audit({{"result", "error"},
+             {"order_id", id},
+             {"reason", sender && sender->ready()
+                            ? "resting order is not shown cancelled yet: "
+                              "asking again every 5s - check it on Polymarket"
+                            : "resting order cannot be cancelled: the order "
+                              "connection is down - check it on Polymarket"}});
+      pause("resting order not shown cancelled", true);
+    }
+    for (auto &o : rest_book.give_up(wall)) {
+      if (o.off_book)
+        continue; // its final size comes from the venue's records
+      ++errors;
+      audit({{"result", "rest_done"},
+             {"order_id", o.id},
+             {"side", o.side},
+             {"outcome", "unknown"},
+             {"reason", "no venue record shows it cancelled and its market "
+                        "has closed: check it on Polymarket"}});
+    }
+  }
+  void rest_send_cancel(const std::string &id, double mono) {
+    auto *o = rest_book.find(id);
+    if (!o)
+      return;
+    bool sent = false;
+    std::string fault;
+    try {
+      auto body = cancel_order_body(id);
+      std::int64_t stamp;
+      try {
+        stamp = clock.now(mono);
+      } catch (const std::exception &) {
+        stamp = static_cast<std::int64_t>(venue_wall());
+      }
+      sent = sender->cancel(std::string(REST_CANCEL) + id, body,
+                            l2_headers(*signer, creds, "DELETE", "/order", body,
+                                       stamp));
+    } catch (const std::exception &e) {
+      fault = e.what();
+    }
+    Json row{{"result", "rest_cancel"},
+             {"order_id", id},
+             {"side", o->side},
+             {"why", o->why},
+             {"try", o->cancels},
+             {"sent", sent},
+             {"rested_ms", py::round((mono - o->placed_mono) * 1000.0, 1)}};
+    if (!fault.empty())
+      row["reason"] = fault.substr(0, 160);
+    audit(std::move(row));
+    if (!sent)
+      rest_book.cancel_unproven(id, mono);
+  }
+  void on_cancel_reply(const std::string &id, const HttpResult &reply) {
+    // Whatever happens below, the order's own record is read next.
+    reconcile_asap = true;
+    rest::CancelReply answer;
+    try {
+      answer = rest::parse_cancel_reply(reply.status, reply.body, id);
+      Json row{{"result", "rest_cancel_reply"},
+               {"order_id", id},
+               {"http_status", reply.status},
+               {"canceled", answer.kind == rest::Cancelled::Yes}};
+      if (!answer.detail.empty())
+        row["reason"] = answer.detail;
+      audit(std::move(row));
+    } catch (const std::exception &) {
+      answer = rest::CancelReply{};
+    }
+    if (answer.kind == rest::Cancelled::Yes)
+      // Off the book: its market is free again. Its final size comes from the
+      // venue's record of it (the private channel, or the read asked for here).
+      rest_book.proven(id, mono_s());
+    else
+      rest_book.cancel_unproven(id, mono_s());
+  }
+  // The venue shows this resting order can match no more, with this final
+  // size: from the private channel, its own record, or its trades.
+  void rest_final(const std::string &id, Units size, std::string_view source) {
+    auto it = ledger.orders.find(id);
+    if (it == ledger.orders.end())
+      return;
+    // Several sources report the same end (the private channel, the order's
+    // record every few seconds, its trades). The ledger is written again
+    // only when one of them has something new: a larger size, or an order
+    // that is not closed yet.
+    const bool known = rest_final_at.count(id) > 0;
+    if (!known || size > it->second.matched_shares || it->second.unresolved()) {
+      ledger.status(id, size ? "matched" : "no_match", size);
+      if (!size) {
+        ledger.release_missed_spend(id);
+        ledger.release_fill_slot(id);
+      }
+    }
+    release(id);
+    // A match seen earlier counts even when this source says less.
+    size = std::max(size, it->second.matched_shares);
+    auto *o = rest_book.find(id);
+    Json row{{"result", "rest_done"},
+             {"order_id", id},
+             {"side", it->second.side},
+             {"filled", size > 0},
+             {"shares", dollars(size)},
+             {"of_shares", dollars(it->second.target)},
+             {"price", dollars(it->second.limit)},
+             {"source", source}};
+    if (o) {
+      row["rested_ms"] = py::round((mono_s() - o->placed_mono) * 1000.0, 1);
+      if (!o->why.empty())
+        row["cancel_why"] = o->why;
+    }
+    rest_book.off(id);
+    for (auto i = rest_final_at.begin(); i != rest_final_at.end();)
+      i = mono_s() - i->second > 3600 ? rest_final_at.erase(i) : std::next(i);
+    if (!rest_final_at.emplace(id, mono_s()).second)
+      return;
+    if (sniper)
+      ++sniper->n[size ? "rest orders filled" : "rest orders unfilled"];
+    audit(std::move(row));
+  }
   void on_reply(std::string_view id, const HttpResult &reply) {
     const auto reply_received_ns = mono_ns();
     if (id == "__clock") {
@@ -2069,10 +2946,18 @@ struct Runtime::Impl {
       }
       return;
     }
+    if (id.starts_with(REST_CANCEL)) {
+      on_cancel_reply(std::string(id.substr(REST_CANCEL.size())), reply);
+      return;
+    }
     auto it = ledger.orders.find(std::string(id));
     if (it == ledger.orders.end())
       return;
     auto &intent = it->second;
+    if (intent.rest) {
+      on_rest_reply(std::string(id), reply);
+      return;
+    }
     if (auto s = stamps.find(std::string(id)); s != stamps.end())
       s->second.stages[6] = reply_received_ns;
     auto timings = timing_fields(id);
@@ -2160,6 +3045,15 @@ struct Runtime::Impl {
               sniper->retry_after_miss(side);
           });
         }
+        // SNIPER_REST_LIVE: the same BUY rests on the book for a few seconds
+        // instead, once this reply has been handled.
+        if (miss && c.s.rest_live && !stopping) {
+          const std::string missed(id);
+          post("rest after miss", [this, missed] {
+            if (!stopping)
+              rest_after_miss(missed);
+          });
+        }
       } else if (success) {
         ledger.status(id, "pending");
         release(id);
@@ -2175,9 +3069,25 @@ struct Runtime::Impl {
   void on_unknown(std::string_view id, std::string_view why) {
     if (id == "__clock")
       return;
+    if (id.starts_with(REST_CANCEL)) {
+      // A cancel with no answer is simply sent again.
+      const std::string order(id.substr(REST_CANCEL.size()));
+      rest_book.cancel_unproven(order, mono_s());
+      audit({{"result", "rest_cancel_reply"},
+             {"order_id", order},
+             {"canceled", false},
+             {"reason", std::string(why).substr(0, 160)}});
+      return;
+    }
     auto i = ledger.orders.find(std::string(id));
     if (i == ledger.orders.end() || i->second.status == "confirmed")
       return;
+    // A resting order whose end the venue already showed: the missing reply
+    // to its placement no longer matters.
+    if (i->second.rest && rest_final_at.count(std::string(id))) {
+      sent_at.erase(std::string(id));
+      return;
+    }
     ledger.status(id, "unknown");
     auto timings = timing_fields(id);
     release(id);
@@ -2188,11 +3098,83 @@ struct Runtime::Impl {
            {"never_retry", true}, {"acknowledged", false}};
     row.update(timings);
     audit(std::move(row));
+    // A resting order whose placement is unknown may be on the book: it is
+    // cancelled, which is harmless if it is not.
+    if (i->second.rest) {
+      rest_book.posted(id);
+      rest_book.cancel(id, "its placement outcome is unknown", mono_s());
+    }
+  }
+  // One fill of one of our orders: record it, and book it once confirmed.
+  // `maker` is a resting order's fill (no fee).
+  void book_trade(const ParsedTrade &t, const Json &j, std::string_view source,
+                  std::int64_t received_ns, bool maker) {
+    auto evidence = execution::trade_evidence_fields(j, source, received_ns);
+    if (t.status == "FAILED") {
+      private_sizes[t.order].erase(t.id);
+      pause("private trade failed; reconciliation required", true);
+      return;
+    }
+    if (t.status != "CONFIRMED" && !execution::pending_trade_status(t.status))
+      throw std::runtime_error("unknown private trade status");
+    private_sizes[t.order][t.id] = t.shares;
+    // Reconciliation re-reads every trade of the session every 5 s; one that
+    // is already booked has nothing new to record.
+    if (ledger.trade_ids.count(t.id))
+      return;
+    Units delivered = 0;
+    for (auto &[id, sh] : private_sizes[t.order]) {
+      if (sh < 0 || delivered > std::numeric_limits<Units>::max() - sh)
+        throw std::overflow_error("private trade size total overflow");
+      delivered += sh;
+    }
+    auto &intent = ledger.orders.at(t.order);
+    if (t.status == "CONFIRMED") {
+      auto outflow = static_cast<__int128>(booked_outflow) + t.cost + t.fee;
+      if (outflow > std::numeric_limits<Units>::max())
+        throw std::overflow_error("confirmed collateral outflow overflow");
+      if (ledger.fill(t.id, t.order, t.shares, t.cost, t.fee)) {
+        booked_outflow = static_cast<Units>(outflow);
+        Json row{{"result", "live_fill"},
+               {"order_id", t.order},
+               {"trade_id", t.id},
+               {"side", intent.side},
+               {"shares", dollars(t.shares)},
+               {"amount", dollars(t.cost)},
+               {"fee", dollars(t.fee)},
+               {"status", "CONFIRMED"}};
+        if (maker)
+          row["rest"] = true;
+        row.update(evidence);
+        audit(std::move(row));
+      }
+    } else if (delivered > intent.matched_shares)
+      ledger.status(intent.id, intent.status, delivered, intent.matched_cost);
+    Json row{{"result", "live_fill_update"},
+           {"order_id", t.order},
+           {"trade_id", t.id},
+           {"status", t.status}};
+    if (maker)
+      row["rest"] = true;
+    row.update(evidence);
+    audit(std::move(row));
+    // A resting order matched in full is done: no cancellation will follow.
+    if (maker && delivered >= intent.target &&
+        (!rest_final_at.count(t.order) || intent.unresolved()))
+      rest_final(t.order, delivered, "fully matched");
   }
   void consume_trade(const Json &j, std::string_view source,
                      std::int64_t received_ns) {
     try {
       if (is_foreign_trade(j, ledger.orders)) {
+        // SNIPER_REST_LIVE: our resting order filled as a maker of someone
+        // else's trade.
+        auto fills = parse_maker_fills(j, ledger.orders);
+        if (!fills.empty()) {
+          for (auto &t : fills)
+            book_trade(t, j, source, received_ns, true);
+          return;
+        }
         const std::string trade = j.value("id", "");
         std::ifstream in(c.state / "manual_trades.txt");
         if (!trade.empty() && read_manual_trades(in).count(trade)) {
@@ -2216,52 +3198,11 @@ struct Runtime::Impl {
         audit(std::move(row));
         return;
       }
-      auto t = parse_trade(j, ledger.orders);
-      auto evidence = execution::trade_evidence_fields(j, source, received_ns);
-      if (t.status == "FAILED") {
-        private_sizes[t.order].erase(t.id);
-        pause("private trade failed; reconciliation required", true);
-        return;
-      }
-      if (t.status != "CONFIRMED" && !execution::pending_trade_status(t.status))
-        throw std::runtime_error("unknown private trade status");
-      private_sizes[t.order][t.id] = t.shares;
-      // Reconciliation re-reads every trade of the session every 5 s; one that
-      // is already booked has nothing new to record.
-      if (ledger.trade_ids.count(t.id))
-        return;
-      Units delivered = 0;
-      for (auto &[id, sh] : private_sizes[t.order]) {
-        if (sh < 0 || delivered > std::numeric_limits<Units>::max() - sh)
-          throw std::overflow_error("private trade size total overflow");
-        delivered += sh;
-      }
-      auto &intent = ledger.orders.at(t.order);
-      if (t.status == "CONFIRMED") {
-        auto outflow = static_cast<__int128>(booked_outflow) + t.cost + t.fee;
-        if (outflow > std::numeric_limits<Units>::max())
-          throw std::overflow_error("confirmed collateral outflow overflow");
-        if (ledger.fill(t.id, t.order, t.shares, t.cost, t.fee)) {
-          booked_outflow = static_cast<Units>(outflow);
-          Json row{{"result", "live_fill"},
-                 {"order_id", t.order},
-                 {"trade_id", t.id},
-                 {"side", intent.side},
-                 {"shares", dollars(t.shares)},
-                 {"amount", dollars(t.cost)},
-                 {"fee", dollars(t.fee)},
-                 {"status", "CONFIRMED"}};
-          row.update(evidence);
-          audit(std::move(row));
-        }
-      } else if (delivered > intent.matched_shares)
-        ledger.status(intent.id, intent.status, delivered, intent.matched_cost);
-      Json row{{"result", "live_fill_update"},
-             {"order_id", t.order},
-             {"trade_id", t.id},
-             {"status", t.status}};
-      row.update(evidence);
-      audit(std::move(row));
+      book_trade(parse_trade(j, ledger.orders), j, source, received_ns, false);
+      // Should one of our own orders ever take our own resting order, both
+      // sides are ours and both are booked.
+      for (auto &t : parse_maker_fills(j, ledger.orders))
+        book_trade(t, j, source, received_ns, true);
     } catch (const std::exception &e) {
       ++errors;
       pause("accounting disagreement or unauthorized fill", true);
@@ -2270,6 +3211,7 @@ struct Runtime::Impl {
   }
   void on_user(std::string_view raw) {
     const auto received_ns = mono_ns();
+    user_heard = mono_s();
     if (raw == "PONG") {
       user_pong = mono_s();
       return;
@@ -2289,12 +3231,25 @@ struct Runtime::Impl {
             pause("wallet order not authorized by native bot", true);
             continue;
           }
-          if (v.value("type", "") == "CANCELLATION") {
+          const auto kind = v.value("type", "");
+          if (kind == "CANCELLATION" && i->second.rest) {
+            rest_final(id, venue_units(v.at("size_matched")),
+                       "private channel cancellation");
+          } else if (kind == "CANCELLATION") {
             auto size = venue_units(v.at("size_matched"));
             ledger.status(id, size ? "matched" : "no_match", size);
             if (!size)
               ledger.release_fill_slot(id);
             release(id);
+          } else if (kind == "UPDATE" && i->second.rest &&
+                     v.contains("size_matched")) {
+            // A resting order matched some more.
+            auto size = venue_units(v.at("size_matched"));
+            if (size > i->second.matched_shares)
+              ledger.status(id, i->second.status, size,
+                            i->second.matched_cost);
+            if (size >= i->second.target)
+              rest_final(id, size, "private channel: fully matched");
           }
         }
       }
@@ -2489,7 +3444,8 @@ struct Runtime::Impl {
             });
             balanced = mono_s();
           }
-          if (c.live && !workers_stop && now - reconciled >= 5) {
+          if (c.live && !workers_stop &&
+              (reconcile_asap.exchange(false) || now - reconciled >= 5)) {
             std::string cursor;
             for (int pages = 0; pages < 100 && !workers_stop; ++pages) {
               auto target = "https://clob.polymarket.com/data/trades?after=" +
@@ -2527,6 +3483,10 @@ struct Runtime::Impl {
                     // trade reconciliation still books any fill it made.
                     if (!missing_fak_is_unfilled(i->second, wall_s()))
                       return;
+                    if (i->second.rest) {
+                      rest_final(id, 0, "no venue record a minute after it was sent");
+                      return;
+                    }
                     ledger.status(id, "no_match", 0);
                     ledger.release_fill_slot(id);
                     release(id);
@@ -2542,6 +3502,16 @@ struct Runtime::Impl {
                                   ? venue_units(j.at("size_matched"))
                                   : 0;
                   auto status = j.value("status", "");
+                  if (i->second.rest) {
+                    // The venue's own record of a resting order: its final
+                    // size once it can match no more, its size so far if not.
+                    if (rest::record_terminal(status))
+                      rest_final(id, size, "venue order record");
+                    else if (size > i->second.matched_shares)
+                      ledger.status(id, i->second.status, size,
+                                    i->second.matched_cost);
+                    return;
+                  }
                   if (status == "MATCHED" || status == "CANCELED" ||
                       status == "CANCELLED") {
                     ledger.status(id, size ? "matched" : "no_match", size);
@@ -2563,6 +3533,37 @@ struct Runtime::Impl {
               post("open-order reconciliation", [this, open = std::move(open)] {
                 for (auto &o : open) {
                   auto id = o.is_object() ? o.value("id", "") : std::string();
+                  // SNIPER_REST_LIVE: our own resting order is expected here
+                  // while it is watched. One that should be gone is not: it is
+                  // cancelled again and new orders pause.
+                  if (auto mine = ledger.orders.find(id);
+                      mine != ledger.orders.end() && mine->second.rest) {
+                    // A listing read just before the order's end was known
+                    // can still show it.
+                    auto ended = rest_final_at.find(id);
+                    bool just_ended = ended != rest_final_at.end() &&
+                                      mono_s() - ended->second < 15;
+                    // The venue answered "cancelled" a while ago and still
+                    // lists it: it is cancelled again.
+                    if (auto *known = rest_book.find(id);
+                        known && known->off_book &&
+                        mono_s() - known->proven_at > 15 && rest_book.reopen(id)) {
+                      ++errors;
+                      audit({{"result", "error"},
+                             {"order_id", id},
+                             {"reason", "the venue still lists a resting order "
+                                        "it said was cancelled: cancelling again"}});
+                      pause("our resting order is still open on the venue", true);
+                    }
+                    if (!rest_book.find(id) && !just_ended) {
+                      if (!mine->second.unresolved())
+                        ledger.status(id, "pending", mine->second.matched_shares,
+                                      mine->second.matched_cost);
+                      rest_adopt(mine->second, "still open on the venue");
+                      pause("our resting order is still open on the venue", true);
+                    }
+                    continue;
+                  }
                   if (!ledger.orders.count(id) ||
                       o.value("order_type", "") == "GTC" ||
                       o.value("order_type", "") == "GTD")
@@ -2668,6 +3669,10 @@ struct Runtime::Impl {
         dash_tick_gap = std::max(dash_tick_gap, now - dash_last_tick);
       dash_last_tick = now;
     }
+    // Resting orders are watched while running and while stopping: a
+    // shutdown cancels them and waits for the venue to show them gone.
+    if (c.live && !rest_book.empty())
+      rest_watch(false);
     if (!stopping) {
       if (journal.failed() || (paper_audit && paper_audit->failed())) {
         pause_reason = "audit or recorder failed";
@@ -2768,8 +3773,19 @@ struct Runtime::Impl {
       if (c.run_for > 0 && now - start_mono >= c.run_for)
         begin_stop(0);
     } else if ((worker_done && refresher_done && settler_done &&
-                sent_at.empty()) ||
+                sent_at.empty() && !rest_book.busy()) ||
                now - stop_started > 20) {
+      for (auto &[id, o] : rest_book.orders()) {
+        if (o.off_book)
+          continue;
+        ++errors;
+        auto text = "resting order " + id +
+                    " could not be shown cancelled at shutdown: cancel it by "
+                    "hand on Polymarket";
+        audit({{"result", "error"}, {"reason", text}, {"order_id", id}});
+        runtime_fault(text);
+        exit_code = exit_code ? exit_code : 1;
+      }
       if (user)
         user->stop();
       sender->stop();
@@ -2811,7 +3827,9 @@ struct Runtime::Impl {
     fetch_wake.notify_all();
     for (auto &ws : coinbase)
       ws->stop();
-    market->stop();
+    for (auto &m : market)
+      if (m)
+        m->stop();
     if (sniper)
       sniper->closing = true;
     paper_timer.cancel();
@@ -2830,12 +3848,30 @@ struct Runtime::Impl {
            {"native_cpp", true},
            {"mode", c.live ? "LIVE" : "PAPER"},
            {"reference", "772f2eb"}});
+    if (c.s.rest_live) {
+      bool on = rest_test_on();
+      audit({{"result", "rest_live"},
+             {"on", on},
+             {"reason", !c.live      ? "live only: no effect in paper"
+                        : c.dry_run  ? "no order is sent in a dry run"
+                        : on         ? "resting a missed order is on"
+                        : rest_test  ? "off: " + rest_test->reason +
+                                           " (delete rest_live_test.json to "
+                                           "begin a new test)"
+                                     : "off"},
+             {"rest_s", c.s.rest_s},
+             {"direction_only", c.s.rest_dir},
+             {"stop_usd", c.s.rest_stop_usd},
+             {"realized", rest_test ? dollars(rest_test->realized) : 0.0}});
+    }
     signals.async_wait([this](auto ec, int sig) {
       if (!ec)
         begin_stop(sig == SIGTERM ? 143 : 130);
     });
     sender->start();
-    market->start();
+    for (auto &m : market)
+      if (m)
+        m->start();
     for (auto &ws : coinbase)
       ws->start();
     if (user)

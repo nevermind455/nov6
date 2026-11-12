@@ -54,6 +54,11 @@ public:
   void send(std::string);
   bool connected() const;
   void reconnect();
+  // Why the connection last went down ("" while it never has), how many
+  // times it has, and when it last came up (monotonic seconds, 0 if never).
+  std::string last_failure() const;
+  std::uint64_t drops() const;
+  double up_since() const;
 };
 struct H2Callbacks {
   std::function<void(std::string_view, std::int64_t)> written;
@@ -82,6 +87,10 @@ public:
   // Absence means no ready connection; generations change after reconnects.
   std::optional<H2ConnectionInfo> connection_info() const;
   bool post(std::string id, std::string body, const Headers &headers);
+  // DELETE /order with this body: cancel one resting order. The reply (or an
+  // unknown outcome) arrives through the same callbacks under `id`. A cancel
+  // whose outcome is unknown is safe to send again.
+  bool cancel(std::string id, std::string body, const Headers &headers);
   bool get_time();
 };
 } // namespace sniper

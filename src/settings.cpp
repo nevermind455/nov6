@@ -154,6 +154,10 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
   bool rest_live = env_bool("SNIPER_REST_LIVE", false);
   double rest_s = env_float("SNIPER_REST_S", 5);
   double rest_stop = env_float("SNIPER_REST_LIVE_STOP_USD", 10);
+  s.rest_live = rest_live;
+  s.rest_s = rest_s;
+  s.rest_stop_usd = rest_stop;
+  s.rest_dir = env_bool("SNIPER_REST_DIR", true);
   bool maker_only = env_bool("SNIPER_MAKER_ONLY", false);
   s.fair_no_limit = env_bool("SNIPER_FAIR_NO_LIMIT", false);
   double maker_under_c = env_float("SNIPER_MAKER_UNDER_C", 2);
@@ -264,7 +268,6 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
   refuse_on("SNIPER_EXTRA_FEEDS", !strip(text("SNIPER_EXTRA_FEEDS", "")).empty());
   refuse_on("SNIPER_WIDE_CAP_C", wide_cap_c > 0);
   refuse_on("SNIPER_WIDE_CAP_LIVE", wide_cap_live);
-  refuse_on("SNIPER_REST_LIVE", rest_live);
   refuse_on("SNIPER_MAKER_ONLY", maker_only);
   refuse_on("SNIPER_MAKER_SPLIT", maker_split > 0);
   refuse_on("SNIPER_DIR_ADD", dir_add > 0);
@@ -337,6 +340,12 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
            " (must be > 0 and at most 5000)"},
       {s.miss_retry == 0 || s.order_type == "FAK",
        "SNIPER_MISS_RETRY needs SNIPER_ORDER_TYPE=FAK"},
+      {!rest_live || (s.order_type == "FAK" && s.order_sizing == "shares"),
+       "SNIPER_REST_LIVE needs SNIPER_ORDER_TYPE=FAK and "
+       "SNIPER_ORDER_SIZING=shares (it rests a missed FAK's shares)"},
+      {!(rest_live && s.miss_retry > 0),
+       "SNIPER_REST_LIVE and SNIPER_MISS_RETRY: choose one (after a miss the "
+       "order either rests or is sent again)"},
       {paper_cash_max_age_s > 0, "SNIPER_PAPER_CASH_MAX_AGE_S=" +
                                      g(paper_cash_max_age_s) +
                                      " (must be > 0)"},

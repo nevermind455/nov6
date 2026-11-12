@@ -1,5 +1,121 @@
 # Changelog
 
+## 12 November 2026 — holding the venue's websockets
+
+The bot never closed a venue websocket on purpose, but it could give one up
+too easily, took a quarter of a second or more to get it back, and wrote
+nowhere why it went.
+
+* **Keep-alive.** The venue sockets send WebSocket pings when nothing has
+  arrived for half the silence limit, and a pong counts as life. Before, 25
+  seconds without a text reply closed a link that was still healthy.
+* **A warm standby for the market feed** (`SNIPER_MARKET_STANDBY`, default
+  on): a second connection, subscribed to the same tokens, takes over in the
+  same instant when the live one drops; the books restart from fresh
+  snapshots. On the fake venue with one market socket cut every 10 s the feed
+  was down 0 ms per cut, against about 267 ms with one connection.
+* **Reconnect** at once after a drop; a link that does not hold backs off
+  (24 connections in a minute against a venue that drops every socket, where
+  the old code made 159).
+* A fault in the bot's own market handler no longer costs the connection.
+* **Every socket up/down is journalled** (`"result":"ws"`) with its reason
+  and the seconds left in the round; `sniper-miss-report` has a `sockets`
+  section; the dashboard has a `POLY WS` line.
+* `tools/fake-venue`: `VENUE_MARKET_KILL_EVERY_S`, `VENUE_NO_PONG`,
+  `VENUE_MARKET_FLAP`.
+
+See [docs/WEBSOCKETS.md](docs/WEBSOCKETS.md). No strategy rule changed.
+
+Checked before going live: a fresh clone verifies against
+`reports/SHA256SUMS` and passes its own tests; the build on `main` and this
+one give byte-identical decisions on three recorded feeds; a live state
+written by the `main` build is continued by this one, taken back by `main`
+and continued again with the ledger equal to the venue's record throughout
+(`tools/fake-venue`, whose trade ids are now unique across restarts and which
+no longer fails on a round older than itself).
+
+## 11 November 2026 — rest a missed order on the book (`SNIPER_REST_LIVE`)
+
+Opt-in, live only, off by default. No change to any decision, limit or size,
+and none at all unless `SNIPER_REST_LIVE=1`.
+
+* After a FAK the venue confirms matched nothing, the same BUY (its shares at
+  its limit) can rest on the book as a post-only order for at most
+  `SNIPER_REST_S` seconds. A fill is a maker fill: booked at the order's own
+  price with no fee.
+* `SNIPER_REST_DIR=1` (default) rests only the side that beats the price to
+  beat by more than the estimate's own error.
+* It is cancelled early when the trigger fires the other way, when BTC gives
+  the move back, when the side falls behind the price to beat, when the feed
+  goes stale, on any pause, and at shutdown. A cancel is repeated until the
+  venue shows the order gone.
+* While an order may be on the book its market takes no other order of ours.
+* `SNIPER_REST_LIVE_STOP_USD` turns it off for good once the resting orders'
+  own settled loss reaches it (`state/live/rest_live_test.json`).
+* The order sender gained a cancel (`DELETE /order`) on the same HTTP/2
+  connection; the ledger a `rest` flag per order and `rest_realized`; trade
+  handling accepts a trade whose maker leg is our resting order (it was an
+  "unauthorized fill" before); open-order reconciliation expects our own
+  resting order; an inherited resting order is cancelled at start.
+* `sniper-miss-report` prints a `resting_orders` section and knows the new
+  reasons (`RISK_RESTING_ORDER`, `LATE_REST`).
+* `tools/fake-venue` can play the account side (`VENUE_LIVE=1`): orders,
+  cancels, the private channel, trades and balance, for end-to-end runs of
+  `--live` with no real venue.
+
+Details, rules and limits: [docs/RESTING_ORDERS.md](docs/RESTING_ORDERS.md).
+Wire bytes are checked against the real SDK; the feature has not traded on
+the real venue.
+
+Found and fixed in a review of the above, before any live use:
+
+* A fault while watching a resting order was caught as a Coinbase error (the
+  feed reconnected) or, from the timer, stopped the bot. It is now reported,
+  pauses new orders and never reaches the caller.
+* A fault while handling the placement or cancel reply could reset the order
+  connection. The placement reply now fails closed (unknown outcome, cancel).
+* A cancel waited for the placement's answer however late it was. After one
+  second it is sent anyway.
+* An order that could not be cancelled because the order connection was down
+  was never reported. Any order not shown gone five seconds after its cancel
+  was wanted is now an error and pauses new orders.
+* A placement reply arriving after the private channel had already shown the
+  order's end put the order back to pending; a late "unknown" could too.
+* The end of an order was written to the ledger again for every repeat of the
+  same evidence, and its `rest_done` row could report fewer shares than had
+  matched.
+* The loss stop counted settled results only, so resting fills still open
+  could take the test past it. One more order must now fit under the stop
+  even if every open resting fill, and itself, lost all it paid.
+* An order the venue confirmed cancelled but still lists is cancelled again.
+* A missed order is not rested while another order of ours can still trade in
+  the market.
+
+Dashboard: the MARKET panel shows the resting order under the book (side,
+shares, price, time left with a bar, or its state), recomputed every frame;
+the ORDERS table has a line for each order that rested.
+
+A second pass (sanitizer builds, connection-drop stress, static analysis):
+
+* A resting order is cancelled when the private channel closes or goes
+  silent; before, it stayed on the book with its fills unseen until the next
+  reconciliation.
+* A placement answered with any 2xx status and `live` is resting; null
+  `errorMsg` and amount fields are read as absent; an order the venue takes
+  without showing it on the book (`delayed`) is followed and cancelled at
+  once instead of raising the unknown-outcome pause.
+* Cancel replies match the order id whatever its letter case.
+* When a late placement answer arrives for an order whose cancel is already
+  wanted, the cancel goes out at once.
+* A placement answered as resting for an order no longer followed is followed
+  again and cancelled.
+* The same fault in the resting-order watch is reported once in ten seconds.
+* Should one of our orders ever take our own resting order, both sides of
+  the trade are booked.
+* `tools/fake-venue` gained `VENUE_SIGMA`, and its account side was used for
+  the stress runs: with every connection cut every 6 s for ten minutes the
+  ledger equalled the venue's record and no order was left open.
+
 ## 9 November 2026 — execution latency and measurement
 
 * Precompute immutable EIP-712 signing data, avoid duplicate token parsing and

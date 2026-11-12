@@ -334,6 +334,7 @@ void Sniper::signal(double mid, double t, std::int64_t t_ns) {
   ++n["signals"];
   std::string why = cb_fresh.why_not(t / 1000.0);
   std::string side = *direction > 0 ? "UP" : "DOWN";
+  ++signals_by_side[idx(side)];
   if (!why.empty()) {
     Json window = window_fields(t);
     trigger.q.values.clear();
@@ -895,6 +896,9 @@ std::shared_ptr<Plan> Sniper::decide(const std::string &side, Json &row,
     return skip("no current round", row);
   double end = *end_opt;
   std::string token = side == "UP" ? up : down;
+  // (asked first: the resting order itself also awaits its fill size)
+  if (env.resting_in(cond))
+    return skip("our resting order is in this market", row);
   if (env.awaiting_fak(side, cond, token))
     return skip("awaiting FAK fill size", row);
   double left = end - env.wall();

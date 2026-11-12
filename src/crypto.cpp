@@ -360,7 +360,10 @@ std::string wallet_for(std::string_view signer, int type) {
   return checksum_address(hex(std::span(h.data() + 12, 20)));
 }
 std::string serialize_order(const UnsignedOrder &o, std::string_view signature,
-                            std::string_view owner, std::string_view type) {
+                            std::string_view owner, std::string_view type,
+                            bool post_only) {
+  if (post_only && type != "GTC" && type != "GTD")
+    throw std::invalid_argument("only a resting order can be post-only");
   // SDK 0.13.0 build_post_order_request key order, serialized without spaces.
   auto quoted = [](std::string_view s) { return Json(std::string(s)).dump(); };
   return fmt::format(
@@ -368,16 +371,22 @@ std::string serialize_order(const UnsignedOrder &o, std::string_view signature,
       "\"maker\":{},\"makerAmount\":\"{}\",\"metadata\":{},\"salt\":{},"
       "\"side\":\"BUY\",\"signature\":{},\"signatureType\":{},\"signer\":{},"
       "\"takerAmount\":\"{}\",\"timestamp\":\"{}\",\"tokenId\":{}}},"
-      "\"orderType\":{},\"owner\":{}}}",
+      "\"orderType\":{},\"owner\":{}{}}}",
       quoted(o.builder), quoted(o.maker), o.maker_amount, quoted(o.metadata),
       o.salt, quoted(signature), o.signature_type, quoted(o.signer),
       o.taker_amount, o.timestamp, quoted(o.token), quoted(type),
-      quoted(owner));
+      quoted(owner), post_only ? ",\"postOnly\":true" : "");
+}
+std::string cancel_order_body(std::string_view order_id) {
+  if (order_id.empty())
+    throw std::invalid_argument("an order id is required to cancel");
+  return "{\"orderID\":" + Json(std::string(order_id)).dump() + "}";
 }
 SignedOrder build_order(const Signer &signer, std::string_view maker,
                         int signature_type, std::string_view token_id,
                         Units stake, Units cap, const Rules &rules,
-                        const Credentials &creds, std::string_view type) {
+                        const Credentials &creds, std::string_view type,
+                        bool post_only) {
   if (!rules.loaded)
     throw std::invalid_argument("order rules or token unavailable");
   Big token;
@@ -413,7 +422,7 @@ SignedOrder build_order(const Signer &signer, std::string_view maker,
   s.digest = order_digest_impl(o, &token);
   s.signature = signer.sign(s.digest);
   s.id = hex(s.digest);
-  s.body = serialize_order(o, s.signature, creds.key, type);
+  s.body = serialize_order(o, s.signature, creds.key, type, post_only);
   return s;
 }
 Units fee_total(Units shares, Units price, Units rate, int exponent) {

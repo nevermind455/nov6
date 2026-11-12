@@ -21,7 +21,7 @@ the PDF's acceptance conditions.
 | Allocation-free hot path | **Not achieved.** JSON, string, container and snapshot activity still allocate; ledger work can block. |
 | Full fault matrix and week of bounded memory | **Not completed.** Book/history/maps have limits, but the required long-duration proof is absent. |
 | Live $5 canary after paper/parity acceptance | **Not performed.** Requires completion of earlier acceptance steps and deliberate user-side setup. |
-| Optional phase-3 features | Extra feeds, maker experiments, direction add-ons, measured odds, strict paper/live matching and cash mirroring are explicitly refused when enabled. |
+| Optional phase-3 features | Extra feeds, maker-only and split maker orders, direction add-ons, measured odds, strict paper/live matching and cash mirroring are explicitly refused when enabled. |
 | Optional price-to-beat gate | Reference legacy estimate (trigger TWAP, calibrated by published values) ported and replay-verified; the Python production path instead reads Polymarket's RTDS reference, which is not ported. Disabled by default. |
 
 ## Material differences and limits

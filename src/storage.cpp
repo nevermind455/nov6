@@ -233,6 +233,7 @@ Json intent_json(const Intent &i) {
           {"canary_spend_released", i.canary_spend_released},
           {"canary_session", i.canary_session},
           {"min_entry", i.min_entry},
+          {"rest", i.rest},
           {"sent_wall", i.sent_wall}};
 }
 Intent intent_from_json(const Json &j) {
@@ -264,6 +265,7 @@ Intent intent_from_json(const Json &j) {
   i.canary_spend_released = j.value("canary_spend_released", false);
   i.canary_session = j.value("canary_session", 0.0);
   i.min_entry = j.at("min_entry");
+  i.rest = j.value("rest", false);
   i.sent_wall = j.at("sent_wall");
   return i;
 }
@@ -293,6 +295,7 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
     reference_cash = j.at("reference_cash");
     high_water = j.at("high_water");
     realized = j.at("realized");
+    rest_realized = j.value("rest_realized", Units(0));
     fees = j.at("fees");
     risk_epoch = j.at("risk_epoch");
     dd_pause_until = j.at("dd_pause_until");
@@ -449,6 +452,18 @@ void Ledger::apply(const Json &e) {
     auto condition = e.at("condition").get<std::string>();
     if (!settled_conditions.insert(condition).second)
       return;
+    // What the resting orders' own fills made or lost in this round.
+    for (const auto &[id, o] : orders) {
+      (void)id;
+      if (!o.rest || o.condition != condition || o.booked_shares <= 0)
+        continue;
+      auto paid = e.at("payouts").find(o.token);
+      if (paid == e.at("payouts").end())
+        continue;
+      auto pnl = static_cast<__int128>(multiply(o.booked_shares, paid->get<Units>())) -
+                 o.booked_cost - o.booked_fee;
+      rest_realized = checked_money(static_cast<__int128>(rest_realized) + pnl);
+    }
     for (auto it = e.at("payouts").begin(); it != e.at("payouts").end(); ++it) {
       auto p = positions.find(it.key());
       if (p == positions.end() || p->second.settled)
@@ -753,6 +768,7 @@ Json Ledger::json() const {
           {"reference_cash", reference_cash},
           {"high_water", high_water},
           {"realized", realized},
+          {"rest_realized", rest_realized},
           {"fees", fees},
           {"risk_epoch", risk_epoch},
           {"dd_pause_until", dd_pause_until},
