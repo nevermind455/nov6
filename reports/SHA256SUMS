@@ -3,7 +3,7 @@
 c60c41043056a15facf348d62a9e55b1e62063185e130b2b96579b3efe8f69a4  ./.gitignore
 1e18be772b8b48b9fa524dcbf162c96f2014c9c74da1bfc72a738a0ae8779f73  ./CHANGELOG.md
 a10798b257eb21217fcc572a8ee78f24aeac49313e3b5c5ef3e56431eda9c6d6  ./CMakeLists.txt
-0dc95b10e2d5265b96aee1bba96a14182977f0c311a7571e0a5e88fedfddb83a  ./README.md
+30dcc3f55bff6b5ecb026f0c87f79c21a7b4fffff85e6e33dab207d1993b9f3a  ./README.md
 9e505e68eb4eacd1601afa478c628cc21a05ea890c2deac458e0b7cd38c6060c  ./bin/sniper-cpp
 9c724a45d7de8625d97140c913963776e590341ae40f36b8d52bd8bea3a59f1d  ./bin/sniper-diff
 5ece4a6e98c3d8a91c9a08dc182cf5a0762f2ced3addc3c13207ed4e133b9604  ./bin/sniper-edge-report
@@ -194,5 +194,6 @@ d3b639b49a647a3fb1c2e0f3ad6e0dab89edd098358c03a961dd8b337e44eab8  ./tools/replay
 378d97ee4fc009f45549b57783106635b188a49acb3128c490076f5267d4c505  ./tools/replay/test_py_replay.py
 0b2d4084afdef2290e840098ef3094be7dda92ba819b51ff02e68176a9c74ab0  ./tools/report/edge_report.cpp
 8aca671a28d6784021a36199ec35bfc02eb246892096f008eb6a5f9ed0f5741c  ./tools/report/edge_report.hpp
+7de3ecc8345a3c19dfe372b1064a07498d0010416915b3e0b34f11c8a8ebcbea  ./tools/report/live_check.py
 f9bf55863ab8be465168a37b94d9353dbc549ae62e79c454f617ea1672b9cd03  ./tools/report/miss_report.cpp
 42d52bdb3537751ed97ef40637fc1de5569ae0b9559f010b99b12414367e3d2b  ./tools/report/miss_report.hpp

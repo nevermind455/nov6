@@ -35,6 +35,12 @@ control, missed opportunity, unfilled, venue rejection, software failure or
 unknown outcome), and live orders are followed from send to acknowledgement
 to fill with per-stage latency. See `docs/MISSED_ORDERS.md`.
 
+For a short health report of a live run (halts and their reasons, errors,
+orders and fills, resting orders, websocket drops, settlement and the ledger),
+run `nice python3 -I tools/report/live_check.py` from the bot's folder
+(`--hours 6` for a shorter window, `--state state/paper` for paper). It only
+reads, and prints no key.
+
 ## Execution latency and VPS measurements
 
 The order sender reuses its HTTP/2 TLS connection, and WebSocket feeds drive
