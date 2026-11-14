@@ -151,6 +151,27 @@ inline Units as_units(const Json &j) {
     throw std::invalid_argument("expected decimal");
   return units(fixed6(j.get<double>()));
 }
+// o[key] when o is an object that has key, else null (Python dict.get).
+inline const Json &get(const Json &o, const char *key) {
+  static const Json null;
+  if (!o.is_object())
+    return null;
+  auto it = o.find(key);
+  return it == o.end() ? null : *it;
+}
+// Python bool() of a JSON value: null, false, 0, "" and empty containers are
+// false.
+inline bool truthy(const Json &v) {
+  if (v.is_null())
+    return false;
+  if (v.is_boolean())
+    return v.get<bool>();
+  if (v.is_number())
+    return v.get<double>() != 0;
+  if (v.is_string() || v.is_array() || v.is_object())
+    return !v.empty();
+  return true;
+}
 inline double number(const Json &j) {
   if (j.is_boolean())
     throw std::invalid_argument("expected number");
@@ -254,8 +275,6 @@ inline Amounts market_amounts(Units stake, Units price, Units tick) {
     throw std::overflow_error("taker amount overflow");
   return {maker, static_cast<Units>(coarse) * mul};
 }
-enum class Side { Up = 0, Down = 1 };
-inline const char *side_name(Side s) { return s == Side::Up ? "UP" : "DOWN"; }
 struct Rules {
   Units tick = 0, min_shares = 0, rate = 0;
   int exponent = 1;
@@ -271,9 +290,6 @@ struct Round {
 struct Level {
   Units price = 0, size = 0;
 };
-inline std::string token(const Round &r, Side side) {
-  return side == Side::Up ? r.up : r.down;
-}
 inline bool valid_hex(std::string_view s, std::size_t bytes) {
   if (s.size() != 2 + bytes * 2 || s.substr(0, 2) != "0x")
     return false;

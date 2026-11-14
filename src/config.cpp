@@ -209,46 +209,16 @@ Config Config::load(int argc, char **argv) {
   }
   c.s = sniper_settings(
       [&c](const std::string &name) { return c.raw(name); }, &c.notices);
-  // the runtime's own copies of the reference settings
-  c.k = c.s.k_bp;
-  c.window = c.s.window_ms;
-  c.cooldown = c.s.cooldown_ms;
-  c.min_left = c.s.min_left_s;
-  c.stale_ms = c.s.stale_ms;
-  c.max_fills = c.s.max_fills_round;
-  c.max_side = c.s.max_side_shares;
-  c.slip = c.s.slip;
-  c.fair = c.s.fair;
-  c.margin = c.s.fair_margin;
-  c.vol_window = c.s.fair_vol_s;
-  c.min_gap = c.s.min_gap_c;
-  c.fair_no_limit = c.s.fair_no_limit;
-  c.kelly_on = c.s.kelly;
-  c.kelly = c.s.kelly_fraction;
-  c.hybrid = c.s.hybrid_sizing;
-  c.flat = c.s.flat_live;
-  c.order_type = c.s.order_type;
-  c.conns = c.s.coinbase_conns;
-  c.shares = runtime_int(c.s.shares, "SNIPER_SHARES");
-  c.baseline_bp = c.s.hybrid_policy.vol_baseline_bp;
-  c.dd_stop = c.s.hybrid_policy.drawdown_stop;
-  c.dd_pause = c.s.hybrid_dd_pause_s;
-  c.risk_fraction = units(fixed6(c.s.hybrid_policy.risk_fraction));
-  c.max_order = units(fixed6(c.s.hybrid_policy.max_order_usd));
-  c.min_entry = c.s.kelly_min_entry;
-  c.min_entry_dd = c.s.min_entry_max_drawdown;
-  c.venue_min_override = static_cast<Units>(c.s.venue_min_shares) * U;
-  c.coinbase_stale = c.s.coinbase_stale_ms;
-  c.coinbase_unknown = c.s.coinbase_unknown_ms;
-  c.backlog_max = c.s.coinbase_backlog_max;
-  c.silent = c.s.coinbase_silent_s;
-  c.hold_ms = runtime_int(c.s.hold_ms, "SNIPER_HOLD_MS");
-  c.extra_ms = runtime_int(c.s.paper_extra_ms, "SNIPER_PAPER_EXTRA_MS");
-  c.book_wait_ms = runtime_int(c.s.book_wait_ms, "SNIPER_BOOK_WAIT_MS");
-  c.ptb_skip = c.s.ptb_skip_close;
-  c.ptb_margin = c.s.ptb_margin_bp;
-  // The runtime reads these later. They count as used here, and --check refuses
-  // a bad value now instead of leaving it to fail at the real start.
+  // The runtime reads the trading settings from c.s. Refuse at start, as
+  // before, a value it could not hold: a count or a time in milliseconds past
+  // the int range, an order cap past the ledger's money range.
+  runtime_int(c.s.shares, "SNIPER_SHARES");
+  units(fixed6(c.s.hybrid_policy.max_order_usd));
+  runtime_int(c.s.hold_ms, "SNIPER_HOLD_MS");
+  runtime_int(c.s.book_wait_ms, "SNIPER_BOOK_WAIT_MS");
+  // The runtime reads these later (all but the two below). They count as used
+  // here, and --check refuses a bad value now instead of leaving it to fail at
+  // the real start.
   for (auto name :
        {"MAX_ALLOWED_SPREAD", "PAPER_LATENCY_MS", "ORDERBOOK_MAX_AGE_SECONDS",
         "ORDERBOOK_MAX_QUIET_SECONDS", "ORDERBOOK_FUTURE_TOLERANCE_SECONDS",
@@ -267,6 +237,16 @@ Config Config::load(int argc, char **argv) {
       throw std::invalid_argument(std::string(name) +
                                   " must be a finite number");
   }
+  // Checked like the reference's, but this build's paper model has no use for
+  // them: say so rather than ignore them silently.
+  for (auto name : {"PAPER_LATENCY_MS", "PAPER_FLAGGED_DELAY_SECONDS"}) {
+    auto v = c.raw(name);
+    if (v && v->find_first_not_of(" \t") != std::string::npos)
+      c.notices.push_back(std::string(name) +
+                          " has no effect in this build: paper order delays "
+                          "come from SNIPER_LATENCY_MS or the live-like model "
+                          "(SNIPER_NET_MS, SNIPER_HOLD_MS, SNIPER_SERVER_MS)");
+  }
   for (auto &[name, value] : c.values)
     if (!c.used.count(name))
       c.notices.push_back("unused setting: " + name);
@@ -276,7 +256,7 @@ Config Config::load(int argc, char **argv) {
 void Config::validate() const {
   if (start_cash <= 0 || min_price >= max_price || min_expiry >= trade_last)
     throw std::invalid_argument("invalid cash, price band or trading window");
-  if ((min_gap > 0 || fair_no_limit) && !fair)
+  if ((s.min_gap_c > 0 || s.fair_no_limit) && !s.fair)
     throw std::invalid_argument(
         "SNIPER_FAIR_NO_LIMIT and SNIPER_MIN_GAP_C require SNIPER_FAIR=1");
   if (new_session && !live)
@@ -291,14 +271,17 @@ void Config::validate() const {
           "POLY_FUNDER is required for proxy signature types");
     // Slip: the baseline 0.05, or the owner's tighter 0.02, which can only make
     // an order's price limit lower.
-    if (k != .5 || window != 250 || cooldown != 300 ||
-        (slip != .05 && slip != .02) || !fair || margin != .01 ||
-        order_type != "FAK" || fair_no_limit)
+    if (s.k_bp != .5 || s.window_ms != 250 || s.cooldown_ms != 300 ||
+        (s.slip != .05 && s.slip != .02) || !s.fair || s.fair_margin != .01 ||
+        s.order_type != "FAK" || s.fair_no_limit)
       throw std::invalid_argument(
           "live frozen-spec check failed: trigger, window, cooldown, slip "
           "(0.02 or 0.05), fair margin and FAK must match the baseline");
-    if (!(kelly_on && hybrid && kelly >= .25 && kelly <= .5) &&
-        !(flat && !kelly_on && shares >= 5 && shares <= 20))
+    // SNIPER_SHARES may have a fraction; these checks compare its whole shares.
+    const double shares = std::trunc(s.shares);
+    if (!(s.kelly && s.hybrid_sizing && s.kelly_fraction >= .25 &&
+          s.kelly_fraction <= .5) &&
+        !(s.flat_live && !s.kelly && shares >= 5 && shares <= 20))
       throw std::invalid_argument(
           "live frozen-spec check failed: Kelly/hybrid or flat live sizing");
     if (canary_shares < shares)
@@ -313,17 +296,17 @@ void Config::validate() const {
 Json Config::public_view() const {
   return {{"native_cpp", true},
           {"mode", live ? (dry_run ? "LIVE DRY RUN" : "LIVE") : "PAPER"},
-          {"trigger_bp", k},
+          {"trigger_bp", s.k_bp},
           {"trigger_feeds", [&] {
              Json f = Json::array({s.primary_feed});
              for (const auto &x : s.extra_feeds)
                f.push_back(x);
              return f;
            }()},
-          {"window_ms", window},
-          {"order_type", order_type},
-          {"kelly_fraction", kelly},
-          {"fair_margin", margin},
+          {"window_ms", s.window_ms},
+          {"order_type", s.order_type},
+          {"kelly_fraction", s.kelly_fraction},
+          {"fair_margin", s.fair_margin},
           {"prepare_lead_s", prepare_lead},
           {"runtime_dependencies", "C++ libraries; no Python"},
           {"independent_paper_model", !live},

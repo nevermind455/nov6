@@ -33,11 +33,7 @@ Dec tick_cap(const Dec &configured, const Dec &tick) {
   Dec cap = py::min(configured, ONE - tick);
   return py::to_integral(cap / tick, Rounding::Floor) * tick;
 }
-std::string lower(std::string s) {
-  std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-  return s;
-}
+using py::lower;
 Dec venue_minimum_stake(const Dec &wanted, const DecLevels &asks,
                         const Dec &minimum, const Dec &cap) {
   if (minimum <= ZERO || cap <= ZERO || asks.empty())
@@ -449,7 +445,6 @@ FillQuote PaperBroker::quote(const BookSnapshot &book, const Order &o) {
 }
 
 void PaperBroker::reject(Order &o, const std::string &why) {
-  ++rejected_orders;
   o.result.filled = false;
   o.result.error = why.empty() ? "paper order rejected" : why;
   o.finished = true;
@@ -755,7 +750,6 @@ void PaperBroker::arrive(Order &o, BookState &books, const SniperSettings &s) {
       for (auto &[p, sh, nl] : q.levels)
         mine.emplace_back(m, p, sh);
     }
-    ++filled_orders;
     Json levels = Json::array();
     for (auto &[p, sh, nl] : q.levels)
       levels.push_back({p.to_double(), sh.to_double(), nl.to_double()});
@@ -791,7 +785,6 @@ void PaperBroker::arrive(Order &o, BookState &books, const SniperSettings &s) {
       h_.audit(fill);
     o.result.filled = true;
     o.result.fill = fill;
-    o.result.matched_mono = now;
     o.finished = true;
   } catch (const PaperRejected &e) {
     reject(o, e.what());

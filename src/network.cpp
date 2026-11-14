@@ -608,5 +608,4 @@ bool WebSocket::connected() const { return p_->up; }
 void WebSocket::reconnect() { p_->fail(); }
 std::string WebSocket::last_failure() const { return p_->failure; }
 std::uint64_t WebSocket::drops() const { return p_->drops; }
-double WebSocket::up_since() const { return p_->up ? p_->up_since : 0.0; }
 } // namespace sniper

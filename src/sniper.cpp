@@ -28,11 +28,7 @@ Json end_json(double end) {
     return Json(static_cast<long long>(end));
   return Json(end);
 }
-std::string lower(std::string s) {
-  std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-  return s;
-}
+using py::lower;
 bool starts_with(const std::string &s, const std::string &p) {
   return s.rfind(p, 0) == 0;
 }
@@ -498,14 +494,6 @@ std::pair<double, Json> Sniper::latency_plan() {
   if (s.fixed_latency)
     return {s.latency_ms, Json{{"latency_mode", "fixed"}}};
   double extra = env.live() ? 0.0 : s.paper_extra_ms;
-  if (auto d = env.live_delay()) {
-    Json parts{{"latency_mode", "live-sampled"},
-               {"delay_ms", py::round(d->first, 1)},
-               {"delay_n", d->second}};
-    if (extra)
-      parts["extra_ms"] = extra;
-    return {d->first + extra, parts};
-  }
   auto rtt = env.net_rtt();
   bool measured = !rtt.empty();
   double net = s.net_default_ms;
@@ -1313,7 +1301,6 @@ std::shared_ptr<Plan> Sniper::decide(const std::string &side, Json &row,
   plan->amount = amount;
   plan->cap = cap;
   plan->lat = lat;
-  plan->lat_parts = parts;
   plan->view = view;
   plan->dispatch_deadline = end - last;
   plan->risk_shares = risk_shares;

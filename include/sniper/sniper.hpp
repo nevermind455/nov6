@@ -87,8 +87,7 @@ struct SniperSettings {
   bool binance_freshness = true;
   double binance_stale_ms = 1000, binance_unknown_ms = 5000, binance_silent_s = 5;
   int binance_backlog_max = 20;
-  std::string delay_source = "auto";
-  double delay_days = 3, coinbase_silent_s = 5;
+  double coinbase_silent_s = 5;
   double ptb_max_gap_s = 5, ptb_min_checks = 6;
 };
 
@@ -179,10 +178,6 @@ struct SniperEnv {
   // live: prepare, sign, write the intent and send; false when refused
   // before the wire (the row is written by the sender then)
   virtual bool dispatch_live(const std::shared_ptr<Plan> &) { return false; }
-  // paper SNIPER_DELAY_SOURCE=live: one sampled delay per order (ms)
-  virtual std::optional<std::pair<double, std::size_t>> live_delay() {
-    return std::nullopt;
-  }
 };
 
 struct InFlight {
@@ -214,13 +209,11 @@ struct Plan {
   // "live halted" when new orders are paused)
   std::string live_refusal;
   bool live_halted = false;
-  Json lat_parts;
   Json row;      // the decision row, journalled when the outcome is known
   BookView view; // the book the decision saw
   double r_bp = 0;
   int retry = 0; // 0 for a signal's order, 1 for its re-try after a miss
-  std::int64_t t_ns = 0, decided_ns = 0, built_ns = 0, signed_ns = 0,
-               sent_ns = 0;
+  std::int64_t t_ns = 0;
 };
 
 // The paper broker's answer for one order (paper_trade last_fill/last_error).
@@ -229,7 +222,6 @@ struct PaperResult {
   std::string error;
   Json fill;    // the reference's last_fill fields
   Json arrival; // last_timing["arrival"] (info of the arrival book)
-  double matched_mono = 0;
 };
 
 class Sniper {
@@ -330,7 +322,6 @@ public:
   hybrid::Factors hybrid_factors(Json *out = nullptr);
   void check_hybrid_order(Plan &, const py::Dec &spend, double fee_rate,
                           const py::Dec &quoted = py::D(0));
-  double bankroll_value() const { return bankroll_ ? *bankroll_ : NAN; }
   static int idx(const std::string &side) { return side == "UP" ? 0 : 1; }
 
 private:
@@ -346,7 +337,6 @@ private:
   std::vector<std::string> skip_order_;
   std::map<std::string, double> skip_logged_;
   std::vector<std::shared_ptr<Plan>> dispatched_;
-  std::int64_t t1_ns_ = 0;
   std::optional<double> t1_mid_;
   std::shared_ptr<Plan> last_plan_[2]; // each side's last order sent
   std::optional<Json> retry_fields_;   // joined to a re-try's decision row

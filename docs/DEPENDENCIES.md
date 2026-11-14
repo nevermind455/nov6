@@ -9,7 +9,6 @@ glibc 2.39, system OpenSSL 3.0.13. C++20, `-O2`, no fast-math, no
 | Boost | 1.83.0 | Asio/Beast and multiprecision, header-only |
 | fmt | 9.1.0 | Header-only formatting |
 | nlohmann JSON | 3.11.3 | Structured metadata and accounting |
-| simdjson | 3.6.4 | Coinbase parsing; shared library bundled |
 | nghttp2 | 1.59.0 | Native HTTP/2, statically linked |
 | libsecp256k1 | 0.2.0 | Recoverable deterministic signatures, statically linked |
 | OpenSSL | 3.0.13 in build environment | TLS, HMAC, SHA-256 and randomness; system runtime library |

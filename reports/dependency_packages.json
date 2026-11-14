@@ -69,24 +69,11 @@
     "Depends": "libsecp256k1-1 (= 0.2.0-2), pkg-config",
     "Size": "1170768"
   },
-  "libsimdjson-dev": {
-    "Version": "3.6.4-1",
-    "Filename": "pool/universe/s/simdjson/libsimdjson-dev_3.6.4-1_amd64.deb",
-    "SHA256": "95245042a748a9c857b896c49c6dc5399875484fafcaf8c552e7da5b1db52da3",
-    "Depends": "libsimdjson19 (= 3.6.4-1)",
-    "Size": "224754"
-  },
   "nlohmann-json3-dev": {
     "Version": "3.11.3-1",
     "Filename": "pool/universe/n/nlohmann-json3/nlohmann-json3-dev_3.11.3-1_all.deb",
     "SHA256": "85e4e95dc4bdc6034d593e1933ee88e085319fee36cae83c178e8ddc1a66e8fd",
     "Depends": null,
     "Size": "189676"
-  },
-  "libsimdjson19": {
-    "Version": "3.6.4-1",
-    "Filename": "pool/universe/s/simdjson/libsimdjson19_3.6.4-1_amd64.deb",
-    "SHA256": "5e86177bb5ff189e492729ff71bd9e8f45d6af2fb1e7f2523a56d08e6d87343c",
-    "Size": "81218"
   }
 }

@@ -193,8 +193,6 @@ Dashboard::Dashboard(int fd) : s_(std::make_shared<State>()) {
 
 Dashboard::~Dashboard() { stop(); }
 
-bool Dashboard::interactive() const { return s_->interactive; }
-
 void Dashboard::submit(Json snapshot) {
   {
     std::lock_guard lock(s_->mutex);

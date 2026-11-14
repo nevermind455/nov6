@@ -158,7 +158,6 @@ public:
   ~Dashboard();
   Dashboard(const Dashboard &) = delete;
   Dashboard &operator=(const Dashboard &) = delete;
-  bool interactive() const;
   void submit(Json snapshot);
   // Restores the terminal. Safe to call more than once.
   void stop();

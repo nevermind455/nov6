@@ -17,7 +17,6 @@
 #include <fstream>
 #include <iostream>
 #include <openssl/crypto.h>
-#include <simdjson.h>
 #include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
@@ -195,7 +194,6 @@ struct Runtime::Impl {
     return wall_s() + (std::abs(o) > 2.0 ? o : 0.0);
   }
   std::atomic<std::uint64_t> blocked{0};
-  simdjson::dom::parser parser;
   std::map<std::int64_t, Round> rounds;
   std::set<std::string> subscribed, user_markets;
   // Orders still open when this run started. New orders wait until the
@@ -314,11 +312,9 @@ struct Runtime::Impl {
       : c(std::move(cfg)), ledger(c.ledger, c.live ? 0 : c.start_cash, c.live),
         journal(c.journal) {
     tls.set_default_verify_paths();
-    if (parser.allocate(8192) != simdjson::SUCCESS)
-      throw std::runtime_error("simdjson parser allocation failed");
-    cb_open.resize(c.conns);
-    cb_ack.resize(c.conns);
-    cb_last_tick.resize(c.conns);
+    cb_open.resize(c.s.coinbase_conns);
+    cb_ack.resize(c.s.coinbase_conns);
+    cb_last_tick.resize(c.s.coinbase_conns);
     if (!c.record.empty()) {
       rec_out.open(c.record, std::ios::app);
       if (!rec_out)
@@ -424,7 +420,7 @@ struct Runtime::Impl {
           io, tls, "wss://ws-subscriptions-clob.polymarket.com/ws/market",
           [this, k](auto raw, int) { on_market(k, raw); },
           [this, k](bool up) { on_market_state(k, up); }, 25, true);
-    for (int n = 0; n < c.conns; ++n)
+    for (int n = 0; n < c.s.coinbase_conns; ++n)
       coinbase.push_back(std::make_unique<WebSocket>(
           io, tls, "wss://ws-feed.exchange.coinbase.com",
           [this, n](auto raw, int backlog) { on_coinbase(n, raw, backlog); },
@@ -456,7 +452,7 @@ struct Runtime::Impl {
               sniper->on_coinbase_disconnect();
             }
           },
-          c.silent, false));
+          c.s.coinbase_silent_s, false));
     for (std::size_t i = 0; i < c.s.extra_feeds.size(); ++i)
       extra_ws.push_back(std::make_unique<WebSocket>(
           io, tls, feeds::url(c.s.extra_feeds[i]),
@@ -1520,14 +1516,12 @@ struct Runtime::Impl {
       PaperConfig pc;
       pc.max_buy_price = c.max_price;
       pc.min_buy_price = c.min_price;
-      pc.latency_ms = setting("PAPER_LATENCY_MS", 150);
       pc.max_book_age_s = setting("ORDERBOOK_MAX_AGE_SECONDS", 8.0);
       pc.max_quiet_s = setting("ORDERBOOK_MAX_QUIET_SECONDS", 900.0);
       pc.future_tol_s = setting("ORDERBOOK_FUTURE_TOLERANCE_SECONDS", 5.0);
       pc.max_spread = setting("MAX_ALLOWED_SPREAD", 0.25);
       pc.min_seconds_to_expiry = c.min_expiry;
       pc.trade_window_seconds = c.trade_last;
-      pc.flagged_delay_ms = setting("PAPER_FLAGGED_DELAY_SECONDS", 1.0) * 1000.0;
       pc.own_fill_ttl_s = std::max(0.0, setting("PAPER_OWN_FILL_TTL_S", 2.0));
       PaperHooks h;
       h.mono = [] { return mono_s(); };
@@ -2125,10 +2119,10 @@ struct Runtime::Impl {
       return refuse("live orders are share-sized (SNIPER_ORDER_SIZING=shares)");
     // The engine's own round counters only follow paper fills, so the round caps
     // are enforced here for live, from the ledger.
-    if (ledger.round_fills(r.condition) >= c.max_fills)
+    if (ledger.round_fills(r.condition) >= c.s.max_fills_round)
       return refuse("round cap: fills in this round");
     if (dollars(ledger.risk_shares(p->token)) + static_cast<double>(*p->shares) >
-        c.max_side + 1e-9)
+        c.s.max_side_shares + 1e-9)
       return refuse("round cap: shares on this side");
     // the cash read just before this round started, or since
     if (wall_s() - (mono_s() - balance_at) <
@@ -2212,7 +2206,7 @@ struct Runtime::Impl {
     ts[2] = mono_ns();
     auto signed_order = build_order(*signer, c.funder, c.signature_type,
                                     p->token, stake, cap, rule, creds,
-                                    c.order_type);
+                                    c.s.order_type);
     ts[3] = mono_ns();
     if (c.dry_run) {
       // Every check above ran and the order was signed. Nothing is recorded as
@@ -2622,10 +2616,10 @@ struct Runtime::Impl {
     if (dollars(missed.limit) < c.min_price - 1e-9 ||
         dollars(missed.limit) > c.max_price + 1e-9)
       return no("price outside the buy band", "refused");
-    if (ledger.round_fills(r.condition) >= c.max_fills)
+    if (ledger.round_fills(r.condition) >= c.s.max_fills_round)
       return no("round cap: fills in this round", "refused");
     if (dollars(ledger.risk_shares(missed.token)) + dollars(missed.target) >
-        c.max_side + 1e-9)
+        c.s.max_side_shares + 1e-9)
       return no("round cap: shares on this side", "refused");
     if (wall_s() - (mono_s() - balance_at) <
         std::min(static_cast<double>(r.start), wall_s()) - 10.0)
@@ -3847,7 +3841,7 @@ struct Runtime::Impl {
           last_probe = now;
         }
       }
-      for (int n = 0; n < c.conns; ++n)
+      for (int n = 0; n < c.s.coinbase_conns; ++n)
         if (cb_open[n] && now - cb_last_tick[n] > 60)
           coinbase[n]->reconnect();
       if (now - last_report >= 60) {

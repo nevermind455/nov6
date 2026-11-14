@@ -287,9 +287,9 @@ TEST(Config, LiveAcceptsOnlyTheBaselineOrTheTighterLimit) {
   c.live = true;
   c.private_key = "dummy";
   EXPECT_NO_THROW(c.validate());
-  c.slip = .02;
+  c.s.slip = .02;
   EXPECT_NO_THROW(c.validate());
-  c.slip = .03;
+  c.s.slip = .03;
   EXPECT_THROW(c.validate(), std::exception);
 }
 TEST(Config, DryRunRequiresLive) {
@@ -461,21 +461,79 @@ TEST(Ledger, ConfirmedTradeBeforeReplyIsNotAnEmptyOrder) {
   }
   std::filesystem::remove_all(p.parent_path());
 }
-TEST(Ledger, DurableDrawdownPauseDoesNotRebaseCapital) {
+TEST(Ledger, DurableLogRowsAreTheJsonFormulaBytes) {
+  // DurableLog::append writes its row by hand to serialize the event once; the
+  // bytes must stay those of the Json formula it replaced (and readers check).
+  auto dir = tempdir();
+  auto p = dir / "ledger.json.journal";
+  std::vector<Json> events{
+      Json{{"type", "intent"},
+           {"text", "quote \" backslash \\ newline \n tab \t control \x01 end"}},
+      Json{{"unicode", "\xC3\xA9 \xE2\x82\xAC \xF0\x9F\x98\x80"},
+           {"tenth", 0.1},
+           {"huge", 1e300},
+           {"negative_zero", -0.0},
+           {"max_unsigned", std::numeric_limits<std::uint64_t>::max()},
+           {"min_signed", std::numeric_limits<std::int64_t>::min()}},
+      Json{{"nested", {{"list", Json::array({1, 2.5, "x", nullptr, true})},
+                       {"empty", Json::object()},
+                       {"none", Json::array()}}}},
+      Json::object()};
+  {
+    DurableLog log(p);
+    for (const auto &e : events)
+      log.append(e);
+  }
+  std::ifstream in(p);
+  std::string line;
+  std::uint64_t n = 0;
+  while (std::getline(in, line)) {
+    const auto &e = events.at(n++);
+    const Json row{{"seq", n}, {"event", e}, {"sha256", sha256(e.dump())}};
+    EXPECT_EQ(line, row.dump());
+  }
+  EXPECT_EQ(n, events.size());
+  std::filesystem::remove_all(dir);
+}
+TEST(Ledger, RiskRowsKeepTheFieldsOlderBuildsRead) {
+  // The drawdown pause runs in memory (SNIPER_HYBRID_DRAWDOWN_PAUSE_S). The
+  // ledger still writes its retired pause fields, as 0, because older builds
+  // refuse a snapshot or a risk row without them (a rollback must still load).
   auto p = tempdir() / "ledger.json";
   {
     Ledger l(p, 100 * U, false);
-    l.drawdown_pause(12345);
-    EXPECT_EQ(l.reference_cash, 100 * U);
-    EXPECT_EQ(l.high_water, 100 * U);
-    l.snapshot();
+    l.risk_rebase(80 * U);
+    EXPECT_EQ(l.reference_cash, 80 * U);
+    EXPECT_EQ(l.high_water, 80 * U);
+  }
+  {
+    std::ifstream in(p.string() + ".journal");
+    std::string line;
+    int risk_rows = 0;
+    while (std::getline(in, line)) {
+      auto event = Json::parse(line).at("event");
+      if (event.at("type") == "risk") {
+        ++risk_rows;
+        EXPECT_TRUE(event.at("pause_until").is_number());
+        EXPECT_EQ(event.at("pause_until"), 0);
+      }
+    }
+    EXPECT_EQ(risk_rows, 1);
   }
   {
     Ledger l(p, 100 * U, false);
-    EXPECT_EQ(l.dd_pause_until, 12345);
-    EXPECT_EQ(l.reference_cash, 100 * U);
-    l.risk_rebase(80 * U);
-    EXPECT_EQ(l.dd_pause_until, 0);
+    EXPECT_EQ(l.high_water, 80 * U);
+    l.snapshot();
+  }
+  {
+    std::ifstream in(p);
+    auto snapshot = Json::parse(in);
+    EXPECT_TRUE(snapshot.at("dd_pause_until").is_number());
+    EXPECT_EQ(snapshot.at("dd_pause_until"), 0);
+  }
+  {
+    Ledger l(p, 100 * U, false);
+    EXPECT_EQ(l.reference_cash, 80 * U);
     EXPECT_EQ(l.high_water, 80 * U);
   }
   std::filesystem::remove_all(p.parent_path());

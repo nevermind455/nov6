@@ -125,7 +125,7 @@ public:
   // Settled profit and loss of the resting orders' own fills, all time; the
   // SNIPER_REST_LIVE loss stop reads its change since the test began.
   Units rest_realized = 0;
-  double risk_epoch = 0, dd_pause_until = 0;
+  double risk_epoch = 0;
   CanaryState canary;
   std::uint64_t entries = 0;
   Ledger(const std::filesystem::path &, Units start_cash, bool live);
@@ -138,8 +138,7 @@ public:
             Units cost, Units fee);
   bool settle(std::string_view condition,
               const std::map<std::string, Units> &payouts);
-  void risk_rebase(Units equity, double pause_until = 0);
-  void drawdown_pause(double deadline);
+  void risk_rebase(Units equity);
   // Writes the canary state; a state equal to the current one writes nothing.
   void set_canary(const CanaryState &);
   void release_fill_slot(std::string_view id);

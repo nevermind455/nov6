@@ -4,12 +4,7 @@
 #include <cmath>
 namespace sniper::rest {
 namespace {
-std::string lower(std::string_view text) {
-  std::string out(text);
-  std::transform(out.begin(), out.end(), out.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-  return out;
-}
+using py::lower;
 // An amount in a placement reply: absent, null and "" all mean nothing.
 Units reply_amount(const Json &j, const char *key) {
   auto it = j.find(key);

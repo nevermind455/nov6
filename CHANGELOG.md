@@ -1,5 +1,38 @@
 # Changelog
 
+## 14 November 2026 — cleanup: one implementation of each thing
+
+No strategy rule, price, threshold, size or risk limit changed. 96 decision
+replays (8 recordings x 12 settings mixes, 40,585 journal rows) are byte for
+byte the same as the previous build's. Details and measurements:
+[reports/CLEANUP_2026-11-14.md](reports/CLEANUP_2026-11-14.md).
+
+* **simdjson removed.** The bot linked it and created a parser at start, but
+  never parsed with it. The bundled `lib/libsimdjson.so.19` is gone and the
+  binaries need only system libraries. After `git pull` on the VPS, `lib/` can
+  be deleted.
+* **`sniper-diff` removed.** Its input came from the Python generator removed
+  earlier today (both are in git history).
+* **One copy of the trading settings.** `Config` kept a second copy of 36
+  settings beside the parsed ones; the runtime read some from each. Everything
+  now reads the parsed settings. The start-up refusals the copies caused (a
+  value past the int or money range) are kept as explicit checks.
+* **Duplicate helpers merged:** five `lower()`, two `strip()`, three JSON
+  `get()`/`truthy()` copies; the extra-feed name list now lives only in
+  `feeds.cpp`.
+* **Dead code removed:** unused functions, a delay branch that could never
+  run, and fields written but never read (listed in the report). The ledger's
+  unused durable drawdown pause is gone from memory. Its two file fields are
+  still written (as 0) so a ledger from this build loads in the previous one.
+* **Settings that were silently ignored now say so at start:**
+  `SNIPER_DELAY_SOURCE=live`, `PAPER_LATENCY_MS` and
+  `PAPER_FLAGGED_DELAY_SECONDS` have no effect in this build (unchanged
+  behaviour, new notice).
+* **The synced intent is written with one serialization instead of two plus a
+  copy** (same bytes; a test compares them). Tick-to-wire instructions per
+  order: -10.3%. Writing the intent: -27.9%. Wall clock, median of 6 runs:
+  p50 313 -> 282 us without the disk sync, 902 -> 832 us with it.
+
 ## 14 November 2026 — extra trigger feeds; C++ only
 
 * **`SNIPER_EXTRA_FEEDS=binance_fut,binance_spot`** (off by default): Binance

@@ -26,6 +26,9 @@ double round(double x, int ndigits);
 std::string fixed(double x, int places);
 // Python format(x, "g").
 std::string fmt_g(double x);
+// Python str.strip() and str.lower() of ASCII text (settings, venue replies).
+std::string strip(std::string_view s);
+std::string lower(std::string_view s);
 // Python's builtin sum() of floats (3.12+: Neumaier-compensated).
 template <class C> double builtin_sum(const C &values) {
   double f = 0.0, c = 0.0;
@@ -60,13 +63,10 @@ struct Dec {
   static Dec from_double(double); // Decimal(str(x))
   static Dec from_int(long long v);
   bool zero() const { return coef == 0; }
-  int digits() const;
-  int adjusted() const { return exp + digits() - 1; }
   std::string str() const;           // Decimal.__str__
   std::string fixed(int places) const; // format(d, ".Nf")
   double to_double() const;          // float(d)
   long long to_ll() const;           // int(d), truncating
-  bool integral() const;             // d == d.to_integral_value()
 };
 
 Dec fix(Dec d, const Context &c);

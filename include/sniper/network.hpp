@@ -54,11 +54,10 @@ public:
   void send(std::string);
   bool connected() const;
   void reconnect();
-  // Why the connection last went down ("" while it never has), how many
-  // times it has, and when it last came up (monotonic seconds, 0 if never).
+  // Why the connection last went down ("" while it never has) and how many
+  // times it has.
   std::string last_failure() const;
   std::uint64_t drops() const;
-  double up_since() const;
 };
 struct H2Callbacks {
   std::function<void(std::string_view, std::int64_t)> written;

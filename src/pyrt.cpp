@@ -77,14 +77,6 @@ BigInt round_div(const BigInt &coef, const BigInt &divisor, Rounding mode,
   }
   return up ? q + 1 : q;
 }
-std::string strip(std::string_view s) {
-  std::size_t a = 0, b = s.size();
-  while (a < b && std::isspace(static_cast<unsigned char>(s[a])))
-    ++a;
-  while (b > a && std::isspace(static_cast<unsigned char>(s[b - 1])))
-    --b;
-  return std::string(s.substr(a, b - a));
-}
 // Decimal(str(x)) is deliberately used for strategy arithmetic, but Python's
 // round(float, negative_digits) rounds the exact binary value instead.
 Dec exact_float(double x) {
@@ -105,6 +97,21 @@ Dec exact_float(double x) {
   return d;
 }
 } // namespace
+
+std::string strip(std::string_view s) {
+  std::size_t a = 0, b = s.size();
+  while (a < b && std::isspace(static_cast<unsigned char>(s[a])))
+    ++a;
+  while (b > a && std::isspace(static_cast<unsigned char>(s[b - 1])))
+    --b;
+  return std::string(s.substr(a, b - a));
+}
+std::string lower(std::string_view s) {
+  std::string out(s);
+  for (auto &c : out)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return out;
+}
 
 std::string repr(double x) {
   if (std::isnan(x))
@@ -248,8 +255,6 @@ double parse_float(std::string_view text) {
 }
 
 // ------------------------------------------------------------------ Decimal
-int Dec::digits() const { return ndigits(coef); }
-
 Dec Dec::from_int(long long v) {
   Dec d;
   d.neg = v < 0;
@@ -370,12 +375,6 @@ long long Dec::to_ll() const {
       v > std::numeric_limits<long long>::max())
     throw ValueError("decimal integer is outside native integer range");
   return v.convert_to<long long>();
-}
-
-bool Dec::integral() const {
-  if (exp >= 0 || coef == 0)
-    return true;
-  return coef % pow10(-exp) == 0;
 }
 
 Dec fix(Dec d, const Context &c) {

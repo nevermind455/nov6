@@ -9,5 +9,3 @@ build-*/
 tools/fake-venue/node_modules/
 tools/fake-venue/certs/
 tools/fake-venue/venue.log
-__pycache__/
-*.py[cod]

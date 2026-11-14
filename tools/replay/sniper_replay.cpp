@@ -125,12 +125,6 @@ struct ReplayEnv : SniperEnv {
   }
 };
 
-const Json &get(const Json &o, const char *k) {
-  static const Json null;
-  auto it = o.find(k);
-  return it == o.end() ? null : *it;
-}
-
 SniperSettings settings_from(const Json &cfg) {
   // The same SNIPER_* names and defaults the runtime reads (config.cpp).
   std::map<std::string, std::string> env;

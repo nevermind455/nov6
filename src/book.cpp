@@ -33,26 +33,6 @@ std::string json_str(const Json &v) {
     return v.get<double>() == 0 ? "" : py::repr(v.get<double>());
   return v.empty() ? "" : v.dump();
 }
-bool truthy(const Json &v) {
-  if (v.is_null())
-    return false;
-  if (v.is_boolean())
-    return v.get<bool>();
-  if (v.is_string() || v.is_array() || v.is_object())
-    return !v.empty();
-  if (v.is_number_float())
-    return v.get<double>() != 0;
-  if (v.is_number())
-    return v.get<long long>() != 0;
-  return true;
-}
-const Json &get(const Json &o, const char *key) {
-  static const Json null;
-  if (!o.is_object())
-    return null;
-  auto it = o.find(key);
-  return it == o.end() ? null : *it;
-}
 // feeds/book._to_map
 std::pair<std::shared_ptr<LevelMap>, bool> to_map(const Json &levels) {
   auto out = std::make_shared<LevelMap>();
@@ -393,7 +373,6 @@ void BookState::desync(const std::vector<std::string> &tokens,
     generation_[token] += 1;
     m->second.desync_reason = reason;
     record(token, std::nullopt, true);
-    ++rejected_updates;
   }
 }
 
@@ -421,10 +400,8 @@ BookState::subscription_gap(const std::string &token, std::uint64_t expected) {
 
 bool BookState::apply_snapshot(const std::string &token, const Json &bids,
                                const Json &asks, const SnapshotOptions &o) {
-  if (!active_.count(token)) {
-    ++dropped_inactive;
+  if (!active_.count(token))
     return false;
-  }
   auto &m = meta_[token];
   if (o.source != "ws" && o.source != "rest")
     throw std::invalid_argument("book snapshot source must be ws or rest");
@@ -521,10 +498,8 @@ bool BookState::apply_price_changes(const Json &changes, const Json &ts_ms,
   bool skipped_pending = false;
   for (auto &change : changes) {
     std::string token = json_str(get(change, "asset_id"));
-    if (!active_.count(token)) {
-      ++dropped_inactive;
+    if (!active_.count(token))
       continue;
-    }
     auto &meta = meta_[token];
     if (!meta.synced) {
       skipped_pending = true;
@@ -721,10 +696,8 @@ bool dispatch_market_event(BookState &book, const Json &m) {
   }
   if (et == "last_trade_price") {
     std::string token = json_str(get(m, "asset_id"));
-    if (!book.is_active(token)) {
-      book.note_inactive_drop();
+    if (!book.is_active(token))
       return false;
-    }
     const Json &jp = get(m, "price"), &jt = get(m, "timestamp");
     if (jp.is_boolean() || jt.is_boolean())
       return false;
@@ -777,7 +750,6 @@ int handle_market_frame(BookState &book, std::string_view raw) {
 void Freshness::note_trade(std::optional<double> event_ms, double recv_wall_ms,
                            double mono) {
   if (!event_ms || !std::isfinite(recv_wall_ms - *event_ms)) {
-    ++trade_without_e;
     last_trade_mono.reset();
     last_excess.reset();
     return;
@@ -791,7 +763,6 @@ void Freshness::note_trade(std::optional<double> event_ms, double recv_wall_ms,
     min_q.pop_front();
   last_excess = lag - min_q.front().second;
   last_trade_mono = mono;
-  ++trades;
 }
 
 std::string Freshness::why_not(double now) const {

@@ -105,11 +105,19 @@ std::uint64_t DurableLog::append(const Json &event) {
   // the next start, so after a failure the log takes no more rows.
   if (failed_)
     throw std::runtime_error("durable log refused: an earlier write failed");
-  auto text = Json{{"seq", seq_ + 1},
-                   {"event", event},
-                   {"sha256", sha256(event.dump())}}
-                  .dump() +
-              "\n";
+  // The bytes Json{{"seq", n}, {"event", event}, {"sha256", sha256(event.dump())}}
+  // .dump() writes, without a copy of the event or a second serialization of it
+  // (a test holds the two equal).
+  const std::string body = event.dump();
+  std::string text;
+  text.reserve(body.size() + 112);
+  text += "{\"seq\":";
+  text += std::to_string(seq_ + 1);
+  text += ",\"event\":";
+  text += body;
+  text += ",\"sha256\":\"";
+  text += sha256(body);
+  text += "\"}\n";
   try {
     all_write(fd_, text);
     if (!benchmark_without_sync && fdatasync(fd_))
@@ -298,7 +306,6 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
     rest_realized = j.value("rest_realized", Units(0));
     fees = j.at("fees");
     risk_epoch = j.at("risk_epoch");
-    dd_pause_until = j.at("dd_pause_until");
     for (auto &v : j.at("positions")) {
       Position x;
       x.condition = v.at("condition");
@@ -496,7 +503,6 @@ void Ledger::apply(const Json &e) {
     reference_cash = e.at("reference_cash");
     high_water = e.at("high_water");
     risk_epoch = e.at("epoch");
-    dd_pause_until = e.at("pause_until");
   } else if (type == "release_slot") {
     auto &i = orders.at(e.at("id").get<std::string>());
     if (i.fill_slot && i.matched_shares == 0 && i.booked_shares == 0) {
@@ -554,7 +560,7 @@ void Ledger::register_intent(const Intent &i, const SignedOrder *signed_order,
     event["signed_order"] = Json::parse(signed_order->body).at("order");
     event["wire_sha256"] = sha256(signed_order->body);
   }
-  commit(event);
+  commit(std::move(event));
 }
 void Ledger::status(std::string_view id, std::string_view s, Units shares,
                     Units cost) {
@@ -649,21 +655,16 @@ bool Ledger::settle(std::string_view condition,
   commit({{"type", "settle"}, {"condition", condition}, {"payouts", payouts}});
   return true;
 }
-void Ledger::risk_rebase(Units equity, double pause_until) {
+void Ledger::risk_rebase(Units equity) {
   if (equity < 0)
     equity = 0;
+  // pause_until: retired (the drawdown pause runs in memory), always 0, kept
+  // because older builds refuse a risk row without it.
   commit({{"type", "risk"},
           {"reference_cash", checked_money(static_cast<__int128>(equity) - realized)},
           {"high_water", equity},
           {"epoch", wall_s()},
-          {"pause_until", pause_until}});
-}
-void Ledger::drawdown_pause(double deadline) {
-  commit({{"type", "risk"},
-          {"reference_cash", reference_cash},
-          {"high_water", high_water},
-          {"epoch", risk_epoch},
-          {"pause_until", deadline}});
+          {"pause_until", 0.0}});
 }
 void Ledger::set_canary(const CanaryState &s) {
   // Every signal refused while a budget pause runs hands back the state it
@@ -789,7 +790,8 @@ Json Ledger::json() const {
           {"rest_realized", rest_realized},
           {"fees", fees},
           {"risk_epoch", risk_epoch},
-          {"dd_pause_until", dd_pause_until},
+          // retired, always 0: older builds refuse a snapshot without it
+          {"dd_pause_until", 0.0},
           {"positions", p},
           {"orders", o},
           {"trade_ids", trade_ids},

@@ -81,7 +81,6 @@ public:
   bool connected = false;
   double stale_after, history_s, future_tolerance = 5.0, max_quiet = 900.0;
   std::optional<long long> ts_hwm;
-  std::uint64_t dropped_inactive = 0, rejected_updates = 0;
 
   std::pair<std::vector<std::string>, std::vector<std::string>>
   set_active(const std::vector<std::string> &tokens);
@@ -97,7 +96,6 @@ public:
   bool set_tick_size(const std::string &token, const Json &tick,
                      const Json &ts_ms, bool require_exchange_ts);
   void note_exchange_ts(const Json &ts);
-  void note_inactive_drop() { ++dropped_inactive; }
 
   BookView view(const std::string &token) const;
   std::pair<std::optional<BookView>, ViewAtInfo>
@@ -167,7 +165,6 @@ struct Freshness {
   int backlog = 0, backlog_max_seen = 0;
   std::string mode = "count";
   double fresh_ms = 100;
-  std::uint64_t trades = 0, trade_without_e = 0;
   bool fresh_burst() const {
     return backlog > backlog_max && last_excess && *last_excess <= fresh_ms;
   }

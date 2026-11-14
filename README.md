@@ -99,8 +99,10 @@ stage definitions, signing constraints and interpretation.
   skip its final seconds. The audited runtime refreshes active venue-rule
   snapshots when discovery returns new metadata; it does not extend expired
   rules or weaken the freshness gate.
-* New tools: `sniper-replay` (decision replay) and `sniper-diff`
-  (differential test). `--record FILE` writes the replay format. The Python
+* New tool: `sniper-replay` (decision replay). `--record FILE` writes the
+  replay format. (`sniper-diff`, the differential-test tool, was removed on
+  14 November 2026 with the Python case generator it served; both are in git
+  history.) The Python
   tools that ran the reference bot for the parity results were removed when
   this repository became C++ only (14 November 2026); they are in its git
   history (commit d5221b5).
@@ -108,7 +110,7 @@ stage definitions, signing constraints and interpretation.
 ## Start paper mode on a VPS
 
 The supplied binaries target **Ubuntu 24.04, x86-64**, with OpenSSL 3, glibc 2.39
-and libstdc++ from GCC 13. The simdjson shared library is included. This is not an
+and libstdc++ from GCC 13; no other shared library is needed. This is not an
 Android/Termux, Windows, macOS, ARM, or Ubuntu 22.04 binary. Termux can connect to
 your Ubuntu VPS using SSH; run the bot on the VPS.
 
@@ -208,14 +210,13 @@ For Ubuntu 24.04 with the usual main and universe package sources enabled:
 sudo apt-get update
 sudo apt-get install -y build-essential cmake ninja-build ca-certificates \
   libssl-dev libboost1.83-dev libfmt-dev nlohmann-json3-dev \
-  libsimdjson-dev libnghttp2-dev libsecp256k1-dev \
+  libnghttp2-dev libsecp256k1-dev \
   libgtest-dev libbenchmark-dev
 bash scripts/build.sh
 ```
 
-The build runs native offline tests, installs the binaries in `bin/`, and copies
-the needed simdjson library to `lib/`. No Python package manager or interpreter
-is used. See [dependencies and licenses](docs/DEPENDENCIES.md) for pinned library
+The build runs native offline tests and installs the binaries in `bin/`. No
+Python package manager or interpreter is used. See [dependencies and licenses](docs/DEPENDENCIES.md) for pinned library
 versions. Rebuild on a different supported Linux architecture rather than using
 the included x86-64 executable there.
 
@@ -374,11 +375,11 @@ never resubmitted. Redemption of actual winning tokens is manual.
 ## Files and recovery
 
 * `bin/sniper-cpp`: native main executable; `bin/sniper-tests`: native offline tests;
-  `bin/sniper-replay`, `bin/sniper-diff`: parity tools (see below).
+  `bin/sniper-replay`: decision-parity tool (see below).
 * `src/`, `include/`, `tests/`: full source, test code and expected JSON fixtures.
 * `reports/`: build, test, parity, paper-run and benchmark evidence
   (`TEST_REPORT.md` first, then `PARITY.md`).
-* `tools/replay/`: decision-parity and differential-test tools.
+* `tools/replay/`: the decision-parity tool (`sniper-replay`).
 * `tools/fake-venue/`: optional, development-only local venue (Node.js) for
   end-to-end paper tests; the bot never uses it.
 * `state/paper/` and `state/live/`: created separately at runtime.
@@ -413,5 +414,4 @@ same scripted fills, so decisions are compared, not paper fill luck.
 
 For a missing round, inspect `discovery_refused` rows. For a missing shared
 library or an incompatible glibc, rebuild on the target supported Linux host.
-For `.env` permission refusal, run `chmod 600 .env`. Keep the `lib/` directory
-beside `bin/`; the packaged binaries locate it relative to themselves.
+For `.env` permission refusal, run `chmod 600 .env`.

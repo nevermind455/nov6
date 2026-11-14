@@ -4,6 +4,7 @@
 #include "sniper/dashboard.hpp"
 #include "sniper/storage.hpp"
 #include "sniper/book.hpp"
+#include "sniper/pyrt.hpp"
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -65,11 +66,7 @@ std::string upper(std::string s) {
                  [](unsigned char c) { return std::toupper(c); });
   return s;
 }
-std::string lower(std::string s) {
-  std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-  return s;
-}
+using py::lower;
 // Up to `n` whole characters of a UTF-8 string.
 std::string take(std::string_view s, std::size_t n) {
   std::size_t seen = 0, i = 0;
@@ -89,13 +86,6 @@ std::string repeat(const char *glyph, int n) {
 }
 
 // ---------------------------------------------------------- values
-const Json &get(const Json &o, const char *key) {
-  static const Json null;
-  if (!o.is_object())
-    return null;
-  auto it = o.find(key);
-  return it == o.end() ? null : *it;
-}
 // A finite number, from a number or a numeric string; never a boolean.
 std::optional<double> num(const Json &v) {
   double f;
@@ -114,17 +104,6 @@ std::optional<double> num(const Json &v) {
   return f;
 }
 Json opt(std::optional<double> v) { return v ? Json(*v) : Json(); }
-bool truthy(const Json &v) {
-  if (v.is_null())
-    return false;
-  if (v.is_boolean())
-    return v.get<bool>();
-  if (v.is_number())
-    return v.get<double>() != 0;
-  if (v.is_string() || v.is_array() || v.is_object())
-    return !v.empty();
-  return true;
-}
 std::string text(const Json &v, const std::string &fallback = MISSING) {
   if (v.is_null())
     return fallback;

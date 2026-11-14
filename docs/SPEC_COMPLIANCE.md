@@ -26,10 +26,15 @@ reference's own Python code and the C++ code on the same recorded input.
 | Tick-to-wire, in process (frame -> decision -> signed order -> durable intent), this machine | p50 167 us / p99 320 us without fdatasync; p50 426 us / p99 817 us with it (prompt, on the VPS: p50 under 0.3 ms without the fsynced intent, under 2 ms with it) |
 | Decision alone (frame -> sized plan) | p50 53 us / p99 120 us |
 
+The rows above are the 1.1.0 release's evidence. Current figures (222 unit tests,
+replay parity and latency on 14 November 2026):
+[reports/CLEANUP_2026-11-14.md](../reports/CLEANUP_2026-11-14.md).
+
 Reproduce (with the Python tools removed from this repository on 14 November
 2026 - it is C++ only now; they are in git history at commit d5221b5):
 `tools/replay/run_parity.sh REPO PYTHON bin/sniper-replay OUT`,
-`PYTHON -I tools/replay/diff_cases.py REPO bin/sniper-diff 20000` and
+`PYTHON -I tools/replay/diff_cases.py REPO bin/sniper-diff 20000` (sniper-diff,
+its C++ side, was removed on 14 November 2026 too; same commit) and
 `PYTHON -I tools/replay/live_prepare_cases.py REPO` (the expected values of the
 `Live.PresendCheckMatchesReferencePrepare` test). REPO = a checkout of the
 reference at 772f2eb; PYTHON = a Python 3.13 environment with its requirements. Any recording the bot writes with `--record` replays the same

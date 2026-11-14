@@ -63,10 +63,9 @@ LiveOrderCheck live_presend_check(const Plan &, const MarketRules &rules,
                                   double venue_wall_now);
 
 struct PaperConfig {
-  double max_buy_price = 0.95, min_buy_price = 0.05, latency_ms = 150,
-         max_book_age_s = 8, max_quiet_s = 900, future_tol_s = 5,
-         max_spread = 0.25, min_seconds_to_expiry = 10,
-         trade_window_seconds = 300, flagged_delay_ms = 1000,
+  double max_buy_price = 0.95, min_buy_price = 0.05, max_book_age_s = 8,
+         max_quiet_s = 900, future_tol_s = 5, max_spread = 0.25,
+         min_seconds_to_expiry = 10, trade_window_seconds = 300,
          own_fill_ttl_s = 2;
 };
 
@@ -85,7 +84,6 @@ class PaperBroker {
 public:
   PaperBroker(PaperConfig, PaperHooks);
   PaperConfig cfg;
-  std::uint64_t filled_orders = 0, rejected_orders = 0, refused_real = 0;
 
   bool has_recent_own_fill(const std::string &token);
   BookSnapshot net_of_own_fills(const BookSnapshot &);

@@ -2,6 +2,7 @@
 // defaults, parsing (_env_float/_env_bool) and the same refusal messages.
 // Settings this build does not implement are refused when enabled; a
 // reference default this build cannot honour is named in `notices`.
+#include "sniper/feeds.hpp"
 #include "sniper/pyrt.hpp"
 #include "sniper/sniper.hpp"
 #include <algorithm>
@@ -10,16 +11,8 @@
 
 namespace sniper {
 namespace {
-std::string strip(const std::string &s) {
-  auto a = s.find_first_not_of(" \t\r\n\f\v"),
-       b = s.find_last_not_of(" \t\r\n\f\v");
-  return a == std::string::npos ? "" : s.substr(a, b - a + 1);
-}
-std::string lower(std::string s) {
-  std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-  return s;
-}
+using py::lower;
+using py::strip;
 std::string pyrepr(const std::string &s) {
   bool sq = s.find('\'') != std::string::npos,
        dq = s.find('"') != std::string::npos;
@@ -110,8 +103,9 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
   if (delay == "live" && s.fixed_latency)
     throw std::invalid_argument("SNIPER_DELAY_SOURCE=live and SNIPER_LATENCY_MS "
                                 "are exclusive: unset SNIPER_LATENCY_MS");
-  s.delay_source = delay;
-  s.delay_days = delay_days;
+  if (delay == "live")
+    note("SNIPER_DELAY_SOURCE=live: sampled live delays are not implemented; "
+         "paper delays use the model (as SNIPER_DELAY_SOURCE=model)");
   // Default paper requires live controls in the reference (strict paper/live
   // comparison); this build runs the independent paper model only.
   {
@@ -277,7 +271,7 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
       at = comma == std::string::npos ? raw.size() + 1 : comma + 1;
       if (item.empty() || item == s.primary_feed)
         continue;
-      if (item != "binance_fut" && item != "binance_spot")
+      if (!feeds::known(item))
         unknown.push_back(item);
       else if (std::find(s.extra_feeds.begin(), s.extra_feeds.end(), item) ==
                s.extra_feeds.end())
