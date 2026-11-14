@@ -57,18 +57,37 @@
 namespace sniper {
 using Json = nlohmann::ordered_json;
 struct Intent;
+struct Position;
 struct BookView;
 }
 
 namespace sniper::dash {
 // Pure evidence adapters. Confirmed ledger bookings drive live fills; HTTP
 // acknowledgements and decision asks are independent of the bounded order table.
+// Resting orders (SNIPER_REST_LIVE) are not FAK orders and are left out.
+// An order filled in part: fewer shares booked than it asked for. One that got
+// every share below its limit spent less than its stake and is filled in full.
+bool partial_fill(const Intent &);
 Json live_execution_quality(const std::map<std::string, Intent> &orders,
                             const std::set<std::string> &acknowledged,
                             const std::map<std::string, double> &decision_asks,
                             double started_wall,
                             const std::string &last_fill_order = {});
 Json execution_latencies(const Json &row);
+// Settled rounds in the ledger, all time: won (the round's positions made
+// money together), lost, even; unknown counts rounds with a settled position
+// whose payout is not on record.
+struct RoundResults {
+  long long won = 0, lost = 0, even = 0, unknown = 0;
+};
+RoundResults settled_rounds(const std::map<std::string, Position> &positions);
+// A settled position that paid something: worth its payout until redeemed.
+bool redeem_candidate(const Position &);
+// Settled winnings not redeemed yet, in dollars: each winning position's
+// payout on the shares the wallet still holds (`held`: token -> micro-shares
+// read on chain). Empty when a winning position's balance is not known.
+std::optional<double> unredeemed_value(const std::map<std::string, Position> &positions,
+                                       const std::map<std::string, std::int64_t> &held);
 Json mark_position(double shares, double notional, double fees,
                     const BookView &, double now_mono, double max_age_ms);
 Json live_balance_view(std::optional<double> balance, double age_s,

@@ -124,10 +124,13 @@ It shows the side, the shares (`2/5` once part of it matched), the price it
 rests at, and the time it has left with a bar; the time is recomputed for every
 frame (`DASH_FPS`, default 2 a second), and turns amber under two seconds. In
 other moments it reads `placing`, `cancelling`, `off the book` (cancelled,
-final size still to come), `no order on the book`, or `off: <why>` when the
-loss stop ended the test. The ORDERS table has a line for each order that got
-onto the book: `RESTING`, then `FILLED` or `NO FILL` with the reason it was
-cancelled. These lines are not counted in the execution figures.
+final size still to come), `no order on the book` (followed by this run's
+count, e.g. `3 rested 1 filled`), or `off: <why>` when the loss stop ended
+the test. The ORDERS table has a line for each order that got onto the book:
+`RESTING`, then `FILLED` or `NO FILL` with the reason it was cancelled.
+Resting orders are not counted in the TRIGGER panel's orders and fill rate or
+in EXECUTION QUALITY, which are the FAK orders'; the CANARY budgets do count
+them.
 
 ## Journal rows
 

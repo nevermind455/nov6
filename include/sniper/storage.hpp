@@ -68,6 +68,10 @@ struct Position {
   std::string condition, token;
   Units shares = 0, cost = 0, fees = 0;
   bool settled = false;
+  // What one share paid at settlement (micro-dollars); -1 while unknown.
+  // Kept so the settled result of a round, and what a winning position is
+  // still worth until it is redeemed, can be read back from the ledger.
+  Units payout = -1;
 };
 struct Intent {
   std::string id, condition, token, side, slug, up, down, status = "intent";
@@ -99,6 +103,7 @@ struct CanaryState {
   std::string pause_reason;
   Json json() const;
   void load(const Json &);
+  bool operator==(const CanaryState &) const = default;
 };
 class Ledger {
   std::filesystem::path path_;
@@ -135,6 +140,7 @@ public:
               const std::map<std::string, Units> &payouts);
   void risk_rebase(Units equity, double pause_until = 0);
   void drawdown_pause(double deadline);
+  // Writes the canary state; a state equal to the current one writes nothing.
   void set_canary(const CanaryState &);
   void release_fill_slot(std::string_view id);
   void release_missed_spend(std::string_view id);

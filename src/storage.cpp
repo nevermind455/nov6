@@ -307,6 +307,7 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
       x.cost = v.at("cost");
       x.fees = v.at("fees");
       x.settled = v.at("settled");
+      x.payout = v.value("payout", Units(-1));
       positions[x.token] = x;
     }
     for (auto &v : j.at("orders")) {
@@ -330,8 +331,14 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
   std::optional<std::string> legacy_miss;
   std::map<std::string, bool> historical_released;
   std::set<double> unsafe_refund_sessions;
+  // A snapshot written before positions kept their payout lacks it; the
+  // retained settlement events still have it.
+  std::map<std::string, Units> settled_payouts;
   wal_.replay([&](std::uint64_t seq, const Json &e) {
     const auto type = e.at("type").get<std::string>();
+    if (type == "settle")
+      for (auto it = e.at("payouts").begin(); it != e.at("payouts").end(); ++it)
+        settled_payouts.emplace(it.key(), it.value().get<Units>());
     // The retained authorization event identifies the original session even
     // for snapshots written before slot ownership fields were introduced.
     if (type == "intent") {
@@ -386,6 +393,10 @@ Ledger::Ledger(const std::filesystem::path &p, Units start, bool live)
   });
   if (unsafe_refund_sessions.count(canary.started))
     throw std::runtime_error("legacy canary refund history disagrees with the current session; reconcile its budget before restart");
+  for (auto &[token, p] : positions)
+    if (p.settled && p.payout < 0)
+      if (auto paid = settled_payouts.find(token); paid != settled_payouts.end())
+        p.payout = paid->second;
   if (!has_snapshot && wal_.sequence() != 0)
     throw std::runtime_error("ledger snapshot missing for existing history; initial cash is ambiguous");
   if (snapshot_seq > wal_.sequence())
@@ -478,6 +489,7 @@ void Ledger::apply(const Json &e) {
       if (pnl < 0)
         canary.settled_loss = checked_money(static_cast<__int128>(canary.settled_loss) - pnl);
       v.settled = true;
+      v.payout = it.value().get<Units>();
     }
     high_water = std::max(high_water, checked_money(static_cast<__int128>(reference_cash) + realized));
   } else if (type == "risk") {
@@ -654,6 +666,11 @@ void Ledger::drawdown_pause(double deadline) {
           {"pause_until", deadline}});
 }
 void Ledger::set_canary(const CanaryState &s) {
+  // Every signal refused while a budget pause runs hands back the state it
+  // read. Writing it again would add a durable row, synced to disk on the
+  // event loop, for no change.
+  if (s == canary)
+    return;
   commit({{"type", "canary"}, {"state", s.json()}});
 }
 void Ledger::release_fill_slot(std::string_view id) {
@@ -759,7 +776,8 @@ Json Ledger::json() const {
                  {"shares", v.shares},
                  {"cost", v.cost},
                  {"fees", v.fees},
-                 {"settled", v.settled}});
+                 {"settled", v.settled},
+                 {"payout", v.payout}});
   for (auto &[id, i] : orders)
     o.push_back(intent_json(i));
   Json snapshot{{"format", "sniper-native-ledger-2"},

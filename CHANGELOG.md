@@ -1,5 +1,54 @@
 # Changelog
 
+## 14 November 2026 — audit: what the dashboard shows is what is true
+
+A full read of the bot and its dashboard, every number traced to its source
+and checked against the fake venue's own records. No strategy rule, limit,
+size or risk setting changed; 371 replayed decisions are identical to the
+previous build.
+
+* **A canary budget pause was invisible.** When a budget (say spend $25) was
+  reached, every order was refused "canary paused: spend" while the header
+  said `CANARY ARMED` and the panel showed no halt. It now says `HALTED`, with
+  `canary budget spend reached ($23.30 of $25.00): no new orders until
+  06:42:12 ET, then checked again`. A fault pause that outlived a restart
+  (kept in the ledger) shows too. The limits shown are the ones that apply
+  now (with `SNIPER_CANARY_HARD_STOP=0` they grow after each pause).
+* **One ledger row per refused signal.** During such a pause each refused
+  signal wrote the whole canary state (every round of the session) to the
+  ledger journal and synced it to disk, on the event loop. On the fake venue:
+  186 rows for 11 orders in ten minutes. This is very likely what grew the
+  VPS's `ledger.json.journal` to 172 MB (not checked on the VPS itself). An unchanged state is no longer written.
+* **EQUITY left out unredeemed winnings.** After a win the payout is not
+  collateral until it is redeemed, and live EQUITY was collateral + open
+  positions, so it fell by every win (fake venue: $175.08 shown, $200.08
+  true). `REDEEMABLE`, never filled before, is now read from the wallet's
+  token balances on chain (as the reference does) and counted in EQUITY;
+  while it is unknown EQUITY shows `--`, never a low number.
+* **Resting orders were counted as FAK orders** in the TRIGGER panel and in
+  EXECUTION QUALITY (15 orders shown for 13 FAKs), against the docs. They are
+  counted on the MARKET panel's `resting` line now (`3 rested 1 filled`).
+* **"partial" for full fills.** A FAK that got all its shares below its limit
+  spent less than its stake and was labelled and counted partial. Partial is
+  now fewer shares than ordered.
+* **WON/LOST** counted positions of this run only, beside all-time fees and
+  P/L; it now counts settled rounds, all time, from the ledger. Positions keep
+  their settlement payout in the ledger for this (older ledgers get it back
+  from their journal; an older build still reads the new ledger).
+* The header shows uptime and `LIVE DRY RUN` for a dry run (it said `LIVE`);
+  `SETTLE` turns `WARN` when a round waits more than 15 minutes for its result
+  (it was always `OK`).
+* `tools/fake-venue`: wallet token balances on its RPC and
+  `VENUE_REDEEM_AFTER_S` (the owner redeeming).
+
+Checked: 217 unit tests (10 new; two shown to fail with their fix taken out), the same
+under AddressSanitizer/UBSan and ThreadSanitizer with no report, a 10-minute
+live run under ThreadSanitizer with no report, live and paper runs against
+the fake venue whose dashboards agree to the cent with figures recomputed
+from the venue's own trades, balance, results and token balances, ledgers
+equal to the venue's record after a restart, and a ledger passed to the
+previous build and back.
+
 ## 12 November 2026 — holding the venue's websockets
 
 The bot never closed a venue websocket on purpose, but it could give one up

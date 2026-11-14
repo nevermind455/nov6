@@ -393,10 +393,15 @@ Row header(const Json &snap, int cols) {
   auto mode = upper(text(get(snap, "mode")));
   const Json &canary = get(snap, "canary"), &market = get(snap, "market");
   auto left = num(get(market, "seconds_left"));
+  // LIVE trades real money; a live dry run reads the account and sends nothing.
+  const Style mode_style = mode == "LIVE" ? Style{Color::white, Color::red, true}
+                           : mode.rfind("LIVE", 0) == 0
+                               ? Style{Color::ink, Color::amber, true}
+                               : Style{Color::white, Color::green, true};
   std::vector<Run> parts{
       {" BTC SNIPER ", Style{Color::white, Color::rule, true}},
       {" ", PAPER},
-      {" " + mode + " ", Style{Color::white, mode == "LIVE" ? Color::red : Color::green, true}}};
+      {" " + mode + " ", mode_style}};
   if (truthy(canary)) {
     bool halted = truthy(get(canary, "halted"));
     parts.push_back({" ", PAPER});
@@ -423,6 +428,13 @@ Row header(const Json &snap, int cols) {
                      market_state_badge(PENDING_S)});
   }
   auto clock = text(get(snap, "clock"), "");
+  if (auto up = num(get(snap, "uptime_s")); up && *up >= 0) {
+    auto t = static_cast<long long>(*up);
+    clock = (t >= 86400 ? sf("up %lldd%02lldh", t / 86400, t % 86400 / 3600)
+             : t >= 3600 ? sf("up %lldh%02lldm", t / 3600, t % 3600 / 60)
+                         : sf("up %lldm%02llds", t / 60, t % 60)) +
+            "  " + clock;
+  }
   std::size_t used = 0;
   for (auto &r : parts)
     used += cells(r.text);
@@ -536,6 +548,10 @@ Row resting_row(const Json &r, int w) {
     bool on = truthy(get(r, "on"));
     parts.push_back({on ? "no order on the book" : text(get(r, "off"), "off"),
                      on ? FAINT : AMBER});
+    // this run's resting orders so far: on the book, and filled
+    auto rested = num(get(r, "rested")), filled = num(get(r, "filled"));
+    if (on && rested && *rested > 0)
+      parts.push_back({sf("  %.0f rested %.0f filled", *rested, filled.value_or(0)), DIM});
     return runs(std::move(parts), w);
   }
   auto side = upper(text(get(o, "side")));
@@ -1228,6 +1244,16 @@ std::string compute_terminal_text(std::string_view value, std::size_t max_chars)
 }
 } // namespace
 
+bool partial_fill(const Intent &i) {
+  if (i.booked_shares <= 0)
+    return false;
+  // Share-sized orders know their shares: short of them is partial (a
+  // micro-share of venue rounding is not).
+  if (i.target > 0)
+    return i.target - i.booked_shares > 1;
+  return i.booked_cost < i.stake && i.stake - i.booked_cost > 1;
+}
+
 Json live_execution_quality(const std::map<std::string, Intent> &orders,
                             const std::set<std::string> &acknowledged,
                             const std::map<std::string, double> &decision_asks,
@@ -1238,7 +1264,7 @@ Json live_execution_quality(const std::map<std::string, Intent> &orders,
   double slip_sum = 0, latest = -INFINITY;
   Json last;
   for (const auto &[id, i] : orders) {
-    if (!std::isfinite(i.sent_wall) || i.sent_wall < started_wall)
+    if (i.rest || !std::isfinite(i.sent_wall) || i.sent_wall < started_wall)
       continue;
     ++attempted;
     if (i.status == "aborted") {
@@ -1251,9 +1277,7 @@ Json live_execution_quality(const std::map<std::string, Intent> &orders,
     if (i.unresolved() || i.status == "matched")
       ++pending;
     if (i.booked_shares > 0) {
-      const bool is_partial = i.booked_cost < i.stake &&
-                              i.stake - i.booked_cost > 1;
-      ++(is_partial ? partial : filled);
+      ++(partial_fill(i) ? partial : filled);
       const double shares = dollars(i.booked_shares);
       const double price = dollars(i.booked_cost) / shares;
       std::optional<double> ask, slip;
@@ -1310,6 +1334,50 @@ Json execution_latencies(const Json &row) {
       samples["enqueue_to_ack"] = *elapsed;
   }
   return samples;
+}
+
+RoundResults settled_rounds(const std::map<std::string, Position> &positions) {
+  std::map<std::string, std::optional<__int128>> by_round;
+  for (const auto &[token, p] : positions) {
+    (void)token;
+    if (!p.settled || p.shares <= 0)
+      continue;
+    auto &pnl = by_round.try_emplace(p.condition, __int128(0)).first->second;
+    if (!pnl)
+      continue; // already unknown
+    if (p.payout < 0) {
+      pnl.reset();
+      continue;
+    }
+    *pnl += static_cast<__int128>(multiply(p.shares, p.payout)) - p.cost - p.fees;
+  }
+  RoundResults out;
+  for (const auto &[condition, pnl] : by_round) {
+    (void)condition;
+    if (!pnl)
+      ++out.unknown;
+    else
+      ++(*pnl > 0 ? out.won : *pnl < 0 ? out.lost : out.even);
+  }
+  return out;
+}
+
+bool redeem_candidate(const Position &p) {
+  return p.settled && p.payout > 0 && p.shares > 0;
+}
+
+std::optional<double> unredeemed_value(const std::map<std::string, Position> &positions,
+                                       const std::map<std::string, std::int64_t> &held) {
+  __int128 total = 0;
+  for (const auto &[token, p] : positions) {
+    if (!redeem_candidate(p))
+      continue;
+    auto h = held.find(token);
+    if (h == held.end() || h->second < 0)
+      return std::nullopt;
+    total += multiply(std::min(p.shares, h->second), p.payout);
+  }
+  return static_cast<double>(total) / static_cast<double>(U);
 }
 
 Json mark_position(double shares, double notional, double fees,
