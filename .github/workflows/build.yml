@@ -28,9 +28,6 @@ jobs:
       - name: Build and run the native tests
         run: bash scripts/build.sh
 
-      - name: Verify development comparison tools
-        run: python3 -m unittest discover -s tools/replay -p 'test_*.py'
-
       - name: Run setup on the shipped settings
         run: bash scripts/setup.sh
 
@@ -97,6 +94,9 @@ jobs:
             | jq -e '.coinbase_live and .clob_h2_ready'
           jq -s -e '[.[] | .round_end // empty] | unique | length >= 2' \
             "$sim/state/paper/sniper.jsonl"
+          # the C++ health report reads the same state
+          ../../bin/sniper-live-check --state "$sim/state/paper" | tee "$sim/live-check.txt"
+          grep -qF "SIGNALS AND SKIPS" "$sim/live-check.txt"
 
       # The dashboard in a real terminal (tmux), against the same local venue.
       # The screen is saved so the layout can be read, at two sizes.
@@ -117,8 +117,9 @@ jobs:
           cp ../../.env.example "$sim/.env"
           chmod 600 "$sim/.env"
 
+          # This run also has the extra trigger feeds (Binance futures and spot).
           tmux new-session -d -s dash -x 170 -y 50 -c "$PWD" \
-            "HTTPS_PROXY=http://127.0.0.1:18080 SSL_CERT_FILE='$PWD/certs/ca.crt' ../../bin/sniper-cpp --config '$sim/.env' --paper --dash --run-for 270; echo \$? > '$sim/exit_code'; sleep 20"
+            "SNIPER_EXTRA_FEEDS=binance_fut,binance_spot HTTPS_PROXY=http://127.0.0.1:18080 SSL_CERT_FILE='$PWD/certs/ca.crt' ../../bin/sniper-cpp --config '$sim/.env' --paper --dash --run-for 270; echo \$? > '$sim/exit_code'; sleep 20"
           # Long enough for volatility to warm up and for orders to reach the table.
           sleep 240
           tmux capture-pane -pt dash > "$sim/frame-170x50.txt"
@@ -134,7 +135,8 @@ jobs:
           cat "$sim/frame-170x50.txt"
           cat "$sim/frame-100x30.txt"
           [ "$(cat "$sim/exit_code")" = 0 ]
-          for part in "BTC SNIPER" TRIGGER MARKET ACCOUNT ORDERS HEALTH SETTLEMENT EVENTS "FAK +0.02"; do
+          for part in "BTC SNIPER" TRIGGER MARKET ACCOUNT ORDERS HEALTH SETTLEMENT EVENTS "FAK +0.02" \
+              "BIN FUT   LIVE" "BIN SPOT  LIVE" "fired"; do
             grep -qF "$part" "$sim/frame-170x50.txt"
           done
           for part in "BTC SNIPER" TRIGGER MARKET ACCOUNT ORDERS; do

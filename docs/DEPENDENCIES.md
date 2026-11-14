@@ -37,10 +37,11 @@ arithmetic of `Lib/_pydecimal.py` (same license), so money amounts round exactly
 as in the reference bot. This is translated native code and does not link or
 load Python.
 
-The parity tools in `tools/replay/` are development-only. `compare.py` and
-`make_recording.py` need only Python 3; `py_replay.py` and `diff_cases.py` run the
-reference bot (`nevermind455/oct10` at 772f2eb, Python 3.13, its pinned
-requirements including `polymarket-client 0.13.0`).
+This repository holds no Python program. The Python tools that compared this
+build with the reference bot (`nevermind455/oct10` at 772f2eb) were removed on
+14 November 2026; they are in git history at commit d5221b5. The only other
+language is the test simulator in `tools/fake-venue` (JavaScript, Node.js), which
+is development-only and never runs beside the bot.
 
 SDK fixtures were generated against the PDF's pinned `polymarket-client 0.13.0`
 development oracle. The SDK is not a runtime or build dependency of this package.

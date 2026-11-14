@@ -265,7 +265,36 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
   double cb_silent = env_float("SNIPER_COINBASE_SILENT_S", 5);
   s.coinbase_silent_s = cb_silent;
   s.coinbase_conns = env_int("SNIPER_COINBASE_CONNS", 2);
-  refuse_on("SNIPER_EXTRA_FEEDS", !strip(text("SNIPER_EXTRA_FEEDS", "")).empty());
+  {
+    // SNIPER_EXTRA_FEEDS: a comma list; the primary and repeats are dropped.
+    std::string raw = lower(strip(text("SNIPER_EXTRA_FEEDS", "")));
+    std::vector<std::string> unknown;
+    std::size_t at = 0;
+    while (at <= raw.size()) {
+      auto comma = raw.find(',', at);
+      auto item = strip(raw.substr(at, comma == std::string::npos ? std::string::npos
+                                                                 : comma - at));
+      at = comma == std::string::npos ? raw.size() + 1 : comma + 1;
+      if (item.empty() || item == s.primary_feed)
+        continue;
+      if (item != "binance_fut" && item != "binance_spot")
+        unknown.push_back(item);
+      else if (std::find(s.extra_feeds.begin(), s.extra_feeds.end(), item) ==
+               s.extra_feeds.end())
+        s.extra_feeds.push_back(item);
+    }
+    if (!unknown.empty())
+      throw std::invalid_argument("invalid SNIPER_EXTRA_FEEDS " + pyrepr(raw) +
+                                  ": supported binance_fut, binance_spot");
+  }
+  {
+    std::string f = strip(text("SNIPER_BINANCE_FRESHNESS", "1"));
+    s.binance_freshness = !(f == "0" || f == "false" || f == "off");
+  }
+  s.binance_stale_ms = env_float("SNIPER_BINANCE_STALE_MS", 1000);
+  s.binance_unknown_ms = env_float("SNIPER_BINANCE_UNKNOWN_MS", 5000);
+  s.binance_backlog_max = env_int("SNIPER_BINANCE_BACKLOG_MAX", 20);
+  s.binance_silent_s = env_float("SNIPER_BINANCE_SILENT_S", 5);
   refuse_on("SNIPER_WIDE_CAP_C", wide_cap_c > 0);
   refuse_on("SNIPER_WIDE_CAP_LIVE", wide_cap_live);
   refuse_on("SNIPER_MAKER_ONLY", maker_only);
@@ -302,6 +331,10 @@ sniper_settings(const std::function<std::optional<std::string>(const std::string
            s.coinbase_backlog_max >= 0 && cb_silent > 0,
        "SNIPER_COINBASE_STALE_MS / _UNKNOWN_MS / _SILENT_S must be > 0, "
        "_BACKLOG_MAX >= 0"},
+      {s.binance_stale_ms > 0 && s.binance_unknown_ms > 0 &&
+           s.binance_backlog_max >= 0 && s.binance_silent_s > 0,
+       "SNIPER_BINANCE_STALE_MS / _UNKNOWN_MS / _SILENT_S must be > 0 and "
+       "SNIPER_BINANCE_BACKLOG_MAX >= 0"},
       {1 <= s.coinbase_conns && s.coinbase_conns <= 4,
        "SNIPER_COINBASE_CONNS=" + std::to_string(s.coinbase_conns) +
            " (1 to 4)"},

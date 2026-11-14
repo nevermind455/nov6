@@ -1,5 +1,6 @@
 #include "sniper/sniper.hpp"
 #include "sniper/math.hpp"
+#include "sniper/feeds.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -219,6 +220,76 @@ Sniper::Sniper(const SniperSettings &settings, SniperEnv &e)
   cb_fresh.name = "coinbase";
   cb_fresh.mode = s.backlog_gate;
   cb_fresh.fresh_ms = s.backlog_fresh_ms;
+  fire_feed_ = s.primary_feed;
+  for (const auto &name : s.extra_feeds) {
+    Extra f{name, Trigger(s.k_bp, s.window_ms), Freshness{}, std::nullopt};
+    f.fresh.enabled = s.binance_freshness;
+    f.fresh.stale_ms = s.binance_stale_ms;
+    f.fresh.unknown_ms = s.binance_unknown_ms;
+    f.fresh.backlog_max = s.binance_backlog_max;
+    f.fresh.name = name;
+    f.fresh.mode = s.backlog_gate;
+    f.fresh.fresh_ms = s.backlog_fresh_ms;
+    extra.push_back(std::move(f));
+  }
+}
+
+// ------------------------------------------------------------ extra feeds
+std::string Sniper::on_extra(std::size_t i, std::string_view raw, double t,
+                             std::int64_t t_ns) {
+  auto &f = extra.at(i);
+  auto tick = feeds::parse(f.name, raw);
+  if (tick.kind == feeds::Tick::Malformed) {
+    ++n[f.name + " malformed"];
+    return "malformed";
+  }
+  if (tick.kind == feeds::Tick::Trade) {
+    // binance_spot: its trades carry the exchange's clock for the gate
+    f.fresh.note_trade(tick.event_ms, env.wall() * 1000.0, t / 1000.0);
+    ++n[f.name + " trades"];
+    return "trade";
+  }
+  if (tick.kind != feeds::Tick::Book)
+    return "other";
+  if (f.name == "binance_fut") // its book ticker carries the exchange's clock
+    f.fresh.note_trade(tick.event_ms, env.wall() * 1000.0, t / 1000.0);
+  ++n[f.name + " ticks"];
+  bool fresh_enough = f.fresh.why_not(t / 1000.0).empty();
+  f.last_mid = tick.mid;
+  signal_on(f.name, f.trigger, f.fresh, *tick.mid, t, t_ns);
+  if (!fresh_enough) {
+    f.trigger.q.values.clear();
+    f.trigger.ref.reset();
+  }
+  return "tick";
+}
+
+void Sniper::on_extra_connect(std::size_t i) {
+  auto &f = extra.at(i);
+  f.trigger = Trigger(s.k_bp, s.window_ms);
+  f.last_mid.reset();
+  f.fresh.on_connect();
+}
+
+const Freshness &Sniper::freshness(const std::string &feed) const {
+  for (const auto &f : extra)
+    if (f.name == feed)
+      return f.fresh;
+  return cb_fresh;
+}
+
+std::optional<double> Sniper::mid_of(const std::string &feed) const {
+  for (const auto &f : extra)
+    if (f.name == feed)
+      return f.last_mid;
+  return last_mid;
+}
+
+const Trigger &Sniper::trigger_of(const std::string &feed) const {
+  for (const auto &f : extra)
+    if (f.name == feed)
+      return f.trigger;
+  return trigger;
 }
 
 // ------------------------------------------------------------ the feed
@@ -326,59 +397,70 @@ std::string Sniper::on_coinbase(std::string_view raw, double t,
 }
 
 void Sniper::signal(double mid, double t, std::int64_t t_ns) {
+  signal_on(s.primary_feed, trigger, cb_fresh, mid, t, t_ns);
+}
+
+void Sniper::signal_on(const std::string &feed, Trigger &trig, Freshness &fresh,
+                       double mid, double t, std::int64_t t_ns) {
   if (closing)
     return;
-  auto [direction, r] = trigger.update(t, mid);
+  auto [direction, r] = trig.update(t, mid);
   if (!direction)
     return;
-  ++n["signals"];
-  std::string why = cb_fresh.why_not(t / 1000.0);
+  const bool primary = feed == s.primary_feed;
+  const std::string tag = primary ? "" : " (" + feed + ")";
+  ++n[primary ? std::string("signals") : "signals " + feed];
+  std::string why = fresh.why_not(t / 1000.0);
   std::string side = *direction > 0 ? "UP" : "DOWN";
   ++signals_by_side[idx(side)];
   if (!why.empty()) {
-    Json window = window_fields(t);
-    trigger.q.values.clear();
+    // measured on ticks that cannot be shown current: the reference goes too,
+    // so the rule restarts on fresh ticks only
+    Json window = window_fields(trig, t);
+    trig.q.values.clear();
     double wall = env.wall();
     Json row;
     row["wall"] = wall;
     row["id"] = decision_id(wall, side);
     row["side"] = side;
     row["bp"] = py::round(r, 3);
-    row["feed"] = "coinbase";
+    row["feed"] = feed;
     for (auto &[k, v] : window.items())
       row[k] = v;
-    row["coinbase_backlog"] = cb_fresh.backlog;
-    row["coinbase_excess_ms"] = cb_fresh.last_excess
-                                    ? Json(py::round(*cb_fresh.last_excess, 1))
-                                    : Json(nullptr);
+    row[feed + "_backlog"] = fresh.backlog;
+    row[feed + "_excess_ms"] = fresh.last_excess
+                                   ? Json(py::round(*fresh.last_excess, 1))
+                                   : Json(nullptr);
     skip(why, row);
     return;
   }
   int i = idx(side);
   if (t - last_fire_by_side[i] < s.cooldown_ms) {
-    ++n["skip: cooldown"];
+    ++n["skip: cooldown" + tag]; // this side only: the other is not blocked
     return;
   }
   if (inflight[i]) {
-    ++n["skip: previous order in flight"];
+    ++n["skip: previous order in flight" + tag];
     return;
   }
   inflight[i] = InFlight{};
   t1_mid_ = mid;
+  fire_feed_ = feed;
   auto plan = fire_now(side, r, t, t_ns);
+  fire_feed_ = s.primary_feed;
   t1_mid_.reset();
   if (plan) {
     last_fire_by_side[i] = env.mono() * 1000.0;
-    ++n["fired coinbase"];
+    ++n["fired " + feed];
   }
 }
 
-Json Sniper::window_fields(double t_ms) const {
+Json Sniper::window_fields(const Trigger &trig, double t_ms) const {
   Json out = Json::object();
-  if (!trigger.ref || trigger.ref->first > t_ms)
+  if (!trig.ref || trig.ref->first > t_ms)
     return out;
-  out["window_ms"] = py::round(t_ms - trigger.ref->first, 1);
-  out["ref_mid"] = trigger.ref->second;
+  out["window_ms"] = py::round(t_ms - trig.ref->first, 1);
+  out["ref_mid"] = trig.ref->second;
   return out;
 }
 
@@ -783,15 +865,16 @@ std::shared_ptr<Plan> Sniper::fire_now(const std::string &side, double r_bp,
   row["id"] = decision_id(wall, side);
   row["side"] = side;
   row["bp"] = py::round(r_bp, 3);
-  row["feed"] = "coinbase";
+  const std::string feed = fire_feed_.empty() ? s.primary_feed : fire_feed_;
+  row["feed"] = feed;
   row["loop_lag_ms"] = py::round(env.mono() * 1000.0 - t_ms, 1);
-  Json window = window_fields(t_ms);
+  Json window = window_fields(trigger_of(feed), t_ms);
   for (auto &[k, v] : window.items())
     row[k] = v;
   if (t1_mid_)
     row["signal_mid"] = *t1_mid_;
-  if (cb_fresh.last_excess)
-    row["coinbase_excess_ms"] = py::round(*cb_fresh.last_excess, 1);
+  if (const auto &fresh = freshness(feed); fresh.last_excess)
+    row[feed + "_excess_ms"] = py::round(*fresh.last_excess, 1);
   if (retry_fields_)
     for (auto &[k, v] : retry_fields_->items())
       row[k] = v; // keeps the signal's own window and reference
@@ -802,6 +885,7 @@ std::shared_ptr<Plan> Sniper::fire_now(const std::string &side, double r_bp,
       return nullptr;
     }
     plan->t_ms = t_ms;
+    plan->feed = feed;
     plan->t_ns = t_ns;
     plan->r_bp = r_bp;
     plan->retry = retry_next_;
@@ -1346,12 +1430,14 @@ void Sniper::retry_after_miss(const std::string &side, const Plan *missed) {
   }
   // The move must still be there: the latest Coinbase mid against the
   // signal's own reference, the same way and at least the trigger size.
+  // On the feed that signalled: its reference is at that feed's own level.
   const Json &ref = field(prev->row, "ref_mid");
-  if (!ref.is_number() || !(ref.get<double>() > 0) || !last_mid) {
+  const auto feed_mid = mid_of(prev->feed);
+  if (!ref.is_number() || !(ref.get<double>() > 0) || !feed_mid) {
     ++n["miss retry: move unknown"];
     return;
   }
-  const double r_now = (*last_mid / ref.get<double>() - 1.0) * 1e4;
+  const double r_now = (*feed_mid / ref.get<double>() - 1.0) * 1e4;
   if ((side == "UP" ? r_now : -r_now) < s.k_bp - 1e-9) {
     ++n["miss retry: move faded"];
     return;
@@ -1365,10 +1451,12 @@ void Sniper::retry_after_miss(const std::string &side, const Plan *missed) {
   inflight[i] = InFlight{};
   retry_fields_ = std::move(fields);
   retry_next_ = prev->retry + 1;
-  t1_mid_ = last_mid;
+  t1_mid_ = feed_mid;
+  fire_feed_ = prev->feed;
   // The signal's own time: the fair value keeps its pre-move anchor, and the
   // live send guard still refuses it once the trigger has gone stale.
   auto plan = fire_now(side, r_now, prev->t_ms, prev->t_ns);
+  fire_feed_ = s.primary_feed;
   t1_mid_.reset();
   retry_fields_.reset();
   retry_next_ = 0;

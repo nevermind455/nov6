@@ -314,6 +314,12 @@ Json Config::public_view() const {
   return {{"native_cpp", true},
           {"mode", live ? (dry_run ? "LIVE DRY RUN" : "LIVE") : "PAPER"},
           {"trigger_bp", k},
+          {"trigger_feeds", [&] {
+             Json f = Json::array({s.primary_feed});
+             for (const auto &x : s.extra_feeds)
+               f.push_back(x);
+             return f;
+           }()},
           {"window_ms", window},
           {"order_type", order_type},
           {"kelly_fraction", kelly},

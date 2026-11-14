@@ -1,7 +1,7 @@
 // sniper-diff: evaluate differential cases (JSONL on stdin) with the C++
-// ports and print one JSON result per case. tools/replay/diff_cases.py
-// generates the cases, evaluates them with the Python reference and
-// compares. Kinds: fok, fak, fak_shares, min_entry, cent, budget,
+// ports and print one JSON result per case. The generator that evaluated
+// the same cases with the Python reference is in git history at commit
+// d5221b5 (this repository is C++ only). Kinds: fok, fak, fak_shares, min_entry, cent, budget,
 // risk_total, factors, dd_stop, fair, fair_limit, kelly, fee, round, repr.
 #include "sniper/math.hpp"
 #include "sniper/paper.hpp"
