@@ -5,9 +5,12 @@ Networking, strategy, order signing, paper fills, accounting, and settlement run
 inside the C++ process. There is no Python interpreter, Python extension, Python
 SDK, or Python subprocess in the bot, build scripts, or tests. The cryptographic
 libraries include native C code. `SNIPER_HYBRID_SIZING` names the volatility and
-drawdown sizing formula; it does not mean a mixed-language runtime. The only
-Python in the package is under `tools/replay/`: it runs the reference Python bot
-beside this program to prove they decide the same way. The bot never uses it.
+drawdown sizing formula; it does not mean a mixed-language runtime. The
+repository holds no Python program at all: the tools that ran the reference
+Python bot beside this program, to prove they decide the same way, were removed
+on 14 November 2026 (they are in git history at commit d5221b5). The report
+tools are C++ (`sniper-live-check`, `sniper-feed-race`, `sniper-miss-report`,
+`sniper-edge-report`).
 
 **Release status (1.1.0): decision engine matched to the reference.** The
 decision engine, market book and paper broker are now line-for-line ports of
@@ -37,16 +40,17 @@ to fill with per-stage latency. See `docs/MISSED_ORDERS.md`.
 
 For a short health report of a live run (halts and their reasons, errors,
 orders and fills, resting orders, websocket drops, settlement and the ledger),
-run `nice python3 -I tools/report/live_check.py` from the bot's folder
-(`--hours 6` for a shorter window, `--state state/paper` for paper). It only
-reads, and prints no key.
+run `./bin/sniper-live-check` from the bot's folder (`--hours 6` for a
+shorter window, `--state state/paper` for paper). It only reads, prints no
+key, and with `SNIPER_EXTRA_FEEDS` splits orders, fills and settled P&L by the
+feed that fired them.
 
 To see which BTC feed fires the bot's trigger first on this server (Coinbase,
-Binance spot or Binance futures), run `python3 tools/report/feed_race.py 60`:
-it listens to all three for an hour, puts each through the bot's own trigger
-rule (0.5 bp in 250 ms) and says, move by move, which one fired first and by
-how many milliseconds. Public market data only: no key, no order, nothing
-written, lowest CPU priority, standard Python only.
+Binance spot or Binance futures), run `./bin/sniper-feed-race 60`: it listens
+to all three for an hour, puts each through the bot's own trigger rule (0.5 bp
+in 250 ms) and says, move by move, which one fired first and by how many
+milliseconds. Public market data only: no key, no order, nothing written,
+lowest CPU priority.
 
 ## Execution latency and VPS measurements
 
@@ -95,9 +99,11 @@ stage definitions, signing constraints and interpretation.
   skip its final seconds. The audited runtime refreshes active venue-rule
   snapshots when discovery returns new metadata; it does not extend expired
   rules or weaken the freshness gate.
-* New tools: `sniper-replay`, `tools/replay/py_replay.py`, `compare.py`,
-  `run_parity.sh` (decision parity) and `sniper-diff` + `diff_cases.py`
-  (20,000-case differential test). `--record FILE` writes the replay format.
+* New tools: `sniper-replay` (decision replay) and `sniper-diff`
+  (differential test). `--record FILE` writes the replay format. The Python
+  tools that ran the reference bot for the parity results were removed when
+  this repository became C++ only (14 November 2026); they are in its git
+  history (commit d5221b5).
 
 ## Start paper mode on a VPS
 
@@ -237,6 +243,12 @@ that this release passed a full runtime soak under sanitizers.
 * Two Coinbase BTC-USD ticker sockets, deduplicated by sequence. A mid move of
   at least 0.5 bp within 250 ms signals UP or DOWN. A freshness gate (feed
   behind, backlog, unknown age, disconnected) refuses stale signals.
+* Optional extra trigger feeds (`SNIPER_EXTRA_FEEDS=binance_fut,binance_spot`,
+  off by default): the same rule on each feed's own mid, each with its own
+  freshness gate; whichever feed signals first fires. The per-side cooldown and
+  the one-order-in-flight rule are shared, so one move is one order. Only a
+  feed's move is used (Binance quotes in USDT, futures at a basis), never its
+  price level. Every decision row names the feed that fired it.
 * Fair value anchors to the lower of the pre-move and current outcome mid:
   `fair = Phi(Phi^-1(m) + |r|/(sigma*sqrt(tau)))`, with sigma from one-second
   samples over 300 s (floor 0.2 bp, 60 samples to warm up). The limit is fair
@@ -278,6 +290,8 @@ features. Never copy the old Python bot's entire configuration without review.
 | `SNIPER_PTB_SKIP_CLOSE` | `0` | Optional price-to-beat gate; unvalidated here |
 | `SNIPER_MISS_RETRY`, `SNIPER_MISS_RETRY_MS` | `0`, `1000` | Opt-in: after a confirmed zero-fill FAK miss, decide once more for the same signal (every gate again, same limit rule) if it is younger than this many ms and the Coinbase move still holds. Test in paper first |
 | `SNIPER_REST_LIVE`, `SNIPER_REST_S`, `SNIPER_REST_DIR`, `SNIPER_REST_LIVE_STOP_USD` | `0`, `5`, `1`, `10` | Opt-in, live only: after a confirmed zero-fill FAK miss, rest the same order (its shares at its limit, post-only, no fee) for at most this many seconds, only on the side beating the price to beat, cancelled as soon as BTC turns against it; off for good after this settled loss. See [docs/RESTING_ORDERS.md](docs/RESTING_ORDERS.md) |
+| `SNIPER_EXTRA_FEEDS` | empty | More trigger feeds: `binance_fut` (Binance USD-M perpetual BTCUSDT book ticker) and/or `binance_spot` (Binance spot BTCUSDT book ticker, with its trades for the exchange clock). Whichever feed signals first sends the order; one move, one order. Measure first with `bin/sniper-feed-race`, test in paper, then live |
+| `SNIPER_BINANCE_STALE_MS`, `_UNKNOWN_MS`, `_BACKLOG_MAX`, `_SILENT_S`, `SNIPER_BINANCE_FRESHNESS` | `1000`, `5000`, `20`, `5`, `1` | The extra feeds' freshness gate (as Coinbase's): feed behind its usual delay, no exchange time that recent, receive backlog, reconnect after silence |
 | `SNIPER_MARKET_STANDBY` | `1` | A second, warm connection to the venue's market feed that takes over at once when the first drops. `0` = one connection. See [docs/WEBSOCKETS.md](docs/WEBSOCKETS.md) |
 | `SNIPER_CANARY_MAX_SHARES` | `25` | Live order share cap |
 | `SNIPER_CANARY_MAX_ORDERS` | `40` | Initial canary order budget |
@@ -296,9 +310,10 @@ them. The PDF calls for a $5 loss budget in its first live canary, which
 
 Live mode freezes the baseline trigger, cooldown, fair margin, slippage (0.02 or
 0.05), FAK type and sizing combinations. Changing them can correctly refuse startup.
-Optional extra feeds, maker features, direction add-ons, measured fill odds,
-strict paper/live parity and live cash mirroring are not implemented in this
-baseline; enabling them explicitly refuses startup.
+Maker features, direction add-ons, measured fill odds, strict paper/live parity,
+live cash mirroring and a primary feed other than Coinbase are not implemented
+in this baseline; enabling them explicitly refuses startup. Extra trigger feeds
+(`SNIPER_EXTRA_FEEDS`) are implemented, off by default.
 
 ## Live interface — acceptance still required
 
@@ -380,21 +395,20 @@ requires a compatible binary or the matching pre-upgrade snapshot and journal,
 with any subsequent trading reconciled. Never restore old accounting over
 later live activity. See the audit report for recovery details.
 
-`--record PATH` writes every input the decision engine sees (Coinbase and market
-frames, REST book snapshots, round changes, socket connects and drops) as JSON
-lines. Replay a recording through this program and through the reference, then
-compare them row by row:
+`--record PATH` writes every input the decision engine sees (Coinbase, extra
+trigger feed and market frames, REST book snapshots, round changes, socket
+connects and drops) as JSON lines. Replay a recording through two builds and
+compare them row by row - this is how a change is shown to leave every
+decision as it was:
 
 ```bash
-./bin/sniper-replay rec.jsonl cpp.jsonl [settings.json]
-REF_PYTHON -I tools/replay/py_replay.py REFERENCE_CHECKOUT rec.jsonl py.jsonl [settings.json]
-python3 -I tools/replay/compare.py py.jsonl cpp.jsonl
+./bin/sniper-replay rec.jsonl a.jsonl [settings.json]
+/path/to/other/sniper-replay rec.jsonl b.jsonl [settings.json]
+./bin/sniper-cpp --compare a.jsonl b.jsonl
 ```
 
-`REFERENCE_CHECKOUT` is `nevermind455/oct10` at commit 772f2eb and `REF_PYTHON` a
-Python 3.13 environment with its requirements installed. `settings.json` is a
-flat object of `SNIPER_*` settings. Both replays use the same scripted fills, so
-decisions are compared, not paper fill luck.
+`settings.json` is a flat object of `SNIPER_*` settings. Both replays use the
+same scripted fills, so decisions are compared, not paper fill luck.
 `--compare A B` compares two existing journals in row order.
 
 For a missing round, inspect `discovery_refused` rows. For a missing shared

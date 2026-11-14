@@ -1,5 +1,40 @@
 # Changelog
 
+## 14 November 2026 — extra trigger feeds; C++ only
+
+* **`SNIPER_EXTRA_FEEDS=binance_fut,binance_spot`** (off by default): Binance
+  USD-M futures and Binance spot as more trigger feeds beside Coinbase,
+  ported from the reference bot's second trigger. The same rule (0.5 bp in
+  250 ms) runs on each feed's own mid, each with its own freshness gate
+  (`SNIPER_BINANCE_*`); whichever feed signals first sends the order. The
+  per-side cooldown and the one-order-in-flight rule are shared, so a move seen
+  on several feeds is one order. Only a feed's move is used: Binance quotes in
+  USDT, futures at a basis. The send check, a missed order's resting order and
+  `SNIPER_MISS_RETRY` judge the move on the feed that fired. Every decision row
+  names its feed; the dashboard shows the orders each feed fired and a health
+  line per feed; recordings and `sniper-replay` carry the new feeds.
+* **No Python left in the repository.** `tools/report/live_check.py` is now
+  `bin/sniper-live-check` (same report, byte for byte on the runs compared,
+  plus orders, fills and settled P&L by trigger feed), and the feed race is
+  `bin/sniper-feed-race`. The Python tools that compared this build with the
+  reference bot are removed (git history, commit d5221b5); CI no longer runs
+  Python.
+* `tools/fake-venue`: Binance futures and spot feeds, `VENUE_COINBASE_LAG_MS`
+  (Coinbase behind Binance), `VENUE_BINANCE_BASIS`.
+
+With `SNIPER_EXTRA_FEEDS` empty every decision is as before: 2,069 of 2,069
+replayed decisions identical to the previous release on four recordings.
+Tested: 221 unit tests (4 new: first feed fires and the same move elsewhere
+does not, a stale feed fires nothing, Binance messages and settings, spot
+trades keep its gate), the same under AddressSanitizer/UBSan and
+ThreadSanitizer with no report, and a 4-minute live run under ThreadSanitizer
+with the extra feeds on, also with no report. On the fake venue with Coinbase
+60 ms behind: live and paper runs fired from Binance futures (46 of 47 live
+orders), resting orders followed Binance-fired misses and were judged on
+Binance's prices, both live ledgers equal the venue's record order by order,
+and `sniper-feed-race` measured the 60 ms. Not tested against the real Binance
+or Coinbase from a server.
+
 ## 14 November 2026 — audit: what the dashboard shows is what is true
 
 A full read of the bot and its dashboard, every number traced to its source

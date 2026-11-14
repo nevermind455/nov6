@@ -7,7 +7,7 @@ mkdir -p certs
 cd certs
 cat > san.cnf <<'EOF'
 [ext]
-subjectAltName=DNS:clob.polymarket.com,DNS:gamma-api.polymarket.com,DNS:ws-subscriptions-clob.polymarket.com,DNS:ws-feed.exchange.coinbase.com,DNS:polygon-bor-rpc.publicnode.com,DNS:ws-live-data.polymarket.com
+subjectAltName=DNS:clob.polymarket.com,DNS:gamma-api.polymarket.com,DNS:ws-subscriptions-clob.polymarket.com,DNS:ws-feed.exchange.coinbase.com,DNS:polygon-bor-rpc.publicnode.com,DNS:ws-live-data.polymarket.com,DNS:fstream.binance.com,DNS:stream.binance.com
 basicConstraints=CA:FALSE
 keyUsage=digitalSignature,keyEncipherment
 extendedKeyUsage=serverAuth

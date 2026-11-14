@@ -78,7 +78,13 @@ half an hour with `SNIPER_PTB_MIN_CHECKS=1`.
 | `VENUE_BALANCE` | `100` | Account balance, dollars |
 | `VENUE_PTB` | `1` | Publish `eventMetadata.priceToBeat` for started rounds |
 | `VENUE_SIGMA` | `0.0001` | BTC volatility per square-root second |
+| `VENUE_COINBASE_LAG_MS` | `0` | Coinbase's ticker this many ms after the same price on the Binance feeds (`SNIPER_EXTRA_FEEDS`); `0` = together |
+| `VENUE_BINANCE_BASIS` | `0.0003` | Binance futures quote this fraction above the Coinbase price (a basis: only moves may be compared) |
 | `VENUE_REDEEM_AFTER_S` | `0` | The owner redeems a resolved round this many seconds after its result: winning tokens become collateral, the round's tokens leave the wallet (`0` = never, like an owner who has not claimed yet) |
+
+Binance futures (`fstream.binance.com`, book ticker with event time) and Binance
+spot (`stream.binance.com`, combined book ticker and trade stream) carry the same
+BTC path as Coinbase, for `SNIPER_EXTRA_FEEDS` and `bin/sniper-feed-race`.
 
 The Polygon RPC answers `balanceOf(address,uint256)` with the wallet's
 outcome tokens (every confirmed fill adds its shares), which is what the

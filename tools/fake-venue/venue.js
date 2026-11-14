@@ -39,6 +39,8 @@ const CFG = {
   marketFlap: env('VENUE_MARKET_FLAP', '0') === '1', // close every market websocket 100 ms after it connects
   sigma: +env('VENUE_SIGMA', 1e-4), // BTC volatility per sqrt(second)
   redeemAfter: +env('VENUE_REDEEM_AFTER_S', 0), // the owner redeems a resolved round this long after (0 = never)
+  cbLagMs: +env('VENUE_COINBASE_LAG_MS', 0), // Coinbase's ticker this long after Binance's quotes (0 = together)
+  basis: +env('VENUE_BINANCE_BASIS', 0.0003), // Binance futures quote above Coinbase by this fraction
   log: env('VENUE_LOG', __dirname + '/venue.log'),
 };
 const logStream = fs.createWriteStream(CFG.log, { flags: 'a' });
@@ -443,12 +445,43 @@ function tickLoop() {
     open_24h: '99000.00', volume_24h: '12345.6', low_24h: '98000', high_24h: '101000', volume_30d: '1',
     best_bid: bid.toFixed(2), best_bid_size: '0.5', best_ask: ask.toFixed(2), best_ask_size: '0.4',
     side: Math.random() < 0.5 ? 'buy' : 'sell', time: iso(ms), trade_id: tradeId, last_size: '0.001' });
-  for (const ws of cbClients) ws.send(raw);
-  count('cb_ticker');
+  const toCoinbase = () => { for (const ws of cbClients) ws.send(raw); count('cb_ticker'); };
+  if (CFG.cbLagMs > 0) setTimeout(toCoinbase, CFG.cbLagMs); else toCoinbase();
+  publishBinance(ms);
   ensureRounds();
   for (const r of rounds.values()) if (ms / 1000 < r.end + 5 && ms / 1000 > r.start - 600) requote(r, ms, false);
   if (CFG.live) stepResting();
   setTimeout(tickLoop, 40 + Math.random() * 120);
+}
+// Binance: the same BTC price, at once (Coinbase can trail by VENUE_COINBASE_LAG_MS).
+// Futures: the book ticker with its event time, at a basis above Coinbase.
+// Spot: the combined stream of book ticker (no time) and trades (with time).
+const bfClients = new Set(), bsClients = new Set();
+let binanceU = 1;
+function publishBinance(ms) {
+  const f = btc * (1 + CFG.basis);
+  const fut = JSON.stringify({ e: 'bookTicker', u: binanceU, s: 'BTCUSDT', b: (f - 0.05).toFixed(2), B: '3.1',
+    a: (f + 0.05).toFixed(2), A: '2.4', T: ms, E: ms });
+  for (const ws of bfClients) ws.send(fut);
+  const book = JSON.stringify({ stream: 'btcusdt@bookTicker', data: { u: binanceU, s: 'BTCUSDT',
+    b: (btc - 0.01).toFixed(2), B: '1.2', a: (btc + 0.01).toFixed(2), A: '0.8' } });
+  const trade = JSON.stringify({ stream: 'btcusdt@trade', data: { e: 'trade', E: ms, s: 'BTCUSDT', t: binanceU,
+    p: btc.toFixed(2), q: '0.002', T: ms, m: Math.random() < 0.5, M: true } });
+  for (const ws of bsClients) { ws.send(book); ws.send(trade); }
+  ++binanceU;
+  count('binance_quote');
+}
+function binanceServer(port, clients, name) {
+  const srv = https.createServer(tlsOpts);
+  const wss = new WebSocketServer({ server: srv });
+  wss.on('connection', (ws) => {
+    count(name + '_connect');
+    clients.add(ws);
+    const ping = setInterval(() => ws.ping(), 20000); // Binance pings; the client answers
+    ws.on('close', () => { clients.delete(ws); clearInterval(ping); });
+    ws.on('error', () => clients.delete(ws));
+  });
+  srv.listen(port, '127.0.0.1');
 }
 setInterval(() => {
   const raw = JSON.stringify({ type: 'heartbeat', last_trade_id: tradeId, product_id: 'BTC-USD', sequence: seq, time: iso(Date.now()) });
@@ -604,6 +637,7 @@ const ROUTES = {
   'clob.polymarket.com': B + 1, 'gamma-api.polymarket.com': B + 2,
   'ws-subscriptions-clob.polymarket.com': B + 3, 'ws-feed.exchange.coinbase.com': B + 4,
   'polygon-bor-rpc.publicnode.com': B + 5, 'ws-live-data.polymarket.com': B + 6,
+  'fstream.binance.com': B + 7, 'stream.binance.com': B + 8,
 };
 // Reconnection stress: cut every tunnelled connection (market and Coinbase
 // websockets, CLOB HTTP/2, REST) at a fixed interval.
@@ -643,6 +677,7 @@ net.createServer((client) => {
 }).listen(CFG.proxyPort, '127.0.0.1');
 
 clobServer(B + 1); gammaServer(B + 2); marketServer(B + 3); coinbaseServer(B + 4); rpcServer(B + 5);
+binanceServer(B + 7, bfClients, 'binance_fut'); binanceServer(B + 8, bsClients, 'binance_spot');
 tickLoop();
 log('VENUE_UP', JSON.stringify(CFG));
 console.log('venue up', JSON.stringify(CFG));

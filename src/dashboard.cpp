@@ -525,6 +525,21 @@ std::vector<Row> trigger_body(const Json &t, int w) {
                        {count(get(t, "refused")), AMBER},
                        {fr ? sf("  %.0f%%", *fr * 100) : "", DIM}},
                       w));
+  // SNIPER_EXTRA_FEEDS: which feed fired the orders
+  const Json &fired_by = get(t, "fired_by");
+  if (fired_by.is_array() && !fired_by.empty()) {
+    std::vector<Run> parts{{fit("fired", 9), DIM}, {" ", PAPER}};
+    for (const auto &f : fired_by) {
+      if (!f.is_array() || f.size() < 2)
+        continue;
+      auto name = text(f[0]);
+      name = name == "binance_fut" ? "bfut" : name == "binance_spot" ? "bspot"
+                                          : name == "coinbase" ? "cb" : name;
+      parts.push_back({name + " ", FAINT});
+      parts.push_back({count(f[1]) + "  ", INK_B});
+    }
+    rows.push_back(runs(std::move(parts), w));
+  }
   auto slip = num(get(t, "slip")), errors = num(get(t, "errors"));
   rows.push_back(runs({{fit("order", 9), DIM},
                        {" ", PAPER},

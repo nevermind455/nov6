@@ -27,7 +27,7 @@ add_library(sniper_core
   src/config.cpp src/crypto.cpp src/storage.cpp src/book.cpp src/strategy.cpp
   src/pyrt.cpp src/sniper.cpp src/paper.cpp src/settings.cpp
   src/network.cpp src/h2.cpp src/venue.cpp src/rest.cpp src/runtime.cpp
-  src/dashboard.cpp src/dashboard_terminal.cpp third_party/sha3.c)
+  src/dashboard.cpp src/dashboard_terminal.cpp src/feeds.cpp third_party/sha3.c)
 target_include_directories(sniper_core PUBLIC include ${Boost_INCLUDE_DIRS} ${NGHTTP2_INCLUDE_DIR} ${SECP256K1_INCLUDE_DIR} PRIVATE third_party)
 target_compile_definitions(sniper_core PUBLIC BOOST_ERROR_CODE_HEADER_ONLY BOOST_SYSTEM_NO_DEPRECATED)
 target_compile_options(sniper_core PUBLIC -O2 -Wall -Wextra -ffp-contract=off)
@@ -59,6 +59,14 @@ if(SNIPER_SANITIZE)
   target_link_options(sniper-miss-report PRIVATE -fsanitize=address,undefined,float-cast-overflow)
 endif()
 install(TARGETS sniper-miss-report RUNTIME DESTINATION .)
+add_executable(sniper-live-check tools/report/live_check.cpp)
+target_compile_options(sniper-live-check PRIVATE -O2 -Wall -Wextra)
+target_link_libraries(sniper-live-check PRIVATE nlohmann_json::nlohmann_json)
+install(TARGETS sniper-live-check RUNTIME DESTINATION .)
+add_executable(sniper-feed-race tools/report/feed_race.cpp)
+target_link_libraries(sniper-feed-race PRIVATE sniper_core)
+set_target_properties(sniper-feed-race PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")
+install(TARGETS sniper-feed-race RUNTIME DESTINATION .)
 target_link_libraries(sniper-diff PRIVATE sniper_core)
 set_target_properties(sniper-diff PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")
 install(TARGETS sniper-diff RUNTIME DESTINATION .)

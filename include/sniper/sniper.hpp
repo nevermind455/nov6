@@ -76,6 +76,17 @@ struct SniperSettings {
   bool ptb_skip_close = false;
   double ptb_margin_bp = 1.0;
   std::string primary_feed = "coinbase";
+  // SNIPER_EXTRA_FEEDS: trigger feeds beside the primary, in order -
+  // "binance_fut" (Binance USD-M perpetual BTCUSDT book ticker) and
+  // "binance_spot" (Binance spot BTCUSDT book ticker, its trades on the same
+  // socket for the exchange's clock). The same rule runs on each feed's own
+  // mid with its own freshness gate; whichever signals first fires, under the
+  // per-side cooldown and in-flight flag all feeds share: one move, one order.
+  // Empty (the default): the primary only.
+  std::vector<std::string> extra_feeds;
+  bool binance_freshness = true;
+  double binance_stale_ms = 1000, binance_unknown_ms = 5000, binance_silent_s = 5;
+  int binance_backlog_max = 20;
   std::string delay_source = "auto";
   double delay_days = 3, coinbase_silent_s = 5;
   double ptb_max_gap_s = 5, ptb_min_checks = 6;
@@ -187,6 +198,7 @@ struct RoundCounts {
 
 struct Plan {
   std::string side, token, other, cond, up, down, order_type, tick;
+  std::string feed = "coinbase"; // the trigger feed whose signal this is
   double end = 0, amount = 0, cap = 0, lat = 0, risk_shares = 0;
   double dispatch_deadline = 0, t0 = 0, t_ms = 0, decided_mono = 0;
   double sent_wall = 0, sent_mono = 0;
@@ -256,6 +268,26 @@ public:
     cb_fresh.on_connect();
   }
   void on_coinbase_disconnect() { cb_fresh.on_disconnect(); }
+  // SNIPER_EXTRA_FEEDS, in order: each with its own rule, freshness gate and
+  // latest mid (sniper/feeds.hpp has their messages).
+  struct Extra {
+    std::string name;
+    Trigger trigger;
+    Freshness fresh;
+    std::optional<double> last_mid;
+  };
+  std::vector<Extra> extra;
+  // A frame of extra feed i received at monotonic t_ms. Returns tick, trade,
+  // other or malformed.
+  std::string on_extra(std::size_t i, std::string_view raw, double t_ms,
+                       std::int64_t t_ns = 0);
+  // Its socket came up (the rule starts afresh) or went down.
+  void on_extra_connect(std::size_t i);
+  void on_extra_disconnect(std::size_t i) { extra.at(i).fresh.on_disconnect(); }
+  // A feed by name: its freshness gate, rule and latest mid (the primary's
+  // for the primary or an unknown name).
+  const Freshness &freshness(const std::string &feed) const;
+  std::optional<double> mid_of(const std::string &feed) const;
   // _ptb_official_loop: Polymarket published this round's price to beat
   void ptb_official(double start, double official);
   // legacy price-to-beat estimate state (_note_primary_mid)
@@ -321,12 +353,20 @@ private:
   int retry_next_ = 0;
 
   void signal(double mid, double t_ms, std::int64_t t_ns);
+  // The rule on one feed's mid, then the gates every feed shares: the side's
+  // cooldown and one order in flight, so a move seen by two feeds the same
+  // way is one order - fired by whichever saw it first. The primary's
+  // counters keep their names; another feed's are suffixed with its name.
+  void signal_on(const std::string &feed, Trigger &, Freshness &, double mid,
+                 double t_ms, std::int64_t t_ns);
+  const Trigger &trigger_of(const std::string &feed) const;
+  std::string fire_feed_; // the feed whose signal fire_now decides
   std::shared_ptr<Plan> fire_now(const std::string &side, double r_bp,
                                  double t_ms, std::int64_t t_ns);
   std::shared_ptr<Plan> decide(const std::string &side, Json &row,
                                double t_ms);
   std::nullptr_t skip(const std::string &why, Json &row);
-  Json window_fields(double t_ms) const;
+  Json window_fields(const Trigger &, double t_ms) const;
   double side_held(double end, const std::string &side,
                    const std::string &token);
   std::pair<double, double> kelly_inventory(const std::string &cond,

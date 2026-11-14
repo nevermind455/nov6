@@ -1,6 +1,7 @@
 // sniper-replay: one recording through the C++ decision code (sniper::Sniper,
 // sniper::BookState) on a replay clock, with the same scripted broker and
-// account as tools/replay/py_replay.py, which runs the Python reference.
+// account as the Python reference's replay did (that tool is in git history at
+// commit d5221b5; this repository is C++ only).
 // Usage: sniper-replay RECORDING.jsonl OUT.jsonl [CONFIG.json]
 #include "sniper/config.hpp"
 #include "sniper/sniper.hpp"
@@ -296,6 +297,29 @@ int main(int argc, char **argv) {
       } catch (const std::exception &) {
       }
       collect();
+    } else if (k == "xf") {
+      // SNIPER_EXTRA_FEEDS frames: replayed when the settings name the feed
+      const auto feed = get(e, "feed").is_string() ? e["feed"].get<std::string>() : "";
+      for (std::size_t i = 0; i < sn.extra.size(); ++i)
+        if (sn.extra[i].name == feed) {
+          const Json &b = get(e, "backlog");
+          sn.extra[i].fresh.note_message(t, b.is_number() ? std::optional<int>(b.get<int>())
+                                                          : std::nullopt);
+          try {
+            sn.on_extra(i, e["raw"].get<std::string>(), t * 1000.0);
+          } catch (const std::exception &) {
+          }
+          collect();
+        }
+    } else if (k == "xconn") {
+      const auto feed = get(e, "feed").is_string() ? e["feed"].get<std::string>() : "";
+      for (std::size_t i = 0; i < sn.extra.size(); ++i)
+        if (sn.extra[i].name == feed) {
+          if (get(e, "up") == Json(true))
+            sn.on_extra_connect(i);
+          else
+            sn.on_extra_disconnect(i);
+        }
     } else if (k == "cbconn") {
       bool up = e["up"].get<bool>();
       if (up && !cb_up)

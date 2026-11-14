@@ -1,3 +1,4 @@
+#include "sniper/feeds.hpp"
 #include "sniper/math.hpp"
 #include "sniper/paper.hpp"
 #include "sniper/strategy.hpp"
@@ -942,6 +943,192 @@ TEST(Live, RefusedDispatchIsJournalledAsReferenceSkip) {
   fire(true);
   ASSERT_EQ(env.dispatched, 3);
   EXPECT_EQ(sn.n["orders"], 1u);
+}
+namespace {
+std::string bfut_ticker(double mid, double event_ms) {
+  char buf[256];
+  std::snprintf(buf, sizeof buf,
+                R"({"e":"bookTicker","u":1,"s":"BTCUSDT","b":"%.2f","B":"1.5","a":"%.2f","A":"2.0","T":%.0f,"E":%.0f})",
+                mid - 0.05, mid + 0.05, event_ms, event_ms);
+  return buf;
+}
+// The live engine with Binance futures as an extra trigger, warmed up on both
+// feeds; Binance quotes 30 dollars above Coinbase (a basis), as it does.
+struct TwoFeeds {
+  LiveStubEnv env;
+  std::unique_ptr<Sniper> sn;
+  long long seq = 1;
+  double cb = 60000, bf = 60030;
+  explicit TwoFeeds(bool gates = false) { // gates: Binance's freshness gate on
+    SniperSettings s;
+    s.coinbase_conns = 1;
+    s.extra_feeds = {"binance_fut"};
+    sn = std::make_unique<Sniper>(s, env);
+    // (the test tickers carry a fixed time: Coinbase's own gate stays off)
+    sn->cb_fresh.enabled = false;
+    sn->extra[0].fresh.enabled = gates;
+    sn->on_extra_connect(0);
+    sn->cb_fresh.on_connect();
+    for (int i = 0; i < 70; ++i) {
+      env.now += 1;
+      cb *= (i % 2 ? 1.00004 : 0.99996);
+      bf *= (i % 2 ? 1.00004 : 0.99996);
+      quiet();
+    }
+    sn->refresh_bankroll(env.now);
+    sn->refresh_hybrid_risk();
+  }
+  void quotes() {
+    env.quote("111", ".48", ".50");
+    env.quote("222", ".49", ".51");
+  }
+  void quiet() { // both feeds tick at their current price
+    quotes();
+    sn->on_coinbase(live_ticker(seq++, cb), env.now * 1000);
+    sn->on_extra(0, bfut_ticker(bf, env.wall() * 1000), env.now * 1000);
+  }
+  void settle_before_move() { // 4 s of quiet ticks, the last 0.3 s before the move
+    for (int k = 0; k < 4; ++k) {
+      env.now += 1.0;
+      quiet();
+    }
+    env.now += 0.3;
+    quiet();
+    sn->refresh_bankroll(env.now);
+    sn->refresh_hybrid_risk();
+  }
+};
+} // namespace
+TEST(ExtraFeeds, TheFirstFeedToSignalFiresAndTheSameMoveElsewhereDoesNot) {
+  TwoFeeds f;
+  f.settle_before_move();
+  // Binance futures moves +1.2 bp first...
+  f.env.now += 0.01;
+  f.quotes();
+  f.bf *= 1.00012;
+  EXPECT_EQ(f.sn->on_extra(0, bfut_ticker(f.bf, f.env.wall() * 1000), f.env.now * 1000), "tick");
+  ASSERT_EQ(f.env.dispatched, 1);
+  EXPECT_EQ(f.env.plans[0]->feed, "binance_fut");
+  EXPECT_EQ(f.env.plans[0]->side, "UP");
+  EXPECT_EQ(f.env.plans[0]->row["feed"], "binance_fut");
+  // its move and reference are Binance's own, never compared with Coinbase's level
+  EXPECT_NEAR(f.env.plans[0]->row["ref_mid"].get<double>(), f.bf / 1.00012, 0.01);
+  EXPECT_EQ(f.sn->n["fired binance_fut"], 1u);
+  EXPECT_EQ(f.sn->n["signals binance_fut"], 1u);
+  // ...and Coinbase shows the same move 40 ms later: one move, one order
+  f.env.now += 0.04;
+  f.cb *= 1.00012;
+  f.quotes();
+  f.sn->on_coinbase(live_ticker(f.seq++, f.cb), f.env.now * 1000);
+  EXPECT_EQ(f.env.dispatched, 1);
+  EXPECT_EQ(f.sn->n["signals"], 1u);
+  EXPECT_EQ(f.sn->n["skip: cooldown"], 1u); // the side's cooldown, shared by every feed
+  EXPECT_EQ(f.sn->n["fired coinbase"], 0u);
+  // The order ends; after the cooldown Coinbase can fire the next move first.
+  f.sn->release("UP");
+  f.env.now += 1.0;
+  f.settle_before_move();
+  f.env.now += 0.01;
+  f.cb *= 1.00012;
+  f.quotes();
+  f.sn->on_coinbase(live_ticker(f.seq++, f.cb), f.env.now * 1000);
+  ASSERT_EQ(f.env.dispatched, 2);
+  EXPECT_EQ(f.env.plans[1]->feed, "coinbase");
+  EXPECT_EQ(f.env.plans[1]->row["feed"], "coinbase");
+  EXPECT_EQ(f.sn->n["fired coinbase"], 1u);
+}
+TEST(ExtraFeeds, AFeedThatCannotBeShownCurrentFiresNothing) {
+  TwoFeeds f(true);
+  f.settle_before_move();
+  // Binance's events now come 3 s late: its gate refuses its own signal
+  f.env.now += 0.01;
+  f.quotes();
+  f.bf *= 1.00012;
+  f.sn->on_extra(0, bfut_ticker(f.bf, f.env.wall() * 1000 - 3000), f.env.now * 1000);
+  EXPECT_EQ(f.env.dispatched, 0);
+  const Json *skip = nullptr;
+  for (auto &r : f.env.rows)
+    if (r.value("result", "") == "skipped" && r.value("feed", "") == "binance_fut")
+      skip = &r;
+  ASSERT_NE(skip, nullptr);
+  EXPECT_EQ(skip->value("reason", ""), "binance_fut feed behind");
+  EXPECT_TRUE(skip->contains("binance_fut_backlog"));
+  EXPECT_GT(skip->value("binance_fut_excess_ms", 0.0), 2500.0);
+  // Coinbase, current, still fires the move
+  f.env.now += 0.04;
+  f.cb *= 1.00012;
+  f.quotes();
+  f.sn->on_coinbase(live_ticker(f.seq++, f.cb), f.env.now * 1000);
+  ASSERT_EQ(f.env.dispatched, 1);
+  EXPECT_EQ(f.env.plans[0]->feed, "coinbase");
+  // a feed by name: its own gate and price; the primary for any other name
+  EXPECT_EQ(&f.sn->freshness("binance_fut"), &f.sn->extra[0].fresh);
+  EXPECT_EQ(&f.sn->freshness("coinbase"), &f.sn->cb_fresh);
+  EXPECT_EQ(f.sn->mid_of("binance_fut"), f.sn->extra[0].last_mid);
+  EXPECT_EQ(f.sn->mid_of("kraken"), f.sn->last_mid);
+}
+TEST(ExtraFeeds, BinanceMessagesAndSettings) {
+  // futures: the book ticker, with the exchange's event time
+  auto t = feeds::parse("binance_fut", bfut_ticker(60000, 1794657000123));
+  ASSERT_EQ(t.kind, feeds::Tick::Book);
+  EXPECT_DOUBLE_EQ(*t.mid, 60000);
+  EXPECT_DOUBLE_EQ(*t.event_ms, 1794657000123);
+  EXPECT_EQ(feeds::parse("binance_fut", R"({"result":null,"id":1})").kind, feeds::Tick::Other);
+  EXPECT_EQ(feeds::parse("binance_fut", R"({"e":"bookTicker","s":"ETHUSDT","b":"1","a":"2"})").kind,
+            feeds::Tick::Other);
+  EXPECT_EQ(feeds::parse("binance_fut", R"({"e":"bookTicker","s":"BTCUSDT","b":"2","a":"1"})").kind,
+            feeds::Tick::Malformed);
+  EXPECT_EQ(feeds::parse("binance_fut", "not json").kind, feeds::Tick::Malformed);
+  // spot: the combined stream; book tickers carry the price, trades the clock
+  t = feeds::parse("binance_spot",
+                   R"({"stream":"btcusdt@bookTicker","data":{"u":5,"s":"BTCUSDT","b":"59999.99","B":"1","a":"60000.01","A":"1"}})");
+  ASSERT_EQ(t.kind, feeds::Tick::Book);
+  EXPECT_NEAR(*t.mid, 60000, 1e-9);
+  EXPECT_FALSE(t.event_ms);
+  t = feeds::parse("binance_spot",
+                   R"({"stream":"btcusdt@trade","data":{"e":"trade","E":1794657000500,"s":"BTCUSDT","p":"60000","q":"0.1","T":1794657000499}})");
+  ASSERT_EQ(t.kind, feeds::Tick::Trade);
+  EXPECT_DOUBLE_EQ(*t.event_ms, 1794657000500);
+  EXPECT_EQ(feeds::url("binance_fut"), "wss://fstream.binance.com/ws/btcusdt@bookTicker");
+  EXPECT_THROW(feeds::url("kraken"), std::invalid_argument);
+  // SNIPER_EXTRA_FEEDS: a list; the primary and repeats dropped; off by default
+  EXPECT_TRUE(sniper_settings(std::map<std::string, std::string>{}).extra_feeds.empty());
+  auto s = sniper_settings(std::map<std::string, std::string>{
+      {"SNIPER_EXTRA_FEEDS", " binance_fut, BINANCE_SPOT,binance_fut,coinbase,"}});
+  EXPECT_EQ(s.extra_feeds, (std::vector<std::string>{"binance_fut", "binance_spot"}));
+  EXPECT_THROW(sniper_settings(std::map<std::string, std::string>{{"SNIPER_EXTRA_FEEDS", "kraken"}}),
+               std::invalid_argument);
+  EXPECT_THROW(sniper_settings(std::map<std::string, std::string>{
+                   {"SNIPER_EXTRA_FEEDS", "binance_fut"}, {"SNIPER_BINANCE_STALE_MS", "0"}}),
+               std::invalid_argument);
+}
+TEST(ExtraFeeds, SpotTradesKeepItsGateCurrent) {
+  LiveStubEnv env;
+  SniperSettings s;
+  s.extra_feeds = {"binance_spot"};
+  Sniper sn(s, env);
+  sn.on_extra_connect(0);
+  auto book = [&](double mid) {
+    char buf[256];
+    std::snprintf(buf, sizeof buf,
+                  R"({"stream":"btcusdt@bookTicker","data":{"u":1,"s":"BTCUSDT","b":"%.2f","B":"1","a":"%.2f","A":"1"}})",
+                  mid - 0.01, mid + 0.01);
+    return std::string(buf);
+  };
+  auto trade = [&](double event_ms) {
+    char buf[256];
+    std::snprintf(buf, sizeof buf,
+                  R"({"stream":"btcusdt@trade","data":{"e":"trade","E":%.0f,"s":"BTCUSDT","p":"1","q":"1","T":%.0f}})",
+                  event_ms, event_ms);
+    return std::string(buf);
+  };
+  EXPECT_EQ(sn.on_extra(0, book(60000), env.now * 1000), "tick");
+  EXPECT_EQ(sn.extra[0].fresh.why_not(env.now), "binance_spot age unknown");
+  EXPECT_EQ(sn.on_extra(0, trade(env.wall() * 1000), env.now * 1000), "trade");
+  EXPECT_EQ(sn.extra[0].fresh.why_not(env.now), "");
+  EXPECT_EQ(sn.n["binance_spot trades"], 1u);
+  EXPECT_EQ(sn.n["binance_spot ticks"], 1u);
+  EXPECT_DOUBLE_EQ(*sn.mid_of("binance_spot"), 60000);
 }
 TEST(Settings, ReferenceDefaultsAndRefusals) {
   std::vector<std::string> notes;

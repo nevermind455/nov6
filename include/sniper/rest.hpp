@@ -102,6 +102,7 @@ struct Order {
   double proven_at = 0;     // ... since this monotonic time
   Json row;                 // its rest_order journal row, written once
   std::uint64_t signals_other = 0; // opposite-side signals seen when placed
+  std::string feed = "coinbase";   // the trigger feed of its signal
 };
 
 // Why a resting order is cancelled now; empty = it keeps resting. `hold` is a

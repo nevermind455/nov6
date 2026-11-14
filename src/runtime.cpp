@@ -1,5 +1,6 @@
 #include "sniper/runtime.hpp"
 #include "sniper/dashboard.hpp"
+#include "sniper/feeds.hpp"
 #include "sniper/paper.hpp"
 #include "sniper/rest.hpp"
 #include "sniper/sniper.hpp"
@@ -148,6 +149,8 @@ struct Runtime::Impl {
   std::unique_ptr<FileLock> wallet_lock;
   std::unique_ptr<H2Client> sender;
   std::vector<std::unique_ptr<WebSocket>> coinbase;
+  // SNIPER_EXTRA_FEEDS: one socket each, in c.s.extra_feeds order
+  std::vector<std::unique_ptr<WebSocket>> extra_ws;
   // Two connections to the venue's market feed. One is live: its frames
   // build the books. The other is a warm standby, subscribed to the same
   // tokens and otherwise ignored. When the live one drops the standby takes
@@ -298,6 +301,7 @@ struct Runtime::Impl {
     std::string id;
     double t_ms = 0;
     std::optional<double> ref_mid;
+    std::string feed = "coinbase"; // its reference is at this feed's level
   };
   RestSignal rest_signal[2];
   std::map<std::string, double> rest_final_at; // id -> monotonic seconds
@@ -453,6 +457,12 @@ struct Runtime::Impl {
             }
           },
           c.silent, false));
+    for (std::size_t i = 0; i < c.s.extra_feeds.size(); ++i)
+      extra_ws.push_back(std::make_unique<WebSocket>(
+          io, tls, feeds::url(c.s.extra_feeds[i]),
+          [this, i](auto raw, int backlog) { on_extra(i, raw, backlog); },
+          [this, i](bool up) { on_extra_state(i, up); }, c.s.binance_silent_s,
+          false));
     if (c.live)
       user = std::make_unique<WebSocket>(
           io, tls, "wss://ws-subscriptions-clob.polymarket.com/ws/user",
@@ -497,6 +507,8 @@ struct Runtime::Impl {
     if (sender)
       sender->stop();
     for (auto &ws : coinbase)
+      ws->stop();
+    for (auto &ws : extra_ws)
       ws->stop();
     for (auto &m : market)
       if (m)
@@ -909,13 +921,15 @@ struct Runtime::Impl {
       rate = static_cast<double>(signals - dash_signals.front().second) /
              (now - dash_signals.front().first) * 60.0;
     const auto &fresh = sniper->cb_fresh;
-    std::string status =
-        !fresh.enabled     ? "OFF"
-        : !fresh.connected ? "DISCONNECTED"
-        : !fresh.last_msg_mono || (now - *fresh.last_msg_mono) * 1000.0 > fresh.unknown_ms
-            ? "STALE"
-        : fresh.why_not(now).empty() ? "LIVE"
-                                     : "DEGRADED";
+    auto feed_status = [&](const Freshness &f) -> std::string {
+      return !f.enabled     ? "OFF"
+             : !f.connected ? "DISCONNECTED"
+             : !f.last_msg_mono || (now - *f.last_msg_mono) * 1000.0 > f.unknown_ms
+                 ? "STALE"
+             : f.why_not(now).empty() ? "LIVE"
+                                      : "DEGRADED";
+    };
+    std::string status = feed_status(fresh);
     std::string busy;
     if (c.live && hub ? ledger.awaiting(hub->up) : sniper->inflight[0].has_value())
       busy = "UP";
@@ -954,6 +968,15 @@ struct Runtime::Impl {
         {"last_signal_age_s", dash_last_signal ? Json(wall - dash_last_signal->first) : Json()}};
     if (c.live)
       trigger["fill_rate"] = live_quality["fill_rate"];
+    // SNIPER_EXTRA_FEEDS: the orders each feed fired (this run)
+    if (!sniper->extra.empty()) {
+      Json fired = Json::array();
+      fired.push_back(Json::array({c.s.primary_feed,
+                                   counter(("fired " + c.s.primary_feed).c_str())}));
+      for (const auto &f : sniper->extra)
+        fired.push_back(Json::array({f.name, counter(("fired " + f.name).c_str())}));
+      trigger["fired_by"] = std::move(fired);
+    }
     if (c.s.fair) {
       auto v = sniper->vol.vol();
       trigger["fair"] = Json{{"vol_bp", v ? Json(*v * 1e4) : Json()},
@@ -1232,6 +1255,13 @@ struct Runtime::Impl {
             " behind " +
             (fresh.last_excess ? py::fixed(*fresh.last_excess, 0) + "ms" : std::string("--")) +
             " backlog max " + std::to_string(fresh.backlog_max_seen));
+    for (const auto &f : sniper->extra)
+      add(f.name == "binance_fut" ? "BIN FUT" : "BIN SPOT", feed_status(f.fresh),
+          "behind " +
+              (f.fresh.last_excess ? py::fixed(*f.fresh.last_excess, 0) + "ms"
+                                   : std::string("--")) +
+              " backlog max " + std::to_string(f.fresh.backlog_max_seen) + " signals " +
+              std::to_string(counter(("signals " + f.name).c_str())));
     std::string book_state = "WAIT";
     if (!book.connected)
       book_state = "DISCONNECTED";
@@ -2027,6 +2057,47 @@ struct Runtime::Impl {
     if (paper && paper->pending())
       paper_poll();
   }
+  // SNIPER_EXTRA_FEEDS: a frame of extra feed i. Its own rule and gate; the
+  // orders it decides go out exactly as the primary's.
+  void on_extra(std::size_t i, std::string_view raw, int backlog) {
+    auto t0 = mono_ns();
+    double tm = static_cast<double>(t0) / 1e9;
+    if (!stopping && execution::round_switch_due(wall_s(), hub_window))
+      update_hub();
+    if (rec_out.is_open())
+      rec(Json{{"k", "xf"}, {"feed", c.s.extra_feeds[i]}, {"raw", std::string(raw)},
+               {"backlog", backlog}});
+    try {
+      sniper->extra.at(i).fresh.note_message(tm, backlog);
+      sniper->on_extra(i, raw, tm * 1000.0, t0);
+    } catch (const std::exception &e) {
+      audit({{"result", "feed_error"},
+             {"feed", c.s.extra_feeds[i]},
+             {"reason", std::string(e.what()).substr(0, 160)}});
+      extra_ws[i]->reconnect();
+      return;
+    }
+    if (!rest_book.empty())
+      rest_watch(true);
+    for (auto &plan : sniper->take_dispatched()) {
+      ++orders_sent;
+      if (paper)
+        paper->begin(plan, c.s, book);
+    }
+    if (paper && paper->pending())
+      paper_poll();
+  }
+  void on_extra_state(std::size_t i, bool up) {
+    const auto &name = c.s.extra_feeds[i];
+    dash_event(name, up ? "connected" : "disconnected", up ? "good" : "warn");
+    ws_row(name.c_str(), 0, up, extra_ws[i] ? extra_ws[i]->last_failure() : std::string(),
+           "trigger");
+    rec(Json{{"k", "xconn"}, {"feed", name}, {"up", up}});
+    if (up)
+      sniper->on_extra_connect(i);
+    else
+      sniper->on_extra_disconnect(i);
+  }
   // Sniper._fire_live + LiveExecution.prepare: check, sign, durable intent,
   // send (no retry). A refusal sends nothing; the engine journals it as
   // "live refused" ("live halted" while new orders are paused).
@@ -2190,15 +2261,16 @@ struct Runtime::Impl {
       if (!std::isfinite(age) || age < 0 || age > c.s.stale_ms)
         gate = "decision book became stale";
     }
-    if (gate.empty() && sniper->cb_fresh.enabled) {
-      auto why_not = sniper->cb_fresh.why_not(now);
+    // The gate of the feed whose signal this is (each feed has its own).
+    if (const auto &fresh = sniper->freshness(p->feed); gate.empty() && fresh.enabled) {
+      auto why_not = fresh.why_not(now);
       double elapsed = now * 1000.0 - p->t_ms;
-      double excess = sniper->cb_fresh.last_excess.value_or(0.0);
+      double excess = fresh.last_excess.value_or(0.0);
       if (!why_not.empty())
         gate = why_not;
       else if (!std::isfinite(elapsed) || elapsed < 0 ||
-               elapsed > c.s.coinbase_unknown_ms ||
-               excess + elapsed > c.s.coinbase_stale_ms)
+               elapsed > fresh.unknown_ms ||
+               excess + elapsed > fresh.stale_ms)
         gate = "trigger signal became stale";
     }
     if (gate.empty() && static_cast<double>(r.end) - wall_s() <=
@@ -2239,7 +2311,8 @@ struct Runtime::Impl {
       rest_signal[n] = {intent.id, p->t_ms,
                         ref != p->row.end() && ref->is_number()
                             ? std::optional(ref->get<double>())
-                            : std::nullopt};
+                            : std::nullopt,
+                        p->feed};
     }
     row["order_id"] = intent.id;
     row["client_order_id"] = intent.id;
@@ -2352,15 +2425,17 @@ struct Runtime::Impl {
     p.end_margin_s = std::max({2.0, c.min_expiry, c.s.min_left_s});
     return p;
   }
+  // `feed`: the trigger feed of the order's signal; its move is judged on
+  // that feed's own prices (Binance's are not at Coinbase's level).
   rest::Now rest_now(const std::string &side, const std::string &token,
                      double end, Units min_shares, bool with_direction,
-                     bool with_book = true) {
+                     bool with_book = true, const std::string &feed = "coinbase") {
     rest::Now now;
     double mono = mono_s();
     now.wall = wall_s();
     now.mono_ms = mono * 1000.0;
-    now.mid = sniper->last_mid;
-    now.feed_fresh = sniper->cb_fresh.why_not(mono).empty();
+    now.mid = sniper->mid_of(feed);
+    now.feed_fresh = sniper->freshness(feed).why_not(mono).empty();
     now.min_shares = min_shares;
     now.direction = with_direction ? sniper->direction_view(side, end)
                                    : Json::object();
@@ -2524,7 +2599,8 @@ struct Runtime::Impl {
     m.signal_ms = signal.t_ms;
     m.ref_mid = signal.ref_mid;
     const auto policy = rest_policy();
-    auto now = rest_now(missed.side, missed.token, m.end, rule.min_shares, true);
+    auto now = rest_now(missed.side, missed.token, m.end, rule.min_shares, true, true,
+                        signal.feed);
     row["left_s"] = py::round(m.end - now.wall, 1);
     row["signal_age_ms"] = py::round(now.mono_ms - m.signal_ms, 1);
     if (auto move = rest::move_bp(m.side, m.ref_mid, now.mid))
@@ -2659,6 +2735,7 @@ struct Runtime::Impl {
     o.placed_mono = mono;
     o.deadline_mono = mono + life;
     o.signals_other = sniper->signals_by_side[1 - n];
+    o.feed = signal.feed;
     o.row = row;
     rest_book.add(std::move(o));
     ++sniper->n["rest orders sent"];
@@ -2814,7 +2891,7 @@ struct Runtime::Impl {
         continue;
       const int n = o.side == "UP" ? 0 : 1;
       const bool opposite = sniper->signals_by_side[1 - n] != o.signals_other;
-      auto now = rest_now(o.side, o.token, o.end, 0, policy.direction, false);
+      auto now = rest_now(o.side, o.token, o.end, 0, policy.direction, false, o.feed);
       auto why = rest::cancel_reason(o, now, policy, opposite, hold);
       if (!why.empty())
         rest_book.cancel(id, why, mono);
@@ -3887,6 +3964,8 @@ struct Runtime::Impl {
     fetch_wake.notify_all();
     for (auto &ws : coinbase)
       ws->stop();
+    for (auto &ws : extra_ws)
+      ws->stop();
     for (auto &m : market)
       if (m)
         m->stop();
@@ -3933,6 +4012,8 @@ struct Runtime::Impl {
       if (m)
         m->start();
     for (auto &ws : coinbase)
+      ws->start();
+    for (auto &ws : extra_ws)
       ws->start();
     if (user)
       user->start();

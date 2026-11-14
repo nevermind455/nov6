@@ -26,7 +26,9 @@ reference's own Python code and the C++ code on the same recorded input.
 | Tick-to-wire, in process (frame -> decision -> signed order -> durable intent), this machine | p50 167 us / p99 320 us without fdatasync; p50 426 us / p99 817 us with it (prompt, on the VPS: p50 under 0.3 ms without the fsynced intent, under 2 ms with it) |
 | Decision alone (frame -> sized plan) | p50 53 us / p99 120 us |
 
-Reproduce: `tools/replay/run_parity.sh REPO PYTHON bin/sniper-replay OUT`,
+Reproduce (with the Python tools removed from this repository on 14 November
+2026 - it is C++ only now; they are in git history at commit d5221b5):
+`tools/replay/run_parity.sh REPO PYTHON bin/sniper-replay OUT`,
 `PYTHON -I tools/replay/diff_cases.py REPO bin/sniper-diff 20000` and
 `PYTHON -I tools/replay/live_prepare_cases.py REPO` (the expected values of the
 `Live.PresendCheckMatchesReferencePrepare` test). REPO = a checkout of the
@@ -92,7 +94,7 @@ way: `sniper-replay rec.jsonl out.jsonl` and `py_replay.py REPO rec.jsonl out.js
 
 ## Not implemented (refused when enabled)
 
-Binance/Kraken triggers, extra feeds, the direction add-on, maker-only and
+Binance/Kraken as the primary trigger, the direction add-on, maker-only and
 split maker orders, wide caps, measured live fill odds (`auto` acts as `off`), the paper cash
 mirror (`auto` acts as `off`), strict paper/live parity, the fresh market
 socket, live-sampled delays (`auto` uses the model), `SNIPER_BOOK_CLOCK=wake`.
