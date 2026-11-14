@@ -38,6 +38,7 @@ const CFG = {
   noPong: env('VENUE_NO_PONG', '0') === '1', // never answer the text PING on the market channel
   marketFlap: env('VENUE_MARKET_FLAP', '0') === '1', // close every market websocket 100 ms after it connects
   sigma: +env('VENUE_SIGMA', 1e-4), // BTC volatility per sqrt(second)
+  redeemAfter: +env('VENUE_REDEEM_AFTER_S', 0), // the owner redeems a resolved round this long after (0 = never)
   log: env('VENUE_LOG', __dirname + '/venue.log'),
 };
 const logStream = fs.createWriteStream(CFG.log, { flags: 'a' });
@@ -275,7 +276,13 @@ function orderHash(o) {
 // Trade ids are unique across restarts of this venue, as the real venue's
 // are: a client's ledger refuses to book the same trade id twice.
 const RUN = Date.now().toString(36);
-const account = { balance: Math.round(CFG.balance * 1e6), orders: new Map(), trades: [], nextTrade: 1 };
+const account = { balance: Math.round(CFG.balance * 1e6), orders: new Map(), trades: [], nextTrade: 1,
+  holdings: new Map() }; // outcome token -> micro-shares in the wallet (ERC-1155 balanceOf)
+// The wallet's side of a trade: the token and shares it received.
+function ourLeg(t) {
+  if (t.trader_side === 'MAKER') { const m = t.maker_orders[0]; return [m.asset_id, Math.round(Number(m.matched_amount) * 1e6)]; }
+  return [t.asset_id, Math.round(Number(t.size) * 1e6)];
+}
 const sh = (n) => String(Math.round(n * 1e6) / 1e6);
 function orderJson(o) {
   return { id: o.id, status: o.status, owner: o.owner, maker_address: o.maker, market: o.market, asset_id: o.asset_id,
@@ -293,7 +300,12 @@ function tradeEvent(t) { sendUser(t.market, { event_type: 'trade', type: 'TRADE'
 function settleTrade(t, cost) {
   tradeEvent(t);
   setTimeout(() => { t.status = 'MINED'; tradeEvent(t); }, 700);
-  setTimeout(() => { t.status = 'CONFIRMED'; account.balance -= cost; tradeEvent(t); }, 1500);
+  setTimeout(() => {
+    t.status = 'CONFIRMED'; account.balance -= cost;
+    const [token, shares] = ourLeg(t);
+    account.holdings.set(token, (account.holdings.get(token) || 0) + shares);
+    tradeEvent(t);
+  }, 1500);
 }
 function fillResting(o, qty, why) {
   qty = Math.min(qty, o.size - o.matched);
@@ -539,6 +551,24 @@ const SEL = {
   coll: hex(kec('getCollectionId(bytes32,bytes32,uint256)').slice(0, 4)),
 };
 const word = (n) => '0x' + BigInt(n).toString(16).padStart(64, '0');
+SEL.bal = hex(kec('balanceOf(address,uint256)').slice(0, 4));
+// The owner redeeming a resolved round by hand: winning tokens become
+// collateral, every token of the round leaves the wallet.
+if (CFG.redeemAfter > 0)
+  setInterval(() => {
+    for (const r of rounds.values()) {
+      if (r.redeemed || !resolved(r) || Date.now() / 1000 < r.end + CFG.resolveDelay + CFG.redeemAfter) continue;
+      r.redeemed = true;
+      const won = upWon(r);
+      for (const [token, pays] of [[r.up, won], [r.down, !won]]) {
+        const held = account.holdings.get(token) || 0;
+        if (!held) continue;
+        if (pays) account.balance += held;
+        account.holdings.set(token, 0);
+        count('redeemed'); log('REDEEM', token.slice(0, 12), sh(held / 1e6), pays ? 'paid' : 'worthless');
+      }
+    }
+  }, 1000);
 function rpcServer(port) {
   https.createServer(tlsOpts, (req, res) => {
     let body = '';
@@ -549,6 +579,10 @@ function rpcServer(port) {
       const out = batch.map((call) => {
         const data = call.params[0].data.replace(/^0x/, ''), sel = data.slice(0, 8);
         const w = (i) => data.slice(8 + 64 * i, 8 + 64 * (i + 1));
+        if (sel === SEL.bal) {
+          count('rpc balanceOf');
+          return { jsonrpc: '2.0', id: call.id, result: word(account.holdings.get(BigInt('0x' + w(1)).toString()) || 0) };
+        }
         let cid, r;
         if (sel === SEL.den || sel === SEL.num) cid = '0x' + w(0); else cid = '0x' + w(1);
         r = [...rounds.values()].find((x) => x.cid === cid);

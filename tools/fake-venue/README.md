@@ -78,6 +78,12 @@ half an hour with `SNIPER_PTB_MIN_CHECKS=1`.
 | `VENUE_BALANCE` | `100` | Account balance, dollars |
 | `VENUE_PTB` | `1` | Publish `eventMetadata.priceToBeat` for started rounds |
 | `VENUE_SIGMA` | `0.0001` | BTC volatility per square-root second |
+| `VENUE_REDEEM_AFTER_S` | `0` | The owner redeems a resolved round this many seconds after its result: winning tokens become collateral, the round's tokens leave the wallet (`0` = never, like an owner who has not claimed yet) |
+
+The Polygon RPC answers `balanceOf(address,uint256)` with the wallet's
+outcome tokens (every confirmed fill adds its shares), which is what the
+dashboard's `REDEEMABLE` reads after a win. Collateral is never credited on a
+win unless the owner redeems.
 
 Stress knobs (environment variables for `node venue.js`):
 

@@ -217,6 +217,47 @@ std::map<std::string, Units> resolve_payouts(const RestClient &rest,
   }
   return {};
 }
+std::map<std::string, Units> token_balances(const RestClient &rest,
+                                            std::string_view rpc,
+                                            std::string_view wallet,
+                                            const std::vector<std::string> &tokens) {
+  std::map<std::string, Units> out;
+  const auto owner = address_word(wallet);
+  constexpr std::size_t Batch = 25;
+  for (std::size_t from = 0; from < tokens.size(); from += Batch) {
+    const std::size_t n = std::min(Batch, tokens.size() - from);
+    Json batch = Json::array();
+    for (std::size_t k = 0; k < n; ++k)
+      batch.push_back(
+          {{"jsonrpc", "2.0"},
+           {"id", k + 1},
+           {"method", "eth_call"},
+           {"params",
+            Json::array({Json{{"to", CTF},
+                              {"data", call_data("balanceOf(address,uint256)",
+                                                 {owner, word(Big(tokens[from + k]))})}},
+                         "latest"})}});
+    auto response = rest.request("POST", rpc, {}, batch.dump(), 8);
+    if (response.status != 200)
+      throw std::runtime_error("token balance RPC failed");
+    auto replies = response.json();
+    if (!replies.is_array() || replies.size() != n)
+      throw std::runtime_error("invalid token balance batch reply");
+    std::vector<bool> seen(n, false);
+    for (auto &v : replies) {
+      auto id = v.at("id").get<long long>();
+      if (id < 1 || id > static_cast<long long>(n) || seen[id - 1] ||
+          !v.contains("result") || !v.at("result").is_string())
+        throw std::runtime_error("invalid token balance reply");
+      seen[id - 1] = true;
+      Big balance(v.at("result").get<std::string>());
+      if (balance < 0 || balance > std::numeric_limits<Units>::max())
+        throw std::runtime_error("token balance out of range");
+      out[tokens[from + id - 1]] = balance.convert_to<Units>();
+    }
+  }
+  return out;
+}
 std::set<std::string> read_manual_trades(std::istream &in) {
   std::set<std::string> ids;
   std::string line;

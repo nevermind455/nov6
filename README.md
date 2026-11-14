@@ -35,6 +35,12 @@ control, missed opportunity, unfilled, venue rejection, software failure or
 unknown outcome), and live orders are followed from send to acknowledgement
 to fill with per-stage latency. See `docs/MISSED_ORDERS.md`.
 
+For a short health report of a live run (halts and their reasons, errors,
+orders and fills, resting orders, websocket drops, settlement and the ledger),
+run `nice python3 -I tools/report/live_check.py` from the bot's folder
+(`--hours 6` for a shorter window, `--state state/paper` for paper). It only
+reads, and prints no key.
+
 ## Execution latency and VPS measurements
 
 The order sender reuses its HTTP/2 TLS connection, and WebSocket feeds drive
@@ -148,7 +154,32 @@ never invented. Press Ctrl+C to stop the bot, as usual.
   under the book, with the seconds it has left; see `docs/RESTING_ORDERS.md`.
 * Without a terminal (a log file, systemd), `--dash` prints one plain status line
   every 10 seconds instead.
-* Times are US Eastern, as the venue names its rounds. WON/LOST counts this run.
+* Times are US Eastern, as the venue names its rounds. The header also shows
+  how long the bot has been up, and says `LIVE DRY RUN` (amber) when nothing is
+  sent.
+* What the numbers are (live): `COLLATERAL` is the venue's balance less fills
+  confirmed since it was read. `REDEEMABLE` is settled winnings still held as
+  tokens: the wallet's balance of each winning token, read on chain
+  (`POLYGON_RPC`) every 5 s (every 30 s past 25 unredeemed winners) and at
+  once after a win. Winnings are not collateral until they are redeemed on
+  polymarket.com. `EQUITY` is collateral + position value + redeemable, and
+  `--` while redeemable is not known (no reading yet, or the last one failed
+  or is over 2 minutes old). With no deposit or withdrawal, equity is the
+  starting balance plus `TOTAL P/L`; in the few seconds after a redemption by
+  hand, before both readings have caught up, it can be off by the amount
+  redeemed.
+* `WON/LOST` (paper) and the realized P/L and fees beside it are all time, from
+  the ledger. A round counts once, by the net result of its positions.
+* The TRIGGER and EXECUTION QUALITY figures are this run's FAK orders. An
+  order is `partial` when it got fewer shares than it asked for; one that got
+  every share below its limit is filled in full. Resting orders are counted on
+  the MARKET panel's `resting` line (`3 rested 1 filled`), not there.
+* The CANARY panel shows each budget against the limit that applies now (with
+  `SNIPER_CANARY_HARD_STOP=0` a reached budget is raised after its pause). A
+  reached budget, or a fault pause kept from an earlier run, shows as `HALT`
+  with the time it ends, and the header says `HALTED`.
+* `SETTLE` turns `WARN` when a round has waited more than 15 minutes for its
+  result.
 * Text from outside is reduced to plain characters and common secrets are hidden
   before it is drawn.
 

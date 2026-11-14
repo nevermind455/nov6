@@ -18,6 +18,13 @@ Credentials derive_credentials(const RestClient &, const Signer &);
 std::map<std::string, Units> resolve_payouts(const RestClient &, const Round &,
                                              std::string_view rpc,
                                              bool onchain);
+// The wallet's balance of each outcome token (ERC-1155 balanceOf on the
+// conditional-token contract), in micro-shares. Winning tokens still held after
+// settlement are winnings not redeemed yet. Throws when any balance cannot be
+// read: a partial answer is never taken for the whole.
+std::map<std::string, Units> token_balances(const RestClient &, std::string_view rpc,
+                                            std::string_view wallet,
+                                            const std::vector<std::string> &tokens);
 struct ParsedTrade {
   std::string id, order, token, condition, status;
   Units shares = 0, cost = 0, fee = 0;

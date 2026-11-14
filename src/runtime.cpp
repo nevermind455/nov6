@@ -238,6 +238,8 @@ struct Runtime::Impl {
     std::vector<Round> unsettled;
     std::vector<std::string> conditions;
     std::vector<std::string> unresolved;
+    std::vector<std::string> redeem; // winning tokens whose balance to read
+    bool redeem_unread = false;      // ... one of them never read yet
     double since = 0;
     std::int64_t auth_time = 0;
     double auth_mono = 0;
@@ -279,7 +281,12 @@ struct Runtime::Impl {
   std::map<std::string, double> dash_live_decision_asks;
   std::string dash_live_last_fill_order;
   std::set<std::pair<std::string, std::string>> dash_live_latency_recorded;
-  long long dash_wins = 0, dash_losses = 0;
+  // Winning positions that are settled but maybe not redeemed: the wallet's
+  // balance of each such token as last read on chain (micro-shares), when the
+  // last read succeeded, and why the last read failed.
+  std::map<std::string, Units> redeem_held;
+  double redeem_read_at = -1e30;
+  std::string redeem_error;
   std::vector<std::string> dash_faults;
   std::uint64_t dry_orders = 0;
 
@@ -594,9 +601,7 @@ struct Runtime::Impl {
         old["shares"] = shares;
         old["price"] = price;
         old["detail"] = intent.status == "confirmed"
-                            ? (intent.booked_cost < intent.stake &&
-                                       intent.stake - intent.booked_cost > 1
-                                   ? "partial" : "")
+                            ? (dash::partial_fill(intent) ? "partial" : "")
                             : "confirmed trades; awaiting final total";
       } else if (result == "refused") {
         bool miss = dash_has(reason, "no match") || dash_has(reason, "no-fill");
@@ -820,10 +825,6 @@ struct Runtime::Impl {
         Units pnl = multiply(pos->second.shares, pay->second) - pos->second.cost -
                     pos->second.fees;
         realized += dollars(pnl);
-        if (pnl > 0)
-          ++dash_wins;
-        else if (pnl < 0)
-          ++dash_losses;
       }
       auto label = dash::et_label(static_cast<double>(r.start), static_cast<double>(r.end));
       auto shown = winner.empty() ? std::string("SPLIT") : winner;
@@ -874,8 +875,10 @@ struct Runtime::Impl {
   Json dash_snapshot(double now) {
     double wall = wall_s();
     Json snap = Json::object();
-    snap["mode"] = c.live ? "LIVE" : "PAPER";
+    // A live dry run reads the account and sends no order: not LIVE.
+    snap["mode"] = c.live ? (c.dry_run ? "LIVE DRY RUN" : "LIVE") : "PAPER";
     snap["clock"] = dash::et_clock(wall);
+    snap["uptime_s"] = now - start_mono;
     auto counter = [&](const char *key) -> std::uint64_t {
       auto it = sniper->n.find(key);
       return it == sniper->n.end() ? 0 : it->second;
@@ -1033,7 +1036,9 @@ struct Runtime::Impl {
     // SNIPER_REST_LIVE: our own order on the book and the time it has left
     // there. Built anew for every frame, so the time counts down live.
     if (c.live && c.s.rest_live) {
-      Json resting{{"on", rest_test && !rest_test->off}};
+      Json resting{{"on", rest_test && !rest_test->off},
+                   {"rested", counter("rest orders resting")},
+                   {"filled", counter("rest orders filled")}};
       if (rest_test && rest_test->off)
         resting["off"] = "off: " + rest_test->reason;
       for (auto &[id, o] : rest_book.orders()) {
@@ -1115,20 +1120,32 @@ struct Runtime::Impl {
                                    {"cost", pending_cost}}}};
     double realized = dollars(ledger.realized);
     Json position_value = unmarkable ? Json() : Json(active_value + pending_value);
+    // Won and lost rounds, all time like the realized P/L and the fees beside
+    // them: a round's settled positions together made or lost money.
+    const auto results = dash::settled_rounds(ledger.positions);
     Json account{{"realized", realized},
                  {"unrealized", unmarkable ? Json() : Json(unrealized)},
                  {"position_value", position_value},
                  {"fees", dollars(ledger.fees)},
-                 {"wins", dash_wins},
-                 {"losses", dash_losses}};
+                 {"wins", results.unknown ? Json() : Json(results.won)},
+                 {"losses", results.unknown ? Json() : Json(results.lost)}};
     if (c.live) {
       account["kind"] = "LIVE";
       auto collateral = effective_balance();
       account.update(dash::live_balance_view(collateral ? std::optional(dollars(*collateral))
                                                        : std::nullopt,
                                               now - balance_at));
-      account["equity"] = !account["balance"].is_null() && !unmarkable
-                              ? Json(account["balance"].get<double>() + active_value + pending_value)
+      // Settled winnings still held as tokens are worth their payout but are
+      // not collateral until redeemed. Unknown (no reading, or the reading is
+      // stale or failed) leaves equity unknown too, never understated.
+      auto redeemable = dash::unredeemed_value(ledger.positions, redeem_held);
+      if (redeemable && *redeemable > 0 &&
+          (now - redeem_read_at > 120 || !redeem_error.empty()))
+        redeemable.reset();
+      account["redeemable"] = redeemable ? Json(*redeemable) : Json();
+      account["equity"] = !account["balance"].is_null() && !unmarkable && redeemable
+                              ? Json(account["balance"].get<double>() + active_value +
+                                     pending_value + *redeemable)
                               : Json();
       account["total"] = unmarkable ? Json() : Json(realized + unrealized);
     } else {
@@ -1141,6 +1158,7 @@ struct Runtime::Impl {
     snap["account"] = std::move(account);
     // ---- settlement
     Json pending = Json::array();
+    double oldest_pending = 0;
     for (auto &[start, r] : rounds) {
       if (static_cast<double>(r.end) >= wall || ledger.settled_conditions.count(r.condition))
         continue;
@@ -1148,6 +1166,7 @@ struct Runtime::Impl {
           !ledger.awaiting(r.down))
         continue;
       double age = wall - static_cast<double>(r.end);
+      oldest_pending = std::max(oldest_pending, age);
       pending.push_back(Json{
           {"label", dash::et_label(static_cast<double>(r.start), static_cast<double>(r.end))},
           {"state", "PENDING SETTLEMENT"},
@@ -1176,34 +1195,24 @@ struct Runtime::Impl {
                               {"pending_count", waiting}};
     // ---- the live canary
     if (c.live) {
-      Json halted = Json::array();
+      std::vector<std::string> held;
       std::error_code ec;
-      if (wall < pause_until)
-        halted.push_back(pause_reason);
+      const std::string runtime_reason = wall < pause_until ? pause_reason : std::string();
+      if (!runtime_reason.empty())
+        held.push_back(runtime_reason);
       if (std::filesystem::exists(c.stop_file, ec))
-        halted.push_back("STOP_LIVE present: delete the stop file to allow new orders");
+        held.push_back("STOP_LIVE present: delete the stop file to allow new orders");
       if (journal.failed())
-        halted.push_back("audit or recorder failed");
-      const auto &state = ledger.canary;
+        held.push_back("audit or recorder failed");
       std::size_t unresolved = 0;
       for (auto &[id, i] : ledger.orders)
         if (i.unresolved() || i.status == "matched")
           ++unresolved;
-      snap["canary"] = Json{
-          {"halted", std::move(halted)},
-          {"orders", state.orders},
-          {"max_orders", c.canary_orders},
-          {"fills", state.fills},
-          {"max_fills", c.canary_fills},
-          {"spend", dollars(state.spend)},
-          {"max_spend", dollars(c.canary_spend)},
-          {"rounds", state.rounds.size()},
-          {"max_rounds", c.canary_rounds},
-          {"loss", dollars(state.settled_loss + ledger.open_cost())},
-          {"max_loss", dollars(c.canary_loss)},
-          {"guard", wall < pause_until ? "PAUSED" : "OK"},
-          {"guard_reason", wall < pause_until ? pause_reason : std::string()},
-          {"awaiting", unresolved}};
+      // The canary's own pause (a reached budget, or a fault's pause kept
+      // across a restart) holds orders too, and the limits shown are the ones
+      // that apply now.
+      snap["canary"] = canary_panel(c, ledger.canary, ledger.open_cost(), unresolved,
+                                    wall, std::move(held), runtime_reason);
     }
     // ---- network and health
     Json net_ms{{"coinbase", nullptr}, {"clob", nullptr}};
@@ -1262,7 +1271,10 @@ struct Runtime::Impl {
       add("USER WS", user && user->connected() ? "OK" : "DOWN", "");
     else
       add("USER WS", "ABSENT", "paper");
-    add("SETTLE", "OK", "pending " + std::to_string(waiting));
+    // A round's result is normally read a minute after it ends.
+    add("SETTLE", oldest_pending > 900 ? "WARN" : "OK",
+        "pending " + std::to_string(waiting) +
+            (waiting ? " oldest " + py::fixed(oldest_pending / 60, 0) + "m" : std::string()));
     add("LEDGER", "OK", "entries " + std::to_string(ledger.entries));
     add("JOURNAL", journal.failed() ? "ERROR" : "OK", "");
     add("CLOCK", clock.at < 0 ? "WAIT" : now - clock.at > 60 ? "WARN" : "OK",
@@ -3320,6 +3332,17 @@ struct Runtime::Impl {
     for (auto &[id, i] : ledger.orders)
       if (i.unresolved() || i.status == "matched")
         out->unresolved.push_back(id);
+    // Settled winners still to be read in the wallet: once one reads empty it
+    // was redeemed (or moved) and is not read again.
+    if (c.live)
+      for (auto &[token, p] : ledger.positions)
+        if (dash::redeem_candidate(p)) {
+          auto seen = redeem_held.find(token);
+          if (seen == redeem_held.end())
+            out->redeem_unread = true;
+          if (seen == redeem_held.end() || seen->second > 0)
+            out->redeem.push_back(token);
+        }
     out->since =
         ledger.canary.started > 0 ? ledger.canary.started - 5 : wall_s() - 5;
     // An order from an earlier session still needs its own trades read back.
@@ -3633,6 +3656,7 @@ struct Runtime::Impl {
     settler = std::thread([this] {
       background_priority();
       RestClient rest(c.live, &blocked);
+      double redeem_checked = -1e30;
       while (!workers_stop) {
         auto w = work.load();
         for (auto r : w->unsettled) {
@@ -3653,6 +3677,42 @@ struct Runtime::Impl {
                 }
               });
           } catch (...) {
+          }
+        }
+        // Settled winnings still in the wallet as tokens: read at every pass
+        // (5 s, the collateral's own pace, so a redemption by hand is not
+        // counted twice for long) while they fit one RPC batch, else every
+        // 30 s; and at the next pass when a winner has never been read.
+        const double redeem_every = w->redeem.size() <= 25 ? 4.5 : 30;
+        if (c.live && !workers_stop && !w->redeem.empty() &&
+            (w->redeem_unread || mono_s() - redeem_checked >= redeem_every)) {
+          redeem_checked = mono_s();
+          try {
+            auto held = token_balances(rest, c.rpc, c.funder, w->redeem);
+            post("redemption check", [this, held = std::move(held)] {
+              for (auto &[token, shares] : held) {
+                auto old = redeem_held.find(token);
+                if (old == redeem_held.end() || old->second != shares)
+                  audit({{"result", "redeem_balance"},
+                         {"token", token},
+                         {"shares", dollars(shares)},
+                         {"was", old == redeem_held.end() ? Json()
+                                                          : Json(dollars(old->second))}});
+                redeem_held[token] = shares;
+              }
+              redeem_read_at = mono_s();
+              redeem_error.clear();
+            });
+          } catch (const std::exception &e) {
+            post("redemption check", [this, why = std::string(e.what()).substr(0, 160)] {
+              if (why != redeem_error) {
+                audit({{"result", "redeem_balance_unknown"},
+                       {"reason", "wallet token balance unreadable: " + why},
+                       {"effect", "redeemable and equity shown as unknown"}});
+                dash_event("redeem", "wallet token balance unreadable: " + why, "warn");
+              }
+              redeem_error = why;
+            });
           }
         }
         std::unique_lock lock(wake_mutex);

@@ -77,7 +77,7 @@ if(SNIPER_TESTS)
     tests/audit_market_tests.cpp tests/audit_runtime_tests.cpp
     tests/audit_network_tests.cpp tests/edge_report_tests.cpp
     tests/miss_report_tests.cpp tests/latency_crypto_tests.cpp
-    tests/rest_tests.cpp)
+    tests/rest_tests.cpp tests/audit_accuracy_tests.cpp)
   target_include_directories(sniper-tests PRIVATE tools/report)
   target_link_libraries(sniper-tests PRIVATE sniper_core GTest::gtest_main)
   set_target_properties(sniper-tests PROPERTIES INSTALL_RPATH "$ORIGIN/lib;$ORIGIN/../lib")
