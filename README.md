@@ -41,6 +41,13 @@ run `nice python3 -I tools/report/live_check.py` from the bot's folder
 (`--hours 6` for a shorter window, `--state state/paper` for paper). It only
 reads, and prints no key.
 
+To see which BTC feed fires the bot's trigger first on this server (Coinbase,
+Binance spot or Binance futures), run `python3 tools/report/feed_race.py 60`:
+it listens to all three for an hour, puts each through the bot's own trigger
+rule (0.5 bp in 250 ms) and says, move by move, which one fired first and by
+how many milliseconds. Public market data only: no key, no order, nothing
+written, lowest CPU priority, standard Python only.
+
 ## Execution latency and VPS measurements
 
 The order sender reuses its HTTP/2 TLS connection, and WebSocket feeds drive
